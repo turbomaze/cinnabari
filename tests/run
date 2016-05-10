@@ -1,0 +1,13 @@
+#!/bin/bash
+
+testsDirectory="$( dirname "${BASH_SOURCE[0]}")"
+vendorDirectory="${testsDirectory}/vendor";
+phpunitPath="${vendorDirectory}/bin/phpunit"
+
+if [ ! -f "$phpunitPath" ]
+then
+	composer update
+fi
+
+# Run the unit tests
+"$phpunitPath"

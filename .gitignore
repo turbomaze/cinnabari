@@ -1,0 +1,4 @@
+/.idea/
+/.source
+/tests/coverage/
+/tests/vendor/
