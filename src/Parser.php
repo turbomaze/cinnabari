@@ -38,105 +38,289 @@ class Parser
     const BINARY = 2;
 
     // Operator Associativity
-    const NON_ASSOCIATIVE = 0;
-    const LEFT_ASSOCIATIVE = 1;
-    const RIGHT_ASSOCIATIVE = 2;
+    const ASSOCIATIVITY_NONE = 0;
+    const ASSOCIATIVITY_LEFT = 1;
+    const ASSOCIATIVITY_RIGHT = 2;
+
+    // Errors
+    const ERROR_UNEXPECTED_INPUT = 1;
 
     private static $operators = array(
         '.' => array(
             'name' => 'dot',
             'precedence' => 7,
             'arity' => self::BINARY,
-            'associativity' => self::LEFT_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_LEFT
         ),
         '*' => array(
             'name' => 'times',
             'precedence' => 6,
             'arity' => self::BINARY,
-            'associativity' => self::LEFT_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_LEFT
         ),
         '/' => array(
             'name' => 'divides',
             'precedence' => 6,
             'arity' => self::BINARY,
-            'associativity' => self::LEFT_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_LEFT
         ),
         '+' => array(
             'name' => 'plus',
             'precedence' => 5,
             'arity' => self::BINARY,
-            'associativity' => self::LEFT_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_LEFT
         ),
         '-' => array(
             'name' => 'minus',
             'precedence' => 5,
             'arity' => self::BINARY,
-            'associativity' => self::LEFT_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_LEFT
         ),
         '<' => array(
             'name' => 'less',
             'precedence' => 4,
             'arity' => self::BINARY,
-            'associativity' => self::NON_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_NONE
         ),
         '<=' => array(
             'name' => 'lessEqual',
             'precedence' => 4,
             'arity' => self::BINARY,
-            'associativity' => self::NON_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_NONE
         ),
         '=' => array(
             'name' => 'equal',
             'precedence' => 4,
             'arity' => self::BINARY,
-            'associativity' => self::NON_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_NONE
         ),
         '!=' => array(
             'name' => 'notEqual',
             'precedence' => 4,
             'arity' => self::BINARY,
-            'associativity' => self::NON_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_NONE
         ),
         '>=' => array(
             'name' => 'greaterEqual',
             'precedence' => 4,
             'arity' => self::BINARY,
-            'associativity' => self::NON_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_NONE
         ),
         '>' => array(
             'name' => 'greater',
             'precedence' => 4,
             'arity' => self::BINARY,
-            'associativity' => self::NON_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_NONE
         ),
         'not' => array(
             'name' => 'not',
             'precedence' => 3,
             'arity' => self::UNARY,
-            'associativity' => self::RIGHT_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_RIGHT
         ),
         'and' => array(
             'name' => 'and',
             'precedence' => 2,
             'arity' => self::BINARY,
-            'associativity' => self::LEFT_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_LEFT
         ),
         'or' => array(
             'name' => 'or',
             'precedence' => 1,
             'arity' => self::BINARY,
-            'associativity' => self::LEFT_ASSOCIATIVE
+            'associativity' => self::ASSOCIATIVITY_LEFT
         )
     );
 
     public function parse($tokens)
     {
-        if (!is_array($tokens)) {
-            return null;
-        }
-
         return self::getExpression($tokens);
     }
+
+    /*
+    private static function validateTokens($tokens)
+    {
+        if (!is_array($tokens)) {
+            self::errorUnexpectedValue();
+        }
+
+        $i = 0;
+
+        if (!array_key_exists($i, $tokens)) {
+            self::errorExpectedArrayKey(0);
+        }
+
+        foreach ($tokens as $key => $token) {
+            if ($key !== $i++) {
+                self::errorUnexpectedArrayKey($key);
+            }
+
+            try {
+                self::validateToken($token);
+            } catch (Exception $exception) {
+                self::errorUnexpectedArrayValue($key, $exception->getData());
+            }
+        }
+    }
+
+    private static function validateToken($token)
+    {
+        if (!is_array($token)) {
+            self::errorUnexpectedValue();
+        }
+
+        list($type, $value) = each($token);
+
+        if ($type === null) {
+            // TODO: what key should we use?
+            self::errorExpectedArrayKey(null);
+        }
+
+        $name = self::getTypeName($type);
+
+        if ($name === null) {
+            self::errorUnexpectedArrayKey($type);
+        }
+
+        try {
+            $validator = 'self::validate' . ucfirst($name);
+            call_user_func($validator, $value);
+        } catch (Exception $exception) {
+            self::errorUnexpectedArrayValue($type, $exception->getData());
+        }
+
+        $key = key($token);
+
+        if ($key !== null) {
+            self::errorUnexpectedArrayKey($key);
+        }
+    }
+
+    private static function getTypeName($type)
+    {
+        switch ($type) {
+            case Lexer::TYPE_PARAMETER:
+                return 'parameter';
+
+            case Lexer::TYPE_PROPERTY:
+                return 'property';
+
+            case Lexer::TYPE_FUNCTION:
+                return 'function';
+
+            case Lexer::TYPE_OPERATOR:
+                return 'operator';
+
+            case Lexer::TYPE_OBJECT:
+                return 'object';
+
+            case Lexer::TYPE_GROUP:
+                return 'group';
+
+            default:
+                return null;
+        }
+    }
+
+    protected static function validateParameter($input)
+    {
+        if (!is_string($input)) {
+            self::errorUnexpectedValue();
+        }
+    }
+
+    protected static function validateProperty($input)
+    {
+        if (!is_string($input)) {
+            self::errorUnexpectedValue();
+        }
+    }
+
+    protected static function validateFunction($input)
+    {
+        if (!is_array($input)) {
+            self::errorUnexpectedValue();
+        }
+
+        list($key, $value) = each($input);
+
+        if ($key === null) {
+            self::errorExpectedArrayKey(0);
+        }
+
+        if ($key !== 0) {
+            self::errorUnexpectedArrayKey($key);
+        }
+
+        if (!is_string($value)) {
+            self::errorUnexpectedArrayValue($key, null);
+        }
+
+        unset($input[$key]);
+
+        $i = 1;
+
+        foreach ($input as $key => $value) {
+            if ($key !== $i++) {
+                self::errorUnexpectedArrayKey($key);
+            }
+
+            try {
+                self::validateTokens($value);
+            } catch (Exception $exception) {
+                self::errorUnexpectedArrayValue($key, $exception->getData());
+            }
+        }
+    }
+
+    protected static function validateOperator($input)
+    {
+        if (!is_string($input)) {
+            self::errorUnexpectedValue();
+        }
+    }
+
+    protected static function validateObject($object)
+    {
+        if (!is_array($object)) {
+            self::errorUnexpectedValue();
+        }
+    }
+
+    protected static function validateGroup($group)
+    {
+        // TODO
+        try {
+            self::validateTokens($group);
+        } catch (Exception $exception) {
+            $code = $exception->getCode();
+            $data = $exception->getData();
+            $data[] = null;
+
+            throw new Exception($code, $data);
+        }
+    }
+
+    private static function errorUnexpectedValue()
+    {
+        throw new Exception(self::ERROR_UNEXPECTED_INPUT, null);
+    }
+
+    private static function errorExpectedArrayKey($key)
+    {
+        throw new Exception(self::ERROR_UNEXPECTED_INPUT, array(false, null, null));
+    }
+
+    private static function errorUnexpectedArrayKey($key)
+    {
+        throw new Exception(self::ERROR_UNEXPECTED_INPUT, array(false, $key, null));
+    }
+
+    private static function errorUnexpectedArrayValue($key, $position)
+    {
+        throw new Exception(self::ERROR_UNEXPECTED_INPUT, array(true, $key, $position));
+    }
+    */
 
     private static function getExpression($tokens)
     {
@@ -175,7 +359,7 @@ class Parser
     {
         $operatorA = self::getOperator($token);
 
-        $isLeftAssociativeA = $operatorA['associativity'] !== self::RIGHT_ASSOCIATIVE;
+        $isLeftAssociativeA = $operatorA['associativity'] !== self::ASSOCIATIVITY_RIGHT;
         $precedenceA = $operatorA['precedence'];
 
         for ($i = count($tokens) - 1; -1 < $i; --$i) {
@@ -203,10 +387,6 @@ class Parser
     {
         $token = array_pop($tokens);
 
-        if (!is_array($token)) {
-            return null;
-        }
-
         list($type, $value) = each($token);
 
         switch ($type) {
@@ -225,11 +405,8 @@ class Parser
             case Lexer::TYPE_GROUP:
                 return self::getExpression($value);
 
-            case Lexer::TYPE_OPERATOR:
+            default: // Lexer::TYPE_OPERATOR:
                 return self::getOperatorExpression($value, $tokens);
-
-            default:
-                return null;
         }
     }
 

@@ -2,6 +2,7 @@
 
 namespace Datto\Cinnabari\Tests;
 
+use Datto\Cinnabari\Exception;
 use Datto\Cinnabari\Lexer;
 use PHPUnit_Framework_TestCase;
 
@@ -17,34 +18,43 @@ class LexerTest extends PHPUnit_Framework_TestCase
         $this->lexer = new Lexer();
     }
 
-    public function testInvalidInputNull()
+    public function testNull()
     {
         $input = null;
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => null
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
-    public function testInvalidInputInteger()
+    public function testInteger()
     {
         $input = 5;
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => null
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
-    public function testInvalidInputEmptyString()
+    public function testEmptyString()
     {
         $input = '';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 0
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
-    public function testValidParameter()
+    public function testParameter()
     {
         $input = ':_0aA';
 
@@ -52,39 +62,46 @@ class LexerTest extends PHPUnit_Framework_TestCase
             array(Lexer::TYPE_PARAMETER => '_0aA')
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
-    public function testValidWhitespace()
+    public function testWhitespace()
     {
         $input = " \t \n :_0aA \n \t ";
 
-        $output = array(
-            array(Lexer::TYPE_PARAMETER => '_0aA')
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 0
         );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
-    public function testInvalidParameterIllegalCharacter()
+    public function testParameterInvalidCharacter()
     {
         $input = ':*';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 0
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
-    public function testInvalidParameterIllegalSpace()
+    public function testParameterInvalidSpace()
     {
         $input = ': *';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 0
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
-    public function testValidProperty()
+    public function testProperty()
     {
         $input = '_';
 
@@ -92,16 +109,19 @@ class LexerTest extends PHPUnit_Framework_TestCase
             array(Lexer::TYPE_PROPERTY => '_')
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
-    public function testInvalidProperty()
+    public function testPropertyInvalidCharacter()
     {
         $input = '*';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 0
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testFunctionZeroArguments()
@@ -112,10 +132,10 @@ class LexerTest extends PHPUnit_Framework_TestCase
             array(Lexer::TYPE_FUNCTION => array('f'))
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
-    public function testFunctionOneValidArgument()
+    public function testFunctionOneArgument()
     {
         $input = 'f(:x)';
 
@@ -125,23 +145,25 @@ class LexerTest extends PHPUnit_Framework_TestCase
                 array(
                     array(Lexer::TYPE_PARAMETER => 'x')
                 )
-            )
-            )
+            ))
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
     public function testFunctionOneInvalidArgument()
     {
         $input = 'f(*)';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 2
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
-    public function testFunctionTwoValidArguments()
+    public function testFunctionTwoArguments()
     {
         $input = 'f(:x, y)';
 
@@ -154,47 +176,58 @@ class LexerTest extends PHPUnit_Framework_TestCase
                 array(
                     array(Lexer::TYPE_PROPERTY => 'y')
                 )
-            )
-            )
+            ))
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
     public function testFunctionOneValidArgumentOneInvalidArgument()
     {
         $input = 'f(:x, *)';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 6
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testFunctionMissingClosingParenthesis()
     {
         $input = 'f(';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 2
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testGroupEmptyBody()
     {
         $input = '()';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 1
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testGroupMissingClosingParenthesis()
     {
         $input = '(';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 1
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testGroupParameterBody()
@@ -204,20 +237,22 @@ class LexerTest extends PHPUnit_Framework_TestCase
         $output = array(
             array(Lexer::TYPE_GROUP => array(
                 array(Lexer::TYPE_PARAMETER => 'x')
-            )
-            )
+            ))
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
     public function testObjectEmptyBody()
     {
         $input = '{}';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 1
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testObjectParameterValue()
@@ -231,11 +266,10 @@ class LexerTest extends PHPUnit_Framework_TestCase
                 'x' => array(
                     array(Lexer::TYPE_PARAMETER => 'x')
                 )
-            )
-            )
+            ))
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
     public function testObjectPropertyValue()
@@ -249,11 +283,10 @@ class LexerTest extends PHPUnit_Framework_TestCase
                 'x' => array(
                     array(Lexer::TYPE_PROPERTY => 'x')
                 )
-            )
-            )
+            ))
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
     public function testObjectInvalidKey()
@@ -262,9 +295,12 @@ class LexerTest extends PHPUnit_Framework_TestCase
             6: x
         }';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 5
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testObjectMissingKeyValueSeparator()
@@ -273,9 +309,12 @@ class LexerTest extends PHPUnit_Framework_TestCase
             "x" x
         }';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 8
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testObjectInvalidProperty()
@@ -284,20 +323,25 @@ class LexerTest extends PHPUnit_Framework_TestCase
             "x": *
         }';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 10
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testObjectMissingClosingBrace()
     {
         $input = '{
-            "x": x
-        ';
+            "x": x';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 11
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testObjectPropertyValueParameterValue()
@@ -315,11 +359,10 @@ class LexerTest extends PHPUnit_Framework_TestCase
                 'y' => array(
                     array(Lexer::TYPE_PROPERTY => 'x')
                 )
-            )
-            )
+            ))
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
     public function testObjectDuplicateKey()
@@ -334,11 +377,10 @@ class LexerTest extends PHPUnit_Framework_TestCase
                 'x' => array(
                     array(Lexer::TYPE_PROPERTY => 'x')
                 )
-            )
-            )
+            ))
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
     public function testObjectMissingPropertySeparator()
@@ -348,9 +390,12 @@ class LexerTest extends PHPUnit_Framework_TestCase
             "x": x
         }';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 12
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testObjectPropertyValueInvalidValue()
@@ -360,9 +405,12 @@ class LexerTest extends PHPUnit_Framework_TestCase
             "y": *
         }';
 
-        $output = null;
+        $exception = array(
+            'code' => Lexer::ERROR_UNEXPECTED_INPUT,
+            'data' => 21
+        );
 
-        $this->verify($input, $output);
+        $this->verifyException($input, $exception);
     }
 
     public function testUnaryExpressionParameter()
@@ -374,7 +422,7 @@ class LexerTest extends PHPUnit_Framework_TestCase
             array(Lexer::TYPE_PARAMETER => 'x')
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
     public function testBinaryExpressionPropertyDotFunction()
@@ -387,7 +435,7 @@ class LexerTest extends PHPUnit_Framework_TestCase
             array(Lexer::TYPE_FUNCTION => array('f'))
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
     public function testBinaryExpressionExpressionPlusExpression()
@@ -401,11 +449,10 @@ class LexerTest extends PHPUnit_Framework_TestCase
             array(Lexer::TYPE_OPERATOR => '+'),
             array(Lexer::TYPE_GROUP => array(
                 array(Lexer::TYPE_PARAMETER => 'c')
-            )
-            )
+            ))
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
     public function testBinaryExpressionOperators()
@@ -442,13 +489,29 @@ class LexerTest extends PHPUnit_Framework_TestCase
             array(Lexer::TYPE_PROPERTY => 'n'),
         );
 
-        $this->verify($input, $output);
+        $this->verifyOutput($input, $output);
     }
 
-    private function verify($input, $expectedOutput)
+    private function verifyOutput($input, $expectedOutput)
     {
         $actualOutput = $this->lexer->tokenize($input);
 
         $this->assertSame($expectedOutput, $actualOutput);
+    }
+
+    private function verifyException($input, $expected)
+    {
+        try {
+            $this->lexer->tokenize($input);
+
+            $actual = null;
+        } catch (Exception $exception) {
+            $actual = array(
+                'code' => $exception->getCode(),
+                'data' => $exception->getData()
+            );
+        }
+
+        $this->assertSame($expected, $actual);
     }
 }

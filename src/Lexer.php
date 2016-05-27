@@ -62,16 +62,24 @@ class Lexer
     const TYPE_GROUP = 5;
     const TYPE_OPERATOR = 6;
 
+    const ERROR_UNEXPECTED_INPUT = 1;
+
+    /**
+     * @param string $input
+     * @return array
+     * @throws Exception
+     */
     public function tokenize($input)
     {
         if (!is_string($input)) {
-            return null;
+            throw new Exception(self::ERROR_UNEXPECTED_INPUT, null);
         }
 
-        $input = trim($input);
+        $inputLength = strlen($input);
 
         if (!self::getExpression($input, $output) || ($input !== false)) {
-            return null;
+            $position = $inputLength - strlen($input);
+            throw new Exception(self::ERROR_UNEXPECTED_INPUT, $position);
         }
 
         return $output;

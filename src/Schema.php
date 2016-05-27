@@ -24,13 +24,68 @@
 
 namespace Datto\Cinnabari;
 
-interface Schema
+class Schema
 {
-    public function setRelease($release);
+    /** @var array */
+    private $schema;
 
-    public function getDatabaseDefinition($property);
+    public function __construct($schema)
+    {
+        $this->schema = $schema;
+    }
 
-    public function getDefinition($class, $property);
+    public function getPropertyDefinition($class, $property)
+    {
+        // TODO: throw exception
+        $definition = &$this->schema['classes'][$class][$property];
 
-    public function getUnique($table);
+        if ($definition === null) {
+            return null;
+        }
+
+        $type = reset($definition);
+        $path = array_slice($definition, 1, -1);
+        $value = end($definition);
+
+        return array($type, $path, $value);
+    }
+
+    public function getListDefinition($list)
+    {
+        // TODO: throw exception
+        $definition = &$this->schema['lists'][$list];
+
+        if ($definition === null) {
+            return null;
+        }
+
+        // array($table, $expression, $hasZero)
+        return $definition;
+    }
+
+    public function getValueDefinition($tableIdentifier, $value)
+    {
+        // TODO: throw exception
+        $definition = &$this->schema['values'][$tableIdentifier][$value];
+
+        if ($definition === null) {
+            return null;
+        }
+
+        // array($expression, $hasZero)
+        return $definition;
+    }
+
+    public function getJoin($table, $name)
+    {
+        // TODO: throw exception
+        $definition = &$this->schema['connections'][$table][$name];
+
+        return $definition;
+    }
+
+    public function getId($table)
+    {
+        return null;
+    }
 }

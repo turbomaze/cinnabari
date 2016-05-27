@@ -24,6 +24,8 @@
 
 namespace Datto\Cinnabari\Format;
 
+use Datto\Cinnabari\Php\Output;
+
 class Arguments
 {
     /** @var array */
@@ -38,12 +40,15 @@ class Arguments
         $this->output = array();
     }
 
-    public function useArgument($name, $type)
+    public function useArgument($name, $neededType)
     {
-        if (
-            !array_key_exists($name, $this->input) ||
-            (gettype($this->input[$name]) !== $type)
-        ) {
+        if (!array_key_exists($name, $this->input)) {
+            return null;
+        }
+
+        $userType = gettype($this->input[$name]);
+
+        if (($userType !== 'NULL') && ($userType !== $neededType)) {
             return null;
         }
 

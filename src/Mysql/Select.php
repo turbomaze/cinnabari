@@ -28,6 +28,9 @@ use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 class Select
 {
+    const JOIN_INNER = 1;
+    const JOIN_LEFT = 2;
+
     /** @var string[] */
     private $tables;
 
@@ -44,6 +47,13 @@ class Select
         $this->where = null;
     }
 
+    /**
+     * @param string $name
+     * Mysql table identifier (e.g. "`people`")
+     * 
+     * @return int
+     * Numeric table identifier (e.g. 0)
+     */
     public function setTable($name)
     {
         $countTables = count($this->tables);
@@ -53,6 +63,69 @@ class Select
         }
 
         return self::insert($this->tables, $name);
+    }
+
+    public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $type)
+    {
+        if (!self::isDefined($this->tables, $tableAId)) {
+            return null;
+        }
+
+        $tableIdentifierA = self::getIdentifier($tableAId);
+
+        $key = json_encode(array($tableIdentifierA, $tableBIdentifier, $mysqlExpression, $type));
+
+        return self::insert($this->tables, $key);
+    }
+
+    public function setWhere(AbstractExpression $expression)
+    {
+        $this->where = $expression;
+    }
+
+    public function addColumn($tableId, $column)
+    {
+        if (!self::isDefined($this->tables, $tableId)) {
+            return null;
+        }
+
+        $table = self::getIdentifier($tableId);
+        $name = self::getAbsoluteExpression($table, $column);
+
+        return self::insert($this->columns, $name);
+    }
+
+    public function getMysql()
+    {
+        if (!$this->isValid()) {
+            return null;
+        }
+
+        $mysql = $this->getColumns() .
+            $this->getTables() .
+            $this->getWhereClause();
+
+        return rtrim($mysql, "\n");
+    }
+
+    public function getTable($id)
+    {
+        $name = array_search($id, $this->tables, true);
+
+        if (!is_string($name)) {
+            return null;
+        }
+
+        if (0 < $id) {
+            list(, $name) = json_decode($name);
+        }
+
+        return $name;
+    }
+
+    public static function getAbsoluteExpression($context, $expression)
+    {
+        return preg_replace('~`.*?`~', "{$context}.\$0", $expression);
     }
 
     private static function insert(&$array, $key)
@@ -66,27 +139,9 @@ class Select
         return $id;
     }
 
-    public function addColumn($tableId, $column)
+    private static function isDefined($array, $id)
     {
-        if (!is_int($tableId) || ($tableId < 0)) {
-            return null;
-        }
-
-        $countTables = count($this->tables);
-
-        if ($countTables <= $tableId) {
-            return null;
-        }
-
-        $table = self::getIdentifier($tableId);
-        $name = self::getAbsoluteExpression($table, $column);
-
-        return self::insert($this->columns, $name);
-    }
-
-    public function setWhere(AbstractExpression $expression)
-    {
-        $this->where = $expression;
+        return is_int($id) && (-1 < $id) && ($id < count($array));
     }
 
     private static function getIdentifier($name)
@@ -94,42 +149,17 @@ class Select
         return "`{$name}`";
     }
 
-    public static function getAbsoluteExpression($context, $expression)
-    {
-        return preg_replace('~`.*?`~', "{$context}.\$0", $expression);
-    }
-
-    public function getMysql()
-    {
-        if (!$this->isValid()) {
-            return null;
-        }
-
-        $table = $this->getTable();
-        $columns = "\t" . implode(",\n\t", $this->getColumns());
-
-        $mysql = "SELECT\n{$columns}\n\tFROM {$table}";
-
-        if ($this->where !== null) {
-            $where = $this->where->getMysql();
-            $mysql .= "\n\tWHERE {$where}";
-        }
-
-        return $mysql;
-    }
-
     private function isValid()
     {
         return (0 < count($this->tables)) && (0 < count($this->columns));
     }
 
-    private function getTable()
+    private function getColumns()
     {
-        list($name, $id) = each($this->tables);
-        return self::getAliasedName($name, $id);
+        return "SELECT\n\t" . implode(",\n\t", $this->getColumnNames()) . "\n";
     }
 
-    private function getColumns()
+    private function getColumnNames()
     {
         $columns = array();
 
@@ -138,6 +168,45 @@ class Select
         }
 
         return $columns;
+    }
+
+    private function getTables()
+    {
+        list($table, $id) = each($this->tables);
+
+        $mysql = "\tFROM " . self::getAliasedName($table, $id) . "\n";
+
+        $tables = array_slice($this->tables, 1);
+
+        foreach ($tables as $joinJson => $id) {
+            list($tableAIdentifier, $tableBIdentifier, $expression, $type) = json_decode($joinJson, true);
+
+            $joinIdentifier = self::getIdentifier($id);
+
+            $from = array('`0`', '`1`');
+            $to = array($tableAIdentifier, $joinIdentifier);
+            $expression = str_replace($from, $to, $expression);
+
+            if ($type === self::JOIN_INNER) {
+                $mysqlJoin = 'INNER JOIN';
+            } else {
+                $mysqlJoin = 'LEFT JOIN';
+            }
+
+            $mysql .= "\t{$mysqlJoin} {$tableBIdentifier} AS {$joinIdentifier} ON {$expression}\n";
+        }
+
+        return $mysql;
+    }
+
+    private function getWhereClause()
+    {
+        if ($this->where === null) {
+            return null;
+        }
+
+        $where = $this->where->getMysql();
+        return "\tWHERE {$where}\n";
     }
 
     private static function getAliasedName($name, $id)
