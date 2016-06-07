@@ -83,7 +83,7 @@ class Select
         $this->where = $expression;
     }
 
-    public function addColumn($tableId, $column)
+    public function addValue($tableId, $column)
     {
         if (!self::isDefined($this->tables, $tableId)) {
             return null;

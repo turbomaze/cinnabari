@@ -42,6 +42,16 @@ use Datto\Cinnabari\Mysql\Expression\OperatorPlus;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 
+/**
+ * Class Compiler
+ * @package Datto\Cinnabari
+ *
+ * EBNF:
+ *
+ * request = list, [ filter-function ], map-function
+ * map-argument = path | property | object | map
+ * object-value = path | property | object | map
+ */
 class Compiler
 {
     const ERROR_SYNTAX = 1;
@@ -81,16 +91,20 @@ class Compiler
         $this->phpOutput = null;
 
         if (!$this->getArrayProperty()) {
-            return array(null, null, null);
+            return null;
         }
 
         $mysql = $this->mysql->getMysql();
         $formatInput = $this->arguments->getPhp();
 
+        if (!isset($mysql, $formatInput, $this->phpOutput)) {
+            return null;
+        }
+
         return array($mysql, $formatInput, $this->phpOutput);
     }
 
-    protected function getArrayProperty()
+    private function getArrayProperty()
     {
         if (!self::scanPath($this->request, $this->request)) {
             return false;
@@ -102,7 +116,8 @@ class Compiler
             return false;
         }
 
-        list($class, $path, $list) = $this->schema->getPropertyDefinition('Database', $array);
+        list($class, $path) = $this->schema->getPropertyDefinition('Database', $array);
+        $list = array_pop($path);
 
         if (!isset($class, $path, $list)) {
             return false;
@@ -113,12 +128,14 @@ class Compiler
         $this->class = $class;
         $this->table = $this->mysql->setTable($table);
 
-        $idAlias = $this->mysql->addColumn($this->table, $id);
-        $this->addJoins($this->table, $table, $path);
+        $idAlias = $this->mysql->addValue($this->table, $id);
+        $this->connections($this->table, $table, $path);
 
         $this->getOptionalFilterFunction();
 
-        if (!$this->getMapFunction()) {
+        $this->request = reset($this->request);
+
+        if (!$this->readMap()) {
             return false;
         }
 
@@ -126,30 +143,7 @@ class Compiler
         return true;
     }
 
-    private function addJoins(&$contextId, $tableAIdentifier, &$path)
-    {
-        foreach ($path as $key => $value) {
-            if (substr($value, 0, 1) !== '*') {
-                return;
-            }
-
-            $joinName = substr($value, 1);
-            $definition = $this->schema->getJoin($tableAIdentifier, $joinName);
-
-            list($tableBIdentifier, $expression, $allowsZeroMatches, $allowsMultipleMatches) = $definition;
-
-            if (!$allowsZeroMatches && !$allowsMultipleMatches) {
-                $joinType = Select::JOIN_INNER;
-            } else {
-                $joinType = Select::JOIN_LEFT;
-            }
-
-            $contextId = $this->mysql->addJoin($contextId, $tableBIdentifier, $expression, $joinType);
-            unset($path[$key]);
-        }
-    }
-
-    protected function getOptionalFilterFunction()
+    private function getOptionalFilterFunction()
     {
         $token = current($this->request);
 
@@ -161,7 +155,7 @@ class Compiler
             return false;
         }
 
-        if (!$this->readExpression($this->class, $this->table, $arguments[0], $where)) {
+        if (!$this->getExpression($this->class, $this->table, $arguments[0], $where)) {
             return false;
         }
 
@@ -171,37 +165,14 @@ class Compiler
         return true;
     }
 
-    protected function getMapFunction()
+    private function getExpression($class, $tableId, $token, &$expression)
     {
-        $token = current($this->request);
-
-        if (!self::scanFunction($token, $name, $arguments)) {
-            return false;
-        }
-
-        if ($name !== 'map') {
-            return false;
-        }
-
-        if (
-            !$this->readProperty($this->class, $this->table, $arguments[0], $this->phpOutput) &&
-            !$this->readObject($this->class, $this->table, $arguments[0], $this->phpOutput)
-        ) {
-            return false;
-        }
-
-        array_shift($this->request);
-        return true;
+        return $this->getBooleanExpression($class, $tableId, $token, $expression)
+        || $this->getNumericExpression($class, $tableId, $token, $expression)
+        || $this->getStringExpression($class, $tableId, $token, $expression);
     }
 
-    private function readExpression($class, $tableId, $token, &$expression)
-    {
-        return $this->readBooleanExpression($class, $tableId, $token, $expression)
-            || $this->readNumericExpression($class, $tableId, $token, $expression)
-            || $this->readStringExpression($class, $tableId, $token, $expression);
-    }
-
-    private function readBooleanExpression($class, $tableId, $token, &$output)
+    private function getBooleanExpression($class, $tableId, $token, &$output)
     {
         list($type, $name) = $token;
 
@@ -243,27 +214,6 @@ class Compiler
         return $this->getProperty($class, $tableId, $name, Output::TYPE_BOOLEAN, $output);
     }
 
-    private function getProperty($class, $tableId, $name, $neededType, &$output)
-    {
-        $tableIdentifier = $this->mysql->getTable($tableId);
-
-        list($actualType, $path, $value) = $this->schema->getPropertyDefinition($class, $name);
-
-        if ($neededType !== $actualType) {
-            return false;
-        }
-
-        list($column, ) = $this->schema->getValueDefinition($tableIdentifier, $value);
-
-        $this->addJoins($tableId, $tableIdentifier, $path);
-
-        $tableAliasIdentifier = "`{$tableId}`";
-        $columnExpression = Select::getAbsoluteExpression($tableAliasIdentifier, $column);
-        $output = new Column($columnExpression);
-
-        return true;
-    }
-
     private function getBooleanFunction($class, $tableId, $name, $arguments, &$output)
     {
         $countArguments = count($arguments);
@@ -287,7 +237,7 @@ class Compiler
             return false;
         }
 
-        if (!$this->readBooleanExpression($class, $tableId, $argument, $childExpression)) {
+        if (!$this->getBooleanExpression($class, $tableId, $argument, $childExpression)) {
             return false;
         }
 
@@ -331,14 +281,14 @@ class Compiler
     {
         if (
             (
-                $this->readBooleanExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readBooleanExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getBooleanExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getBooleanExpression($class, $tableId, $argumentB, $expressionB)
             ) || (
-                $this->readNumericExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readNumericExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
             ) || (
-                $this->readStringExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readStringExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
             )
         ) {
             $expression = new OperatorEqual($expressionA, $expressionB);
@@ -351,8 +301,8 @@ class Compiler
     private function getAndFunction($class, $tableId, $argumentA, $argumentB, &$expression)
     {
         if (
-            !$this->readBooleanExpression($class, $tableId, $argumentA, $outputA) ||
-            !$this->readBooleanExpression($class, $tableId, $argumentB, $outputB)
+            !$this->getBooleanExpression($class, $tableId, $argumentA, $outputA) ||
+            !$this->getBooleanExpression($class, $tableId, $argumentB, $outputB)
         ) {
             return false;
         }
@@ -364,8 +314,8 @@ class Compiler
     private function getOrFunction($class, $tableId, $argumentA, $argumentB, &$expression)
     {
         if (
-            !$this->readBooleanExpression($class, $tableId, $argumentA, $outputA) ||
-            !$this->readBooleanExpression($class, $tableId, $argumentB, $outputB)
+            !$this->getBooleanExpression($class, $tableId, $argumentA, $outputA) ||
+            !$this->getBooleanExpression($class, $tableId, $argumentB, $outputB)
         ) {
             return false;
         }
@@ -388,11 +338,11 @@ class Compiler
     {
         if (
             (
-                $this->readNumericExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readNumericExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
             ) || (
-                $this->readStringExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readStringExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
             )
         ) {
             $expression = new OperatorLess($expressionA, $expressionB);
@@ -406,11 +356,11 @@ class Compiler
     {
         if (
             (
-                $this->readNumericExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readNumericExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
             ) || (
-                $this->readStringExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readStringExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
             )
         ) {
             $expression = new OperatorLessEqual($expressionA, $expressionB);
@@ -424,11 +374,11 @@ class Compiler
     {
         if (
             (
-                $this->readNumericExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readNumericExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
             ) || (
-                $this->readStringExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readStringExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
             )
         ) {
             $expression = new OperatorGreater($expressionA, $expressionB);
@@ -442,11 +392,11 @@ class Compiler
     {
         if (
             (
-                $this->readNumericExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readNumericExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
             ) || (
-                $this->readStringExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->readStringExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
+                $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
             )
         ) {
             $expression = new OperatorGreaterEqual($expressionA, $expressionB);
@@ -457,7 +407,7 @@ class Compiler
     }
 
 
-    private function readNumericExpression($class, $tableId, $token, &$output)
+    private function getNumericExpression($class, $tableId, $token, &$output)
     {
         $type = $token[0];
 
@@ -479,20 +429,20 @@ class Compiler
     private function getNumericParameter($name, &$output)
     {
         return $this->getParameter($name, 'integer', $output)
-            || $this->getParameter($name, 'double', $output);
+        || $this->getParameter($name, 'double', $output);
     }
 
     private function getNumericProperty($class, $tableId, $name, &$output)
     {
         return $this->getProperty($class, $tableId, $name, Output::TYPE_INTEGER, $output)
-            || $this->getProperty($class, $tableId, $name, Output::TYPE_FLOAT, $output);
+        || $this->getProperty($class, $tableId, $name, Output::TYPE_FLOAT, $output);
     }
 
     private function getNumericBinaryFunction($class, $tableId, $name, $argumentA, $argumentB, &$expression)
     {
         if (
-            !$this->readNumericExpression($class, $tableId, $argumentA, $expressionA) ||
-            !$this->readNumericExpression($class, $tableId, $argumentB, $expressionB)
+            !$this->getNumericExpression($class, $tableId, $argumentA, $expressionA) ||
+            !$this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
         ) {
             return false;
         }
@@ -519,7 +469,7 @@ class Compiler
         }
     }
 
-    private function readStringExpression($class, $tableId, $token, &$output)
+    private function getStringExpression($class, $tableId, $token, &$output)
     {
         $type = $token[0];
 
@@ -545,71 +495,161 @@ class Compiler
         return $this->getProperty($class, $tableId, $name, Output::TYPE_STRING, $output);
     }
 
-    private function readProperty($class, $tableId, $token, &$phpValue)
+    private function getProperty($class, $tableId, $name, $neededType, &$output)
     {
+        $tableIdentifier = $this->mysql->getTable($tableId);
+
+        list($actualType, $path) = $this->schema->getPropertyDefinition($class, $name);
+        $value = array_pop($path);
+
+        if ($neededType !== $actualType) {
+            return false;
+        }
+
+        list($column, ) = $this->schema->getValueDefinition($tableIdentifier, $value);
+
+        $this->connections($tableId, $tableIdentifier, $path);
+
+        $tableAliasIdentifier = "`{$tableId}`";
+        $columnExpression = Select::getAbsoluteExpression($tableAliasIdentifier, $column);
+        $output = new Column($columnExpression);
+
+        return true;
+    }
+
+    private function readExpression()
+    {
+        $token = $this->request;
+
+        $type = $token[0];
+
+        switch ($type) {
+            case Parser::TYPE_PATH:
+                return $this->readPath();
+
+            case Parser::TYPE_PROPERTY:
+                return $this->readProperty();
+
+            case Parser::TYPE_OBJECT:
+                return $this->readObject();
+
+            case Parser::TYPE_FUNCTION:
+                return $this->readMap();
+
+            default:
+                return false;
+        }
+    }
+
+    private function readPath()
+    {
+        if (!self::scanPath($this->request, $tokens)) {
+            return false;
+        }
+
+        $token = reset($tokens);
+
         if (!self::scanProperty($token, $property)) {
             return false;
         }
 
-        $tableIdentifier = $this->mysql->getTable($tableId);
+        array_shift($tokens);
 
-        list($type, $path, $value) = $this->schema->getPropertyDefinition($class, $property);
+        list($this->class, $path) = $this->schema->getPropertyDefinition($this->class, $property);
+
+        $tableIdentifier = $this->mysql->getTable($this->table);
+        $this->connections($this->table, $tableIdentifier, $path);
+        // TODO
+
+        if (count($tokens) === 1) {
+            $this->request = array_shift($tokens);
+        } else {
+            array_unshift($tokens, Parser::TYPE_PATH);
+            $this->request = $tokens;
+        }
+
+        return $this->readExpression();
+    }
+
+    private function readProperty()
+    {
+        if (!self::scanProperty($this->request, $property)) {
+            return false;
+        }
+
+        list($type, $path) = $this->schema->getPropertyDefinition($this->class, $property);
+
+        $value = array_pop($path);
+
+        $tableIdentifier = $this->mysql->getTable($this->table);
+        $this->connections($this->table, $tableIdentifier, $path);
+
         list($column, $isColumnNullable) = $this->schema->getValueDefinition($tableIdentifier, $value);
+        $columnId = $this->mysql->addValue($this->table, $column);
+        $this->phpOutput = Output::getValue($columnId, $isColumnNullable, $type);
 
-        $this->addJoins($tableId, $tableIdentifier, $path);
-        $columnId = $this->mysql->addColumn($tableId, $column);
-
-        $phpValue = Output::getValue($columnId, $isColumnNullable, $type);
         return true;
     }
 
-    private function readObject($class, $tableId, $token, &$format)
+    private function readObject()
     {
-        if (!self::scanObject($token, $object)) {
+        if (!self::scanObject($this->request, $object)) {
             return false;
         }
 
         $properties = array();
 
-        foreach ($object as $label => $propertyToken) {
-            if (
-                !$this->readObject($class, $tableId, $propertyToken, $phpValue) &&
-                !$this->readProperty($class, $tableId, $propertyToken, $phpValue) &&
-                !$this->readPath($class, $tableId, $propertyToken, $phpValue)
-            ) {
+        $class = $this->class;
+        $table = $this->table;
+
+        foreach ($object as $label => $this->request) {
+            if (!$this->readExpression()) {
                 return false;
             }
 
-            $properties[$label] = $phpValue;
+            $properties[$label] = $this->phpOutput;
+
+            $this->class = $class;
+            $this->table = $table;
         }
 
-        $format = Output::getObject($properties);
+        $this->phpOutput = Output::getObject($properties);
         return true;
     }
 
-    private function readPath ($class, $tableId, $pathToken, &$phpValue)
+    private function readMap()
     {
-        if (!self::scanPath($pathToken, $tokens)) {
+        if (!self::scanFunction($this->request, $name, $arguments)) {
             return false;
         }
 
-        $finalToken = array_pop($tokens);
-
-        foreach ($tokens as $token) {
-            if (!self::scanProperty($token, $propertyName)) {
-                return false;
-            }
-
-            list($class, $path) = $this->schema->getPropertyDefinition($class, $propertyName);
-
-            $tableIdentifier = $this->mysql->getTable($tableId);
-            $this->addJoins($tableId, $tableIdentifier, $path);
+        if ($name !== 'map') {
+            return false;
         }
 
-        var_dump($finalToken);
+        $this->request = reset($arguments);
 
-        return $this->readProperty($class, $tableId, $finalToken, $phpValue)
-            || $this->readObject($class, $tableId, $finalToken, $phpValue);
+        return $this->readExpression();
+    }
+
+    private function connections(&$contextId, $tableAIdentifier, $connections)
+    {
+        foreach ($connections as $key => $connection) {
+            $definition = $this->schema->getConnectionDefinition($tableAIdentifier, $connection);
+
+            list($tableBIdentifier, $expression, $id, $allowsZeroMatches, $allowsMultipleMatches) = $definition;
+
+            if (!$allowsZeroMatches && !$allowsMultipleMatches) {
+                $joinType = Select::JOIN_INNER;
+            } else {
+                $joinType = Select::JOIN_LEFT;
+
+                $idAlias = $this->mysql->addValue($this->table, $id);
+                $this->phpOutput = Output::getList($idAlias, $allowsZeroMatches, $allowsMultipleMatches, $this->phpOutput);
+            }
+
+            $contextId = $this->mysql->addJoin($contextId, $tableBIdentifier, $expression, $joinType);
+        }
     }
 
     private static function scanPath($token, &$tokens)
@@ -668,27 +708,23 @@ class Compiler
         return is_array($token) && ($token[0] === Parser::TYPE_FUNCTION);
     }
 
-    protected function getState()
+    private function getState()
     {
         return array(
-            self::copy($this->request),
-            self::copy($this->arguments),
-            self::copy($this->mysql),
-            self::copy($this->phpOutput)
+            'mysql' => $this->mysql,
+            'arguments' => $this->arguments,
+            'phpOutput' => $this->phpOutput,
+            'class' => $this->class,
+            'table' => $this->table
         );
     }
 
-    private static function copy($value)
+    private function setState($state)
     {
-        if (is_object($value)) {
-            return clone $value;
-        }
-
-        return $value;
-    }
-
-    protected function setState($state)
-    {
-        list($this->request, $this->arguments, $this->mysql, $this->phpOutput) = $state;
+        $this->mysql = $state['mysql'];
+        $this->arguments = $state['arguments'];
+        $this->phpOutput = $state['phpOutput'];
+        $this->class = $state['class'];
+        $this->table = $state['table'];
     }
 }

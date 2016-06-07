@@ -63,7 +63,7 @@ class Cinnabari
         return $parser->parse($tokens);
     }
 
-    private static function getResult($schema, $request, $arguments)
+    private static function getResult(Schema $schema, $request, $arguments)
     {
         try {
             $compiler = new Compiler($schema);

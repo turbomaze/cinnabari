@@ -44,10 +44,9 @@ class Schema
         }
 
         $type = reset($definition);
-        $path = array_slice($definition, 1, -1);
-        $value = end($definition);
+        $path = array_slice($definition, 1);
 
-        return array($type, $path, $value);
+        return array($type, $path);
     }
 
     public function getListDefinition($list)
@@ -76,10 +75,10 @@ class Schema
         return $definition;
     }
 
-    public function getJoin($table, $name)
+    public function getConnectionDefinition($tableIdentifier, $connection)
     {
         // TODO: throw exception
-        $definition = &$this->schema['connections'][$table][$name];
+        $definition = &$this->schema['connections'][$tableIdentifier][$connection];
 
         return $definition;
     }

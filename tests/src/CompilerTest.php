@@ -6,6 +6,7 @@ use Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Lexer;
 use Datto\Cinnabari\Parser;
 use Datto\Cinnabari\Schema;
+use Datto\Cinnabari\Translator;
 use PHPUnit_Framework_TestCase;
 
 /*
@@ -269,14 +270,14 @@ EOS;
     },
     "connections": {
         "`Friends`": {
-            "Friends": ["`Friends`", "`0`.`Friend` <=> `1`.`Person`", true, true]
+            "Friends": ["`Friends`", "`0`.`Friend` <=> `1`.`Person`", "`Person`", true, true]
         }
     }
 }
 EOS;
     }
 
-    public function testMapOffIndex()
+    public function testMapDepthZero()
     {
         $scenario = self::getFriendsScenario();
 
@@ -309,7 +310,7 @@ EOS;
         $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
-    public function testMapOffIndexDepthOne()
+    public function testMapDepthOne()
     {
         $scenario = self::getFriendsScenario();
 
@@ -355,7 +356,7 @@ EOS;
         $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
-    public function testMapOffIndexDepthTwo()
+    public function testMapDepthTwo()
     {
         $scenario = self::getFriendsScenario();
 
@@ -414,6 +415,133 @@ EOS;
         $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
+    private static function getRelationshipsScenario()
+    {
+        /*
+        DROP DATABASE IF EXISTS `database`;
+        CREATE DATABASE `database`;
+        USE `database`;
+
+        CREATE TABLE `Names` (
+            `Id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `First` VARCHAR(256) NOT NULL,
+            `Last` VARCHAR(256) NOT NULL
+        );
+
+        CREATE TABLE `PhoneNumbers` (
+            `Person` INT UNSIGNED NOT NULL,
+            `PhoneNumber` BIGINT UNSIGNED NOT NULL,
+            INDEX (`Person`)
+        );
+
+        CREATE TABLE `People` (
+            `Id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `Name` INT UNSIGNED NOT NULL,
+            `Age` TINYINT UNSIGNED NOT NULL,
+            CONSTRAINT `fk_People_Name__Names_Id` FOREIGN KEY (`Name`) REFERENCES `Names` (`Id`),
+            CONSTRAINT `fk_People_Id__PhoneNumbers_Person` FOREIGN KEY (`Id`) REFERENCES `PhoneNumbers` (`Person`)
+        );
+
+        CREATE TABLE `Spouses` (
+            `Person` INT UNSIGNED NOT NULL,
+            `Spouse` INT UNSIGNED NOT NULL,
+            CONSTRAINT `uc_Spouses_Person` UNIQUE (`Person`),
+            CONSTRAINT `fk_Spouses_Spouse__People_Id` FOREIGN KEY (`Spouse`) REFERENCES `People` (`Id`)
+        );
+
+        CREATE TABLE `Friends` (
+            `Person` INT UNSIGNED NOT NULL,
+            `Friend` INT UNSIGNED NOT NULL
+        );
+
+        INSERT INTO `Names`
+            (`Id`, `First`, `Last`) VALUES
+            (1, 'Ann', 'Adams'),
+            (2, 'Bob', 'Baker'),
+            (3, 'Carl', 'Clay'),
+            (4, 'Mary', 'May');
+
+        INSERT INTO `PhoneNumbers`
+            (`Person`, `PhoneNumber`) VALUES
+            (1, 12025550164),
+            (1, 12025550182),
+            (2, 12025550110),
+            (3, 12025550194),
+            (4, 12025550180);
+
+        INSERT INTO `People`
+            (`Id`, `Name`, `Age`) VALUES
+            (1, 1, 21),
+            (2, 2, 28),
+            (3, 3, 18),
+            (4, 4, 26);
+
+        INSERT INTO `Spouses`
+            (`Person`, `Spouse`) VALUES
+            (2, 4),
+            (4, 2);
+
+        INSERT INTO `Friends`
+            (`Person`, `Friend`) VALUES
+            (1, 2),
+            (1, 3),
+            (3, 1);
+        */
+
+        return <<<'EOS'
+{
+    "classes": {
+        "Database": {
+            "people": ["Person", "People"]
+        },
+        "Person": {
+            "name": ["Name", "Name"],
+            "age": [2, "Age"],
+            "phones": [2, "Phones", "Number"],
+            "spouse": ["Person", "Spouse", "Person"],
+            "friends": ["Friend", "Friends"]
+        },
+        "Name": {
+            "first": [4, "First"],
+            "last": [4, "Last"]
+        },
+        "Friend": {
+            "id": [2, "Id"]
+        }
+    },
+    "values": {
+        "`People`": {
+            "Age": ["`Age`", false]
+        },
+        "`Names`": {
+            "First": ["`First`", false],
+            "Last": ["`Last`", false]
+        },
+        "`PhoneNumbers`": {
+            "Number": ["`PhoneNumber`", false]
+        },
+        "`Friends`": {
+            "Id": ["`Friend`", false]
+        }
+    },
+    "lists": {
+        "People": ["`People`", "`Id`", false]
+    },
+    "connections": {
+        "`People`": {
+            "Name": ["`Names`", "`0`.`Name` <=> `1`.`Id`", "`Id`", false, false],
+            "Phones": ["`PhoneNumbers`", "`0`.`Id` <=> `1`.`Person`", "`Person`", false, true],
+            "Spouse": ["`Spouses`", "`0`.`Id` <=> `1`.`Person`", "`Person`", true, false],
+            "Friends": ["`Friends`", "`0`.`Id` <=> `1`.`Person`", "`Person`", true, true]
+        },
+        "`Spouses`": {
+            "Person": ["`People`", "`0`.`Spouse` <=> `1`.`Id`", "`Id`", true, true]
+        }
+    }
+}
+EOS;
+    }
+
     private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
     {
         $scenario = json_decode($scenarioJson, true);
@@ -426,8 +554,8 @@ EOS;
         $tokens = $lexer->tokenize($method);
         $request = $parser->parse($tokens);
         $actual = $compiler->compile($request, $arguments);
-
         $expected = array($mysql, $phpInput, $phpOutput);
+
         $this->assertSame($expected, $actual);
     }
 }
