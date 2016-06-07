@@ -555,7 +555,19 @@ EOS;
         $request = $parser->parse($tokens);
         $actual = $compiler->compile($request, $arguments);
         $expected = array($mysql, $phpInput, $phpOutput);
-
-        $this->assertSame($expected, $actual);
+        
+        // strip nonessential mysql whitespace
+        $this->assertSame(
+            TestUtils::removeMySQLWhitespace($expected[0]),
+            TestUtils::removeMySQLWhitespace($actual[0])
+        );
+        
+        // strip nonessential php whitespace
+        for ($i = 1; $i <= 2; $i++) {
+            $this->assertSame(
+                TestUtils::removePHPWhitespace($expected[$i]),
+                TestUtils::removePHPWhitespace($actual[$i])
+            );
+        }
     }
 }
