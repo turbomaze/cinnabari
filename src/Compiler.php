@@ -644,8 +644,10 @@ class Compiler
             } else {
                 $joinType = Select::JOIN_LEFT;
 
-                $idAlias = $this->mysql->addValue($this->table, $id);
-                $this->phpOutput = Output::getList($idAlias, $allowsZeroMatches, $allowsMultipleMatches, $this->phpOutput);
+                if ($this->phpOutput !== null) {
+                    $idAlias = $this->mysql->addValue($this->table, $id);
+                    $this->phpOutput = Output::getList($idAlias, $allowsZeroMatches, $allowsMultipleMatches, $this->phpOutput);
+                }
             }
 
             $contextId = $this->mysql->addJoin($contextId, $tableBIdentifier, $expression, $joinType);
