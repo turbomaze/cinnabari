@@ -3,6 +3,7 @@
 namespace Datto\Cinnabari\Tests\Php;
 
 use Datto\Cinnabari\Php\Output;
+use Datto\Cinnabari\Tests\TestUtils;
 use PHPUnit_Framework_TestCase;
 
 class OutputTest extends PHPUnit_Framework_TestCase
@@ -21,7 +22,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testOptionalBoolean()
@@ -38,7 +39,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testRequiredInteger()
@@ -55,7 +56,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testOptionalInteger()
@@ -72,7 +73,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testRequiredFloat()
@@ -89,7 +90,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testOptionalFloat()
@@ -106,7 +107,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testRequiredString()
@@ -123,7 +124,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testOptionalString()
@@ -140,7 +141,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testObject()
@@ -163,7 +164,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testListOne()
@@ -182,7 +183,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testListZeroOne()
@@ -203,7 +204,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testListOneMany()
@@ -226,7 +227,7 @@ foreach ($output as &$x0) {
 }
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testListZeroOneMany()
@@ -251,7 +252,7 @@ foreach ($output as &$x0) {
 }
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testListList()
@@ -284,7 +285,7 @@ foreach ($output as &$x1) {
 }
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
     }
 
     public function testObjectLists()
@@ -323,6 +324,14 @@ foreach ($output as &$x0) {
 }
 EOS;
 
-        $this->assertSame($expected, $actual);
+        $this->verify($expected, $actual);
+    }
+    
+    private function verify($expected, $actual)
+    {
+        $this->assertSame(
+            TestUtils::removePHPWhitespace($expected),
+            TestUtils::removePHPWhitespace($actual)
+        );
     }
 }

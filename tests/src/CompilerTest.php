@@ -192,6 +192,42 @@ EOS;
         $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
+    public function testFilterByName()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = 'people.filter((name = :name0) or (name = :name1)).map(id)';
+
+        $arguments = array(
+            'name0' => 'Ann',
+            'name1' => 'Becca'
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`
+    FROM `People` AS `0`
+    WHERE ((`0`.`Name` <=> :0) OR (`0`.`Name` <=> :1))
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['name0'],
+    $input['name1']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[0];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
     public function testFilter()
     {
         $scenario = self::getPeopleScenario();
@@ -277,6 +313,51 @@ EOS;
 EOS;
     }
 
+    public function testStringComparisons()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = 'people.filter(' .
+            'name < :otherName or ' .
+            'name > :otherName or ' .
+            'name <= :otherName or ' .
+            'name >= :otherName and ' .
+            'name != :otherName' .
+        ').map(id)';
+
+        $arguments = array(
+            'otherName' => 'cesium'
+        );
+
+        $mysql = 'SELECT ' .
+            '`0`.`Id` AS `0` ' .
+            'FROM `People` AS `0` ' .
+            'WHERE (' .
+            '(((`0`.`Name` < :0) OR ' .
+            '(`0`.`Name` > :0)) OR ' .
+            '(`0`.`Name` <= :0)) OR ' .
+            '((`0`.`Name` >= :0) AND ' .
+            '(NOT (`0`.`Name` <=> :0))' .
+        '))';
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['otherName']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[0];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    
     public function testMapDepthZero()
     {
         $scenario = self::getFriendsScenario();
@@ -555,7 +636,19 @@ EOS;
         $request = $parser->parse($tokens);
         $actual = $compiler->compile($request, $arguments);
         $expected = array($mysql, $phpInput, $phpOutput);
-
-        $this->assertSame($expected, $actual);
+        
+        // strip nonessential mysql whitespace
+        $this->assertSame(
+            TestUtils::removeMySQLWhitespace($expected[0]),
+            TestUtils::removeMySQLWhitespace($actual[0])
+        );
+        
+        // strip nonessential php whitespace
+        for ($i = 1; $i <= 2; $i++) {
+            $this->assertSame(
+                TestUtils::removePHPWhitespace($expected[$i]),
+                TestUtils::removePHPWhitespace($actual[$i])
+            );
+        }
     }
 }
