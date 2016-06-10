@@ -40,6 +40,9 @@ class Select
     /** @var AbstractExpression */
     private $where;
 
+    /** @var string */
+    private $orderBy;
+
     public function __construct()
     {
         $this->tables = array();
@@ -81,6 +84,26 @@ class Select
     public function setWhere(AbstractExpression $expression)
     {
         $this->where = $expression;
+    }
+
+    public function setOrderBy($tableId, $column, $isAscending)
+    {
+        if (!self::isDefined($this->tables, $tableId)) {
+            return null;
+        }
+
+        $table = self::getIdentifier($tableId);
+        $name = self::getAbsoluteExpression($table, $column);
+
+        $mysql = "ORDER BY {$name} ";
+
+        if ($isAscending) {
+            $mysql .= "ASC";
+        } else {
+            $mysql .= "DESC";
+        }
+
+        $this->orderBy = $mysql;
     }
 
     public function addValue($tableId, $column)
@@ -194,6 +217,10 @@ class Select
             }
 
             $mysql .= "\t{$mysqlJoin} {$tableBIdentifier} AS {$joinIdentifier} ON {$expression}\n";
+        }
+
+        if (isset($this->orderBy)) {
+            $mysql .= "\t{$this->orderBy}\n";
         }
 
         return $mysql;
