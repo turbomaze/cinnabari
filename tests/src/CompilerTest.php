@@ -662,7 +662,7 @@ EOS;
         $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
     
-    public function testMatchPath()
+    public function testMatchPropertyPath()
     {
         $scenario = self::getRelationshipsScenario();
 
@@ -682,8 +682,7 @@ SELECT
     INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
     WHERE (`1`.`First` REGEXP BINARY :0)
 EOS;
-
-        $phpInput = <<<'EOS'
+$phpInput = <<<'EOS'
 $output = array(
     $input['regex']
 );
@@ -696,6 +695,26 @@ foreach ($input as $row) {
 
 $output = isset($output) ? array_values($output) : array();
 EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+    
+    public function testFailParamPath()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.filter(match(name.:a, :regex)).map(age)
+EOS;
+
+        $arguments = array(
+            'regex' => '^',
+            'a' => 'foo'
+        );
+
+        $mysql = null;
+        $phpInput = null;
+        $phpOutput = null;
 
         $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }

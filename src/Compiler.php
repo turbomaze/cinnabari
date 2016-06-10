@@ -443,12 +443,11 @@ class Compiler
     {
         if ($property[0] === Parser::TYPE_PATH) {
             $tokens = array_slice($property, 1);
-            if (!$this->getStringPath($class, $tableId, $tokens, $argumentExpression)) {
+            if (!$this->getStringPropertyPath($class, $tableId, $tokens, $argumentExpression)) {
                 return false;
             }
         } else {
-            if ($property[0] !== Parser::TYPE_PROPERTY ||
-                !$this->getStringProperty($class, $tableId, $property[1], $argumentExpression)) {
+            if (!$this->getStringProperty($class, $tableId, $property[1], $argumentExpression)) {
                 return false;
             }
         }
@@ -587,7 +586,7 @@ class Compiler
         $tableIdentifier = $this->mysql->getTable($tableId);
         $this->connections($tableId, $tableIdentifier, $path);
 
-        if (count($tokens) === 1) {
+        if (count($tokens) < 2) {
             $request = array_shift($tokens);
         } else {
             array_unshift($tokens, Parser::TYPE_PATH);
@@ -595,6 +594,15 @@ class Compiler
         }
 
         return $this->getStringExpression($class, $tableId, $request, $output);
+    }
+
+    private function getStringPropertyPath($class, $tableId, $tokens, &$output)
+    {
+        if (self::isPropertyToken(end($tokens))) {
+            return self::getStringPath($class, $tableId, $tokens, $output);
+        } else {
+            return false;
+        }
     }
 
     private function getStringParameter($name, &$output)
