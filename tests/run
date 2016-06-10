@@ -1,13 +1,45 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-testsDirectory="$( dirname "${BASH_SOURCE[0]}")"
+testsDirectory="$(dirname "${BASH_SOURCE[0]}")"
 vendorDirectory="${testsDirectory}/vendor";
-phpunitPath="${vendorDirectory}/bin/phpunit"
+phpUnitPath="${vendorDirectory}/bin/phpunit"
 
-if [ ! -f "$phpunitPath" ]
+function error() {
+	echo "$@" 1>&2
+}
+
+function installComposer() {
+	local installerUrl='https://getcomposer.org/installer'
+	local installerPath='/tmp/install-composer.php'
+	local composerDirectory='/usr/local/bin'
+	local composerFilename='composer'
+
+	if ! php -r "exit((int)!@copy('$installerUrl', '$installerPath'));"
+	then
+		return 1
+	fi
+
+	echo "Installing Composer to '${composerDirectory}/${composerFilename}'..."
+	sudo php "$installerPath" --install-dir="$composerDirectory" --filename="$composerFilename"
+	status="$?"
+
+	rm -f "$installerPath"
+	return "$status"
+}
+
+if ! which composer > /dev/null
+then
+	if ! installComposer
+	then
+		error 'Composer is not installed. Please follow the installation instructions here: https://getcomposer.org/download/'
+		exit 1
+	fi
+fi
+
+if [ ! -d "$vendorDirectory" ]
 then
 	composer update
 fi
 
 # Run the unit tests
-"$phpunitPath"
+"$phpUnitPath"

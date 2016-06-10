@@ -39,6 +39,7 @@ use Datto\Cinnabari\Mysql\Expression\OperatorMinus;
 use Datto\Cinnabari\Mysql\Expression\OperatorNot;
 use Datto\Cinnabari\Mysql\Expression\OperatorOr;
 use Datto\Cinnabari\Mysql\Expression\OperatorPlus;
+use Datto\Cinnabari\Mysql\Expression\OperatorRegexpBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 
@@ -168,8 +169,8 @@ class Compiler
     private function getExpression($class, $tableId, $token, &$expression)
     {
         return $this->getBooleanExpression($class, $tableId, $token, $expression)
-        || $this->getNumericExpression($class, $tableId, $token, $expression)
-        || $this->getStringExpression($class, $tableId, $token, $expression);
+            || $this->getNumericExpression($class, $tableId, $token, $expression)
+            || $this->getStringExpression($class, $tableId, $token, $expression);
     }
 
     private function getBooleanExpression($class, $tableId, $token, &$output)
@@ -177,6 +178,10 @@ class Compiler
         list($type, $name) = $token;
 
         switch ($type) {
+            case Parser::TYPE_PATH:
+                $tokens = array_slice($token, 1);
+                return $this->getBooleanPath($class, $tableId, $tokens, $output);
+
             case Parser::TYPE_PARAMETER:
                 return $this->getBooleanParameter($name, $output);
 
@@ -190,6 +195,31 @@ class Compiler
             default:
                 return false;
         }
+    }
+
+    private function getBooleanPath($class, $tableId, $tokens, &$output)
+    {
+        $token = reset($tokens);
+
+        if (!self::scanProperty($token, $property)) {
+            return false;
+        }
+
+        array_shift($tokens);
+
+        list($class, $path) = $this->schema->getPropertyDefinition($class, $property);
+
+        $tableIdentifier = $this->mysql->getTable($tableId);
+        $this->connections($tableId, $tableIdentifier, $path);
+
+        if (count($tokens) === 1) {
+            $request = array_shift($tokens);
+        } else {
+            array_unshift($tokens, Parser::TYPE_PATH);
+            $request = $tokens;
+        }
+
+        return $this->getBooleanExpression($class, $tableId, $request, $output);
     }
 
     private function getBooleanParameter($name, &$output)
@@ -271,6 +301,9 @@ class Compiler
 
             case 'greaterEqual':
                 return $this->getGreaterEqualFunction($class, $tableId, $argumentA, $argumentB, $expression);
+
+            case 'match':
+                return $this->getMatchFunction($class, $tableId, $argumentA, $argumentB, $expression);
 
             default:
                 return false;
@@ -406,12 +439,29 @@ class Compiler
         return false;
     }
 
+    private function getMatchFunction($class, $tableId, $property, $pattern, &$expression)
+    {
+        if (($property[0] !== Parser::TYPE_PROPERTY) || !$this->getStringProperty($class, $tableId, $property[1], $propertyExpression)) {
+            return false;
+        }
+
+        if (($pattern[0] !== Parser::TYPE_PARAMETER) || !$this->getStringParameter($pattern[1], $patternExpression)) {
+            return false;
+        }
+
+        $expression = new OperatorRegexpBinary($propertyExpression, $patternExpression);
+        return true;
+    }
 
     private function getNumericExpression($class, $tableId, $token, &$output)
     {
         $type = $token[0];
 
         switch ($type) {
+            case Parser::TYPE_PATH:
+                $tokens = array_slice($token, 1);
+                return $this->getNumericPath($class, $tableId, $tokens, $output);
+
             case Parser::TYPE_PARAMETER:
                 return $this->getNumericParameter($token[1], $output);
 
@@ -424,6 +474,31 @@ class Compiler
             default:
                 return false;
         }
+    }
+
+    private function getNumericPath($class, $tableId, $tokens, &$output)
+    {
+        $token = reset($tokens);
+
+        if (!self::scanProperty($token, $property)) {
+            return false;
+        }
+
+        array_shift($tokens);
+
+        list($class, $path) = $this->schema->getPropertyDefinition($class, $property);
+
+        $tableIdentifier = $this->mysql->getTable($tableId);
+        $this->connections($tableId, $tableIdentifier, $path);
+
+        if (count($tokens) === 1) {
+            $request = array_shift($tokens);
+        } else {
+            array_unshift($tokens, Parser::TYPE_PATH);
+            $request = $tokens;
+        }
+
+        return $this->getNumericExpression($class, $tableId, $request, $output);
     }
 
     private function getNumericParameter($name, &$output)
@@ -474,6 +549,10 @@ class Compiler
         $type = $token[0];
 
         switch ($type) {
+            case Parser::TYPE_PATH:
+                $tokens = array_slice($token, 1);
+                return $this->getStringPath($class, $tableId, $tokens, $output);
+
             case Parser::TYPE_PARAMETER:
                 return $this->getStringParameter($token[1], $output);
 
@@ -483,6 +562,31 @@ class Compiler
             default:
                 return false;
         }
+    }
+
+    private function getStringPath($class, $tableId, $tokens, &$output)
+    {
+        $token = reset($tokens);
+
+        if (!self::scanProperty($token, $property)) {
+            return false;
+        }
+
+        array_shift($tokens);
+
+        list($class, $path) = $this->schema->getPropertyDefinition($class, $property);
+
+        $tableIdentifier = $this->mysql->getTable($tableId);
+        $this->connections($tableId, $tableIdentifier, $path);
+
+        if (count($tokens) === 1) {
+            $request = array_shift($tokens);
+        } else {
+            array_unshift($tokens, Parser::TYPE_PATH);
+            $request = $tokens;
+        }
+
+        return $this->getStringExpression($class, $tableId, $request, $output);
     }
 
     private function getStringParameter($name, &$output)

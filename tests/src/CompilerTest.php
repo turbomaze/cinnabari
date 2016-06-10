@@ -6,7 +6,6 @@ use Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Lexer;
 use Datto\Cinnabari\Parser;
 use Datto\Cinnabari\Schema;
-use Datto\Cinnabari\Translator;
 use PHPUnit_Framework_TestCase;
 
 /*
