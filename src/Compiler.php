@@ -133,6 +133,7 @@ class Compiler
         $this->connections($this->table, $table, $path);
 
         $this->getOptionalFilterFunction();
+        $this->getOptionalSortFunction();
 
         $this->request = reset($this->request);
 
@@ -736,7 +737,7 @@ class Compiler
         return $this->readExpression();
     }
 
-    private function connections(&$contextId, $tableAIdentifier, $connections)
+    private function connections(&$contextId, &$tableAIdentifier, $connections)
     {
         foreach ($connections as $key => $connection) {
             $definition = $this->schema->getConnectionDefinition($tableAIdentifier, $connection);
@@ -755,7 +756,43 @@ class Compiler
             }
 
             $contextId = $this->mysql->addJoin($contextId, $tableBIdentifier, $expression, $joinType);
+            $tableAIdentifier = $tableBIdentifier;
         }
+    }
+
+    private function getOptionalSortFunction()
+    {
+        $token = current($this->request);
+
+        if (!self::scanFunction($token, $name, $arguments)) {
+            return false;
+        }
+
+        if ($name !== 'sort') {
+            return false;
+        }
+
+        $token = $arguments[0];
+
+        if (!self::scanProperty($token, $property)) {
+            return false;
+        }
+
+        $propertyDefinition = $this->schema->getPropertyDefinition($this->class, $property);
+        $path = $propertyDefinition[1];
+
+        $value = array_pop($path);
+
+        $tableIdentifier = $this->mysql->getTable($this->table);
+        $this->connections($this->table, $tableIdentifier, $path);
+
+        $valueDefinition = $this->schema->getValueDefinition($tableIdentifier, $value);
+        $column = $valueDefinition[0];
+
+        $this->mysql->setOrderBy($this->table, $column, true);
+
+        array_shift($this->request);
+        return true;
     }
 
     private static function scanPath($token, &$tokens)
