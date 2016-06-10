@@ -441,15 +441,23 @@ class Compiler
 
     private function getMatchFunction($class, $tableId, $property, $pattern, &$expression)
     {
-        if (($property[0] !== Parser::TYPE_PROPERTY) || !$this->getStringProperty($class, $tableId, $property[1], $propertyExpression)) {
-            return false;
+        if ($property[0] === Parser::TYPE_PATH) {
+            $tokens = array_slice($property, 1);
+            if (!$this->getStringPath($class, $tableId, $tokens, $argumentExpression)) {
+                return false;
+            }
+        } else {
+            if ($property[0] !== Parser::TYPE_PROPERTY ||
+                !$this->getStringProperty($class, $tableId, $property[1], $argumentExpression)) {
+                return false;
+            }
         }
 
         if (($pattern[0] !== Parser::TYPE_PARAMETER) || !$this->getStringParameter($pattern[1], $patternExpression)) {
             return false;
         }
 
-        $expression = new OperatorRegexpBinary($propertyExpression, $patternExpression);
+        $expression = new OperatorRegexpBinary($argumentExpression, $patternExpression);
         return true;
     }
 

@@ -518,6 +518,7 @@ EOS;
             `Id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             `Name` INT UNSIGNED NOT NULL,
             `Age` TINYINT UNSIGNED NOT NULL,
+            `City` VARCHAR(256) NOT NULL,
             CONSTRAINT `fk_People_Name__Names_Id` FOREIGN KEY (`Name`) REFERENCES `Names` (`Id`),
             CONSTRAINT `fk_People_Id__PhoneNumbers_Person` FOREIGN KEY (`Id`) REFERENCES `PhoneNumbers` (`Person`)
         );
@@ -536,10 +537,10 @@ EOS;
 
         INSERT INTO `Names`
             (`Id`, `First`, `Last`) VALUES
-            (1, 'Ann', 'Adams'),
-            (2, 'Bob', 'Baker'),
-            (3, 'Carl', 'Clay'),
-            (4, 'Mary', 'May');
+            (1, 'Ann', 'Adams', 'San Francisco'),
+            (2, 'Bob', 'Baker', 'Boston'),
+            (3, 'Carl', 'Clay', 'Baltimore'),
+            (4, 'Mary', 'May', 'San Antonio');
 
         INSERT INTO `PhoneNumbers`
             (`Person`, `PhoneNumber`) VALUES
@@ -550,7 +551,7 @@ EOS;
             (4, 12025550180);
 
         INSERT INTO `People`
-            (`Id`, `Name`, `Age`) VALUES
+            (`Id`, `Name`, `Age`, `City`) VALUES
             (1, 1, 21),
             (2, 2, 28),
             (3, 3, 18),
@@ -576,6 +577,7 @@ EOS;
         },
         "Person": {
             "name": ["Name", "Name"],
+            "city": [4, "City"],
             "age": [2, "Age"],
             "phones": [2, "Phones", "Number"],
             "spouse": ["Person", "Spouse", "Person"],
@@ -591,7 +593,8 @@ EOS;
     },
     "values": {
         "`People`": {
-            "Age": ["`Age`", false]
+            "Age": ["`Age`", false],
+            "City": ["`City`", false]
         },
         "`Names`": {
             "First": ["`First`", false],
@@ -620,6 +623,81 @@ EOS;
     }
 }
 EOS;
+    }
+    
+    public function testMatchString()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.filter(match(city, :regex)).map(age)
+EOS;
+
+        $arguments = array(
+            'regex' => '^'
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`,
+    `0`.`Age` AS `1`
+    FROM `People` AS `0`
+    WHERE (`0`.`City` REGEXP BINARY :0)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['regex']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[1];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+    
+    public function testMatchPath()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.filter(match(name.first, :regex)).map(age)
+EOS;
+
+        $arguments = array(
+            'regex' => '^'
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`,
+    `0`.`Age` AS `1`
+    FROM `People` AS `0`
+    INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
+    WHERE (`1`.`First` REGEXP BINARY :0)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['regex']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[1];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
     private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
