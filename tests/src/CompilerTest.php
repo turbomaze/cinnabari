@@ -537,10 +537,10 @@ EOS;
 
         INSERT INTO `Names`
             (`Id`, `First`, `Last`) VALUES
-            (1, 'Ann', 'Adams', 'San Francisco'),
-            (2, 'Bob', 'Baker', 'Boston'),
-            (3, 'Carl', 'Clay', 'Baltimore'),
-            (4, 'Mary', 'May', 'San Antonio');
+            (1, 'Ann', 'Adams'),
+            (2, 'Bob', 'Baker'),
+            (3, 'Carl', 'Clay'),
+            (4, 'Mary', 'May');
 
         INSERT INTO `PhoneNumbers`
             (`Person`, `PhoneNumber`) VALUES
@@ -552,10 +552,10 @@ EOS;
 
         INSERT INTO `People`
             (`Id`, `Name`, `Age`, `City`) VALUES
-            (1, 1, 21),
-            (2, 2, 28),
-            (3, 3, 18),
-            (4, 4, 26);
+            (1, 1, 21, 'San Francisco'),
+            (2, 2, 28, 'Boston'),
+            (3, 3, 18, 'Baltimore'),
+            (4, 4, 26, 'San Antonio');
 
         INSERT INTO `Spouses`
             (`Person`, `Spouse`) VALUES
@@ -699,12 +699,32 @@ EOS;
         $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
     
-    public function testFailParamPath()
+    public function testFailParameterPath()
     {
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
 people.filter(match(name.:a, :regex)).map(age)
+EOS;
+
+        $arguments = array(
+            'regex' => '^',
+            'a' => 'foo'
+        );
+
+        $mysql = null;
+        $phpInput = null;
+        $phpOutput = null;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+    
+    public function testFailParameterPropertyPath()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.filter(match(name.:a.first, :regex)).map(age)
 EOS;
 
         $arguments = array(

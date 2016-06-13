@@ -443,7 +443,7 @@ class Compiler
     {
         if ($property[0] === Parser::TYPE_PATH) {
             $tokens = array_slice($property, 1);
-            if (!$this->getStringPropertyPath($class, $tableId, $tokens, $argumentExpression)) {
+            if (!$this->getStringPath($class, $tableId, $tokens, $argumentExpression, Parser::TYPE_PROPERTY)) {
                 return false;
             }
         } else {
@@ -551,6 +551,23 @@ class Compiler
         }
     }
 
+    private function getStringPropertyExpression($class, $tableId, $token, &$output)
+    {
+        $type = $token[0];
+
+        switch ($type) {
+            case Parser::TYPE_PATH:
+                $tokens = array_slice($token, 1);
+                return $this->getStringPath($class, $tableId, $tokens, $output);
+
+            case Parser::TYPE_PROPERTY:
+                return $this->getStringProperty($class, $tableId, $token[1], $output);
+
+            default:
+                return false;
+        }
+    }
+
     private function getStringExpression($class, $tableId, $token, &$output)
     {
         $type = $token[0];
@@ -571,7 +588,7 @@ class Compiler
         }
     }
 
-    private function getStringPath($class, $tableId, $tokens, &$output)
+    private function getStringPath($class, $tableId, $tokens, &$output, $type=-1)
     {
         $token = reset($tokens);
 
@@ -593,15 +610,10 @@ class Compiler
             $request = $tokens;
         }
 
-        return $this->getStringExpression($class, $tableId, $request, $output);
-    }
-
-    private function getStringPropertyPath($class, $tableId, $tokens, &$output)
-    {
-        if (self::isPropertyToken(end($tokens))) {
-            return self::getStringPath($class, $tableId, $tokens, $output);
+        if ($type === Parser::TYPE_PROPERTY) {
+            return $this->getStringPropertyExpression($class, $tableId, $request, $output);
         } else {
-            return false;
+            return $this->getStringExpression($class, $tableId, $request, $output);
         }
     }
 
