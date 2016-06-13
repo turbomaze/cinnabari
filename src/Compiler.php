@@ -558,7 +558,7 @@ class Compiler
         switch ($type) {
             case Parser::TYPE_PATH:
                 $tokens = array_slice($token, 1);
-                return $this->getStringPath($class, $tableId, $tokens, $output);
+                return $this->getStringPath($class, $tableId, $tokens, $output, Parser::TYPE_PROPERTY);
 
             case Parser::TYPE_PROPERTY:
                 return $this->getStringProperty($class, $tableId, $token[1], $output);
@@ -588,7 +588,7 @@ class Compiler
         }
     }
 
-    private function getStringPath($class, $tableId, $tokens, &$output, $type=-1)
+    private function getStringPath($class, $tableId, $tokens, &$output, $type=null)
     {
         $token = reset($tokens);
 
