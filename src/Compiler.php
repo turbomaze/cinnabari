@@ -137,7 +137,7 @@ class Compiler
 
         $this->request = reset($this->request);
 
-        if (!$this->readMap()) {
+        if (!$this->readFunction('map')) {
             return false;
         }
 
@@ -157,7 +157,7 @@ class Compiler
             return false;
         }
 
-        if (!$this->getExpression($this->class, $this->table, $arguments[0], $where)) {
+        if (!$this->getExpression($this->class, $this->table, $arguments[0], $where, $type)) {
             return false;
         }
 
@@ -167,10 +167,10 @@ class Compiler
         return true;
     }
 
-    private function getExpression($class, $tableId, $token, &$expression)
+    private function getExpression($class, $tableId, $token, &$expression, &$type)
     {
         return $this->getBooleanExpression($class, $tableId, $token, $expression)
-            || $this->getNumericExpression($class, $tableId, $token, $expression)
+            || $this->getNumericExpression($class, $tableId, $token, $expression, $type)
             || $this->getStringExpression($class, $tableId, $token, $expression);
     }
 
@@ -318,8 +318,8 @@ class Compiler
                 $this->getBooleanExpression($class, $tableId, $argumentA, $expressionA) &&
                 $this->getBooleanExpression($class, $tableId, $argumentB, $expressionB)
             ) || (
-                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) &&
+                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
             ) || (
                 $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
                 $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
@@ -372,8 +372,8 @@ class Compiler
     {
         if (
             (
-                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) &&
+                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
             ) || (
                 $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
                 $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
@@ -390,8 +390,8 @@ class Compiler
     {
         if (
             (
-                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) &&
+                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
             ) || (
                 $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
                 $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
@@ -408,8 +408,8 @@ class Compiler
     {
         if (
             (
-                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) &&
+                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
             ) || (
                 $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
                 $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
@@ -426,8 +426,8 @@ class Compiler
     {
         if (
             (
-                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) &&
+                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
             ) || (
                 $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
                 $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
@@ -454,30 +454,30 @@ class Compiler
         return true;
     }
 
-    private function getNumericExpression($class, $tableId, $token, &$output)
+    private function getNumericExpression($class, $tableId, $token, &$output, &$type)
     {
         $type = $token[0];
 
         switch ($type) {
             case Parser::TYPE_PATH:
                 $tokens = array_slice($token, 1);
-                return $this->getNumericPath($class, $tableId, $tokens, $output);
+                return $this->getNumericPath($class, $tableId, $tokens, $output, $type);
 
             case Parser::TYPE_PARAMETER:
-                return $this->getNumericParameter($token[1], $output);
+                return $this->getNumericParameter($token[1], $output, $type);
 
             case Parser::TYPE_PROPERTY:
-                return $this->getNumericProperty($class, $tableId, $token[1], $output);
+                return $this->getNumericProperty($class, $tableId, $token[1], $output, $type);
 
             case Parser::TYPE_FUNCTION:
-                return $this->getNumericBinaryFunction($class, $tableId, $token[1], $token[2], $token[3], $output);
+                return $this->getNumericBinaryFunction($class, $tableId, $token[1], $token[2], $token[3], $output, $type);
 
             default:
                 return false;
         }
     }
 
-    private function getNumericPath($class, $tableId, $tokens, &$output)
+    private function getNumericPath($class, $tableId, $tokens, &$output, &$type)
     {
         $token = reset($tokens);
 
@@ -499,28 +499,57 @@ class Compiler
             $request = $tokens;
         }
 
-        return $this->getNumericExpression($class, $tableId, $request, $output);
+        return $this->getNumericExpression($class, $tableId, $request, $output, $type);
     }
 
-    private function getNumericParameter($name, &$output)
+    private function getNumericParameter($name, &$output, &$type)
     {
-        return $this->getParameter($name, 'integer', $output)
-        || $this->getParameter($name, 'double', $output);
+        if ($this->getParameter($name, 'integer', $output)) {
+            $type = Output::TYPE_INTEGER;
+            return true;
+        } else if ($this->getParameter($name, 'double', $output)) {
+            $type = Output::TYPE_FLOAT;
+            return true;
+        } else {
+            return false;
+        }
     }
 
-    private function getNumericProperty($class, $tableId, $name, &$output)
+    private function getNumericProperty($class, $tableId, $name, &$output, &$type)
     {
-        return $this->getProperty($class, $tableId, $name, Output::TYPE_INTEGER, $output)
-        || $this->getProperty($class, $tableId, $name, Output::TYPE_FLOAT, $output);
+        if ($this->getProperty($class, $tableId, $name, Output::TYPE_INTEGER, $output)) {
+            $type = Output::TYPE_INTEGER;
+            return true;
+        } else if ($this->getProperty($class, $tableId, $name, Output::TYPE_FLOAT, $output)) {
+            $type = Output::TYPE_FLOAT;
+            return true;
+        } else {
+            return false;
+        }
     }
 
-    private function getNumericBinaryFunction($class, $tableId, $name, $argumentA, $argumentB, &$expression)
+    private function getNumericBinaryFunction($class, $tableId, $name, $argumentA, $argumentB, &$expression, &$type)
     {
         if (
-            !$this->getNumericExpression($class, $tableId, $argumentA, $expressionA) ||
-            !$this->getNumericExpression($class, $tableId, $argumentB, $expressionB)
+            !$this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) ||
+            !$this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
         ) {
             return false;
+        }
+
+        $aIsAnInteger = $typeA === Output::TYPE_INTEGER;
+        $bIsAnInteger = $typeB === Output::TYPE_INTEGER;
+        $aIsAFloat = $typeA === Output::TYPE_FLOAT;
+        $bIsAFloat = $typeB === Output::TYPE_FLOAT;
+
+        if ($name === 'plus' || $name === 'minus' || $name === 'times' || $name === 'divides') {
+            if ($aIsAnInteger && $bIsAnInteger) {
+                $type = Output::TYPE_INTEGER;
+            } else if ($aIsAnInteger && $bIsAFloat || $aIsAFloat && $bIsAnInteger || $aIsAFloat && $bIsAFloat) {
+                $type = Output::TYPE_FLOAT;
+            } else {
+                return false;
+            }
         }
 
         switch ($name) {
@@ -545,7 +574,7 @@ class Compiler
         }
     }
 
-    private function getStringExpression($class, $tableId, $token, &$output)
+    private function getStringExpression($class, $tableId, $token, &$output, &$type)
     {
         $type = $token[0];
 
@@ -639,7 +668,7 @@ class Compiler
                 return $this->readObject();
 
             case Parser::TYPE_FUNCTION:
-                return $this->readMap();
+                return $this->readFunction(false); // any function
 
             default:
                 return false;
@@ -722,19 +751,31 @@ class Compiler
         return true;
     }
 
-    private function readMap()
+    private function readFunction($which)
     {
         if (!self::scanFunction($this->request, $name, $arguments)) {
             return false;
         }
 
-        if ($name !== 'map') {
+        if ($which!== false && $name != $which) {
             return false;
         }
 
-        $this->request = reset($arguments);
+        if ($name === 'map') {
+            $this->request = reset($arguments);
+            return $this->readExpression();
+        } else {
+            if (!$this->getExpression($this->class, $this->table, $this->request, $expression, $type)) {
+                return false;
+            }
 
-        return $this->readExpression();
+            $columnId = $this->mysql->addExpression($this->table, $expression->getMySql());
+            $nullable = true; // TODO
+            echo $type . " <- \$type \n\n";
+            $this->phpOutput = Output::getValue($columnId, $nullable, $type);
+
+            return true;
+        }
     }
 
     private function connections(&$contextId, &$tableAIdentifier, $connections)
