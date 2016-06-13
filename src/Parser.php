@@ -137,195 +137,10 @@ class Parser
         return self::getExpression($tokens);
     }
 
-    /*
-    private static function validateTokens($tokens)
-    {
-        if (!is_array($tokens)) {
-            self::errorUnexpectedValue();
-        }
-
-        $i = 0;
-
-        if (!array_key_exists($i, $tokens)) {
-            self::errorExpectedArrayKey(0);
-        }
-
-        foreach ($tokens as $key => $token) {
-            if ($key !== $i++) {
-                self::errorUnexpectedArrayKey($key);
-            }
-
-            try {
-                self::validateToken($token);
-            } catch (Exception $exception) {
-                self::errorUnexpectedArrayValue($key, $exception->getData());
-            }
-        }
-    }
-
-    private static function validateToken($token)
-    {
-        if (!is_array($token)) {
-            self::errorUnexpectedValue();
-        }
-
-        list($type, $value) = each($token);
-
-        if ($type === null) {
-            // TODO: what key should we use?
-            self::errorExpectedArrayKey(null);
-        }
-
-        $name = self::getTypeName($type);
-
-        if ($name === null) {
-            self::errorUnexpectedArrayKey($type);
-        }
-
-        try {
-            $validator = 'self::validate' . ucfirst($name);
-            call_user_func($validator, $value);
-        } catch (Exception $exception) {
-            self::errorUnexpectedArrayValue($type, $exception->getData());
-        }
-
-        $key = key($token);
-
-        if ($key !== null) {
-            self::errorUnexpectedArrayKey($key);
-        }
-    }
-
-    private static function getTypeName($type)
-    {
-        switch ($type) {
-            case Lexer::TYPE_PARAMETER:
-                return 'parameter';
-
-            case Lexer::TYPE_PROPERTY:
-                return 'property';
-
-            case Lexer::TYPE_FUNCTION:
-                return 'function';
-
-            case Lexer::TYPE_OPERATOR:
-                return 'operator';
-
-            case Lexer::TYPE_OBJECT:
-                return 'object';
-
-            case Lexer::TYPE_GROUP:
-                return 'group';
-
-            default:
-                return null;
-        }
-    }
-
-    protected static function validateParameter($input)
-    {
-        if (!is_string($input)) {
-            self::errorUnexpectedValue();
-        }
-    }
-
-    protected static function validateProperty($input)
-    {
-        if (!is_string($input)) {
-            self::errorUnexpectedValue();
-        }
-    }
-
-    protected static function validateFunction($input)
-    {
-        if (!is_array($input)) {
-            self::errorUnexpectedValue();
-        }
-
-        list($key, $value) = each($input);
-
-        if ($key === null) {
-            self::errorExpectedArrayKey(0);
-        }
-
-        if ($key !== 0) {
-            self::errorUnexpectedArrayKey($key);
-        }
-
-        if (!is_string($value)) {
-            self::errorUnexpectedArrayValue($key, null);
-        }
-
-        unset($input[$key]);
-
-        $i = 1;
-
-        foreach ($input as $key => $value) {
-            if ($key !== $i++) {
-                self::errorUnexpectedArrayKey($key);
-            }
-
-            try {
-                self::validateTokens($value);
-            } catch (Exception $exception) {
-                self::errorUnexpectedArrayValue($key, $exception->getData());
-            }
-        }
-    }
-
-    protected static function validateOperator($input)
-    {
-        if (!is_string($input)) {
-            self::errorUnexpectedValue();
-        }
-    }
-
-    protected static function validateObject($object)
-    {
-        if (!is_array($object)) {
-            self::errorUnexpectedValue();
-        }
-    }
-
-    protected static function validateGroup($group)
-    {
-        // TODO
-        try {
-            self::validateTokens($group);
-        } catch (Exception $exception) {
-            $code = $exception->getCode();
-            $data = $exception->getData();
-            $data[] = null;
-
-            throw new Exception($code, $data);
-        }
-    }
-
-    private static function errorUnexpectedValue()
-    {
-        throw new Exception(self::ERROR_UNEXPECTED_INPUT, null);
-    }
-
-    private static function errorExpectedArrayKey($key)
-    {
-        throw new Exception(self::ERROR_UNEXPECTED_INPUT, array(false, null, null));
-    }
-
-    private static function errorUnexpectedArrayKey($key)
-    {
-        throw new Exception(self::ERROR_UNEXPECTED_INPUT, array(false, $key, null));
-    }
-
-    private static function errorUnexpectedArrayValue($key, $position)
-    {
-        throw new Exception(self::ERROR_UNEXPECTED_INPUT, array(true, $key, $position));
-    }
-    */
-
     private static function getExpression($tokens)
     {
         $tokens = self::sortTokens($tokens);
-        return self::getTokenStream($tokens);
+        return self::getExpressionFromSortedTokens($tokens);
     }
 
     private static function sortTokens($input)
@@ -383,7 +198,7 @@ class Parser
         return @self::$operators[$lexeme];
     }
 
-    private static function getTokenStream(&$tokens)
+    private static function getExpressionFromSortedTokens(&$tokens)
     {
         $token = array_pop($tokens);
 
@@ -412,12 +227,12 @@ class Parser
 
     private static function getParameterExpression($name)
     {
-        return array(self::TYPE_PARAMETER, $name);
+        return array(array(self::TYPE_PARAMETER, $name));
     }
 
     private static function getPropertyExpression($name)
     {
-        return array(self::TYPE_PROPERTY, $name);
+        return array(array(self::TYPE_PROPERTY, $name));
     }
 
     private static function getFunctionExpression($input)
@@ -433,7 +248,7 @@ class Parser
         $value = $arguments;
         array_unshift($value, self::TYPE_FUNCTION, $name);
 
-        return $value;
+        return array($value);
     }
 
     private static function getObjectExpression($input)
@@ -444,7 +259,7 @@ class Parser
             $output[$property] = self::getExpression($tokens);
         }
 
-        return array(self::TYPE_OBJECT, $output);
+        return array(array(self::TYPE_OBJECT, $output));
     }
 
     private static function getOperatorExpression($lexeme, &$tokens)
@@ -454,36 +269,18 @@ class Parser
 
         // Binary operator
         if ($operator['arity'] === self::BINARY) {
-            $childB = self::getTokenStream($tokens);
-            $childA = self::getTokenStream($tokens);
+            $childB = self::getExpressionFromSortedTokens($tokens);
+            $childA = self::getExpressionFromSortedTokens($tokens);
 
             if ($name === 'dot') {
-                return self::getPathExpression($childA, $childB);
+                return array_merge($childA, $childB);
             }
 
-            return array(self::TYPE_FUNCTION, $name, $childA, $childB);
+            return array(array(self::TYPE_FUNCTION, $name, $childA, $childB));
         }
 
         // Unary operator
-        $child = self::getTokenStream($tokens);
-        return array(self::TYPE_FUNCTION, $name, $child);
-    }
-
-    private static function getPathExpression($childA, $childB)
-    {
-        if ($childA[0] === self::TYPE_PATH) {
-            $children = array_slice($childA, 1);
-        } else {
-            $children = array($childA);
-        }
-
-        if ($childB[0] === self::TYPE_PATH) {
-            $children = array_merge($children, array_slice($childB, 1));
-        } else {
-            $children[] = $childB;
-        }
-
-        array_unshift($children, self::TYPE_PATH);
-        return $children;
+        $child = self::getExpressionFromSortedTokens($tokens);
+        return array(array(self::TYPE_FUNCTION, $name, $child));
     }
 }
