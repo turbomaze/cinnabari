@@ -622,6 +622,26 @@ class Compiler
         return true;
     }
 
+    private function readExpressionAndGetTail(&$tailProperty)
+    {
+        $token = $this->request;
+
+        $type = $token[0];
+
+        switch ($type) {
+            // either paths
+            case Parser::TYPE_PATH:
+                return $this->readPathAndGetTail($tailProperty);
+
+            // or properties; nothing else
+            case Parser::TYPE_PROPERTY:
+                return $this->readPropertyAndGetColumn($tailProperty);
+
+            default:
+                return false;
+        }
+    }
+
     private function readExpression()
     {
         $token = $this->request;
@@ -644,6 +664,36 @@ class Compiler
             default:
                 return false;
         }
+    }
+
+    private function readPathAndGetTail(&$tailProperty)
+    {
+        if (!self::scanPath($this->request, $tokens)) {
+            return false;
+        }
+
+        $token = reset($tokens);
+
+        if (!self::scanProperty($token, $property)) {
+            return false;
+        }
+
+        array_shift($tokens);
+
+        list($this->class, $path) = $this->schema->getPropertyDefinition($this->class, $property);
+
+        $tableIdentifier = $this->mysql->getTable($this->table);
+        $this->connections($this->table, $tableIdentifier, $path);
+        // TODO
+
+        if (count($tokens) === 1) {
+            $this->request = array_shift($tokens);
+        } else {
+            array_unshift($tokens, Parser::TYPE_PATH);
+            $this->request = $tokens;
+        }
+
+        return $this->readExpressionAndGetTail($tailProperty);
     }
 
     private function readPath()
@@ -674,6 +724,27 @@ class Compiler
         }
 
         return $this->readExpression();
+    }
+
+    private function readPropertyAndGetColumn(&$tailProperty)
+    {
+        if (!self::scanProperty($this->request, $property)) {
+            return false;
+        }
+
+        list(, $path) = $this->schema->getPropertyDefinition($this->class, $property);
+
+        $value = array_pop($path);
+
+        // just get the table id; NOTE: this method does not add the property to the output!
+        $tableIdentifier = $this->mysql->getTable($this->table);
+        $this->connections($this->table, $tableIdentifier, $path);
+
+        list($column,) = $this->schema->getValueDefinition($tableIdentifier, $value);
+
+        $tailProperty = $column;
+
+        return true;
     }
 
     private function readProperty()
@@ -742,6 +813,7 @@ class Compiler
         foreach ($connections as $key => $connection) {
             $definition = $this->schema->getConnectionDefinition($tableAIdentifier, $connection);
 
+
             list($tableBIdentifier, $expression, $id, $allowsZeroMatches, $allowsMultipleMatches) = $definition;
 
             if (!$allowsZeroMatches && !$allowsMultipleMatches) {
@@ -772,26 +844,24 @@ class Compiler
             return false;
         }
 
-        $token = $arguments[0];
+        // preserve the state
+        $state = array($this->request, $this->class, $this->table);
 
-        if (!self::scanProperty($token, $property)) {
-            return false;
-        }
+        // set the request to the path / property
+        $this->request = $arguments[0];
 
-        $propertyDefinition = $this->schema->getPropertyDefinition($this->class, $property);
-        $path = $propertyDefinition[1];
+        // read it and grab the final property at the end
+        $this->readExpressionAndGetTail($tailProperty);
 
-        $value = array_pop($path);
+        // use that final property in the order by
+        $this->mysql->setOrderBy($this->table, $tailProperty, true);
 
-        $tableIdentifier = $this->mysql->getTable($this->table);
-        $this->connections($this->table, $tableIdentifier, $path);
+        // restore the initial state
+        list($this->request, $this->class, $this->table) = $state;
 
-        $valueDefinition = $this->schema->getValueDefinition($tableIdentifier, $value);
-        $column = $valueDefinition[0];
-
-        $this->mysql->setOrderBy($this->table, $column, true);
-
+        // shift the request
         array_shift($this->request);
+
         return true;
     }
 
