@@ -574,7 +574,7 @@ class Compiler
         }
     }
 
-    private function getStringExpression($class, $tableId, $token, &$output, &$type)
+    private function getStringExpression($class, $tableId, $token, &$output)
     {
         $type = $token[0];
 
