@@ -134,6 +134,7 @@ class Compiler
 
         $this->getOptionalFilterFunction();
         $this->getOptionalSortFunction();
+        $this->getOptionalSliceFunction();
 
         $this->request = reset($this->request);
 
@@ -237,6 +238,19 @@ class Compiler
         }
 
         $output = new Parameter($id);
+        return true;
+    }
+
+    private function getSubtractiveParameters($nameA, $nameB, $typeA, $typeB, &$outputA, &$outputB)
+    {
+        list($idA, $idB) = $this->arguments->useSubtractiveArgument($nameA, $nameB, $typeA, $typeB);
+
+        if ($idA === null || $idB === null) {
+            return false;
+        }
+
+        $outputA = new Parameter($idA);
+        $outputB = new Parameter($idB);
         return true;
     }
 
@@ -795,6 +809,39 @@ class Compiler
         return true;
     }
 
+    private function getOptionalSliceFunction()
+    {
+        $token = current($this->request);
+
+        if (!self::scanFunction($token, $name, $arguments)) {
+            return false;
+        }
+
+        if ($name !== 'slice') {
+            return false;
+        }
+
+        if (count($token) !== 4) {
+            return false;
+        }
+
+        if (!self::isParameterToken($token[2]) || !self::isParameterToken($token[3])) {
+            return false;
+        }
+
+        $nameA = $token[2][1]; // these are both parameters so they take this form
+        $nameB = $token[3][1];
+
+        if (!$this->getSubtractiveParameters($nameA, $nameB, 'integer', 'integer', $start, $end)) {
+            return false;
+        }
+
+        $this->mysql->setLimit($this->table, $start, $end);
+
+        array_shift($this->request);
+        return true;
+    }
+
     private static function scanPath($token, &$tokens)
     {
         if (!self::isPathToken($token)) {
@@ -844,6 +891,11 @@ class Compiler
     private static function isPropertyToken($token)
     {
         return is_array($token) && ($token[0] === Parser::TYPE_PROPERTY);
+    }
+
+    private static function isParameterToken($token)
+    {
+        return is_array($token) && ($token[0] === Parser::TYPE_PARAMETER);
     }
 
     private static function isFunctionToken($token)

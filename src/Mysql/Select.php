@@ -43,11 +43,16 @@ class Select
     /** @var string */
     private $orderBy;
 
+    /** @var string */
+    private $limit;
+
     public function __construct()
     {
         $this->tables = array();
         $this->columns = array();
         $this->where = null;
+        $this->orderBy= null;
+        $this->limit = null;
     }
 
     /**
@@ -106,6 +111,20 @@ class Select
         $this->orderBy = $mysql;
     }
 
+    public function setLimit($tableId, $start, $length)
+    {
+        if (!self::isDefined($this->tables, $tableId)) {
+            return null;
+        }
+
+        $table = self::getIdentifier($tableId);
+
+        $mysql = "{$start->getMysql()}, {$length->getMysql()}";
+
+        $this->limit = $mysql;
+    }
+
+
     public function addValue($tableId, $column)
     {
         if (!self::isDefined($this->tables, $tableId)) {
@@ -126,7 +145,8 @@ class Select
 
         $mysql = $this->getColumns() .
             $this->getTables() .
-            $this->getWhereClause();
+            $this->getWhereClause() .
+            $this->getLimitClause();
 
         return rtrim($mysql, "\n");
     }
@@ -234,6 +254,15 @@ class Select
 
         $where = $this->where->getMysql();
         return "\tWHERE {$where}\n";
+    }
+
+    private function getLimitClause()
+    {
+        if ($this->limit === null) {
+            return null;
+        }
+
+        return "\tLIMIT {$this->limit}\n";
     }
 
     private static function getAliasedName($name, $id)

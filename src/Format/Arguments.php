@@ -52,7 +52,8 @@ class Arguments
             return null;
         }
 
-        $id = &$this->output[$name];
+        $safeName = var_export($name, true);
+        $id = &$this->output["\$input[{$safeName}]"];
 
         if ($id === null) {
             $id = count($this->output) - 1;
@@ -61,17 +62,43 @@ class Arguments
         return $id;
     }
 
-    public function getPhp()
+    public function useSubtractiveArgument($nameA, $nameB, $neededTypeA, $neededTypeB)
     {
-        $statements = array_map('self::getInputStatement', array_flip($this->output));
-        $array = self::getArray($statements);
-        return self::getAssignment('$output', $array);
+        if (!array_key_exists($nameA, $this->input) || !array_key_exists($nameB, $this->input)) {
+            return null;
+        }
+
+        $userTypeA = gettype($this->input[$nameA]);
+        $userTypeB = gettype($this->input[$nameB]);
+
+        if (($userTypeA !== 'NULL') && ($userTypeA !== $neededTypeA)) {
+            return null;
+        }
+
+        if (($userTypeB !== 'NULL') && ($userTypeB !== $neededTypeB)) {
+            return null;
+        }
+
+        $safeNameA = var_export($nameA, true);
+        $idA = &$this->output["\$input[{$safeNameA}]"];
+        if ($idA === null) {
+            $idA = count($this->output) - 1;
+        }
+
+        $safeNameB = var_export($nameB, true);
+        $idB = &$this->output["\$input[{$safeNameB}] - \$input[{$safeNameA}]"];
+        if ($idB === null) {
+            $idB = count($this->output) - 1;
+        }
+
+        return array($idA, $idB);
     }
 
-    protected static function getInputStatement($key)
+    public function getPhp()
     {
-        $name = var_export($key, true);
-        return "\$input[{$name}]";
+        $statements = array_flip($this->output);
+        $array = self::getArray($statements);
+        return self::getAssignment('$output', $array);
     }
 
     protected static function getArray($statements)
