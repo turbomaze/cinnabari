@@ -589,7 +589,7 @@ class Compiler
         }
     }
 
-    private function getStringPath($class, $tableId, $tokens, &$output, $type=null)
+    private function getStringPath($class, $tableId, $tokens, &$output, $type = null)
     {
         $token = reset($tokens);
 
@@ -604,7 +604,7 @@ class Compiler
         $tableIdentifier = $this->mysql->getTable($tableId);
         $this->connections($tableId, $tableIdentifier, $path);
 
-        if (count($tokens) < 2) {
+        if (count($tokens) === 1) {
             $request = array_shift($tokens);
         } else {
             array_unshift($tokens, Parser::TYPE_PATH);
