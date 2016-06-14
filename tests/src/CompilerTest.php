@@ -518,6 +518,7 @@ EOS;
             `Id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             `Name` INT UNSIGNED NOT NULL,
             `Age` TINYINT UNSIGNED NOT NULL,
+            `City` VARCHAR(256) NOT NULL,
             CONSTRAINT `fk_People_Name__Names_Id` FOREIGN KEY (`Name`) REFERENCES `Names` (`Id`),
             CONSTRAINT `fk_People_Id__PhoneNumbers_Person` FOREIGN KEY (`Id`) REFERENCES `PhoneNumbers` (`Person`)
         );
@@ -550,11 +551,11 @@ EOS;
             (4, 12025550180);
 
         INSERT INTO `People`
-            (`Id`, `Name`, `Age`) VALUES
-            (1, 1, 21),
-            (2, 2, 28),
-            (3, 3, 18),
-            (4, 4, 26);
+            (`Id`, `Name`, `Age`, `City`) VALUES
+            (1, 1, 21, 'San Francisco'),
+            (2, 2, 28, 'Boston'),
+            (3, 3, 18, 'Baltimore'),
+            (4, 4, 26, 'San Antonio');
 
         INSERT INTO `Spouses`
             (`Person`, `Spouse`) VALUES
@@ -576,6 +577,7 @@ EOS;
         },
         "Person": {
             "name": ["Name", "Name"],
+            "city": [4, "City"],
             "age": [2, "Age"],
             "phones": [2, "Phones", "Number"],
             "spouse": ["Person", "Spouse", "Person"],
@@ -591,7 +593,8 @@ EOS;
     },
     "values": {
         "`People`": {
-            "Age": ["`Age`", false]
+            "Age": ["`Age`", false],
+            "City": ["`City`", false]
         },
         "`Names`": {
             "First": ["`First`", false],
@@ -620,6 +623,120 @@ EOS;
     }
 }
 EOS;
+    }
+    
+    public function testMatchString()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.filter(match(city, :regex)).map(age)
+EOS;
+
+        $arguments = array(
+            'regex' => '^'
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`,
+    `0`.`Age` AS `1`
+    FROM `People` AS `0`
+    WHERE (`0`.`City` REGEXP BINARY :0)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['regex']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[1];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+    
+    public function testMatchPropertyPath()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.filter(match(name.first, :regex)).map(age)
+EOS;
+
+        $arguments = array(
+            'regex' => '^'
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`,
+    `0`.`Age` AS `1`
+    FROM `People` AS `0`
+    INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
+    WHERE (`1`.`First` REGEXP BINARY :0)
+EOS;
+$phpInput = <<<'EOS'
+$output = array(
+    $input['regex']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[1];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+    
+    public function testFailParameterPath()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.filter(match(name.:a, :regex)).map(age)
+EOS;
+
+        $arguments = array(
+            'regex' => '^',
+            'a' => 'foo'
+        );
+
+        $mysql = null;
+        $phpInput = null;
+        $phpOutput = null;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+    
+    public function testFailParameterPropertyPath()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.filter(match(name.:a.first, :regex)).map(age)
+EOS;
+
+        $arguments = array(
+            'regex' => '^',
+            'a' => 'foo'
+        );
+
+        $mysql = null;
+        $phpInput = null;
+        $phpOutput = null;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
     private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
