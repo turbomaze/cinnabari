@@ -24,10 +24,14 @@
 
 namespace Datto\Cinnabari\Format;
 
+use Datto\Cinnabari\Exception;
 use Datto\Cinnabari\Php\Output;
 
 class Arguments
 {
+    const ERROR_WRONG_INPUT_TYPE = 301;
+    const ERROR_INPUT_NOT_PROVIDED = 302;
+
     /** @var array */
     private $input;
 
@@ -43,13 +47,30 @@ class Arguments
     public function useArgument($name, $neededType)
     {
         if (!array_key_exists($name, $this->input)) {
-            return null;
+            throw new Exception(
+                self::ERROR_INPUT_NOT_PROVIDED,
+                array(
+                    'name' => $name,
+                    'neededType' => $neededType,
+                    'inputArray' => $this->input
+                ),
+                self::ERROR_INPUT_NOT_PROVIDED .
+                " Error: input parameter '{$name}' not provided."
+            );
         }
 
         $userType = gettype($this->input[$name]);
 
         if (($userType !== 'NULL') && ($userType !== $neededType)) {
-            return null;
+            throw new Exception(
+                self::ERROR_WRONG_INPUT_TYPE,
+                array(
+                    'userType' => $userType,
+                    'neededType' => $neededType
+                ),
+                self::ERROR_WRONG_INPUT_TYPE.
+                " Error: '{$userType}' type provided, '{$neededType}' type expected."
+            );
         }
 
         $id = &$this->output[$name];

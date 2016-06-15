@@ -701,22 +701,43 @@ EOS;
     
     public function testFailParameterPath()
     {
-        $scenario = self::getRelationshipsScenario();
+        // we're expecting an exception
+        $this->setExpectedException('Exception');
 
+        // the api method call
+        $scenario = json_decode(self::getRelationshipsScenario(), true);
         $method = <<<'EOS'
 people.filter(match(name.:a, :regex)).map(age)
 EOS;
-
         $arguments = array(
             'regex' => '^',
             'a' => 'foo'
         );
 
-        $mysql = null;
-        $phpInput = null;
-        $phpOutput = null;
+        // cinnabari stuff
+        $lexer = new Lexer();
+        $parser = new Parser();
+        $schema = new Schema($scenario);
+        $compiler = new Compiler($schema);
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $tokens = $lexer->tokenize($method);
+        $request = $parser->parse($tokens);
+
+        // try to compile
+        try {
+            $actual = $compiler->compile($request, $arguments);
+        } catch (Exception $exception) {
+            $this->assertSame(
+                array(
+                    $exception->getCode(),
+                    $exception->getData()
+                ),
+                array(
+                    Arguments::ERROR_WRONG_INPUT_TYPE,
+                    array('userType' => 'string', 'neededType' => 'integer')
+                )
+            );
+        }
     }
     
     public function testFailParameterPropertyPath()
