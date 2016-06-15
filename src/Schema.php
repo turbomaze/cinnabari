@@ -26,6 +26,10 @@ namespace Datto\Cinnabari;
 
 class Schema
 {
+    const ERROR_CLASS_DNE = 101;
+    const ERROR_LIST_DNE = 102;
+    const ERROR_CONNECTION_DNE = 103;
+
     /** @var array */
     private $schema;
 
@@ -36,11 +40,17 @@ class Schema
 
     public function getPropertyDefinition($class, $property)
     {
-        // TODO: throw exception
         $definition = &$this->schema['classes'][$class][$property];
 
         if ($definition === null) {
-            return null;
+            throw new Exception(
+                self::ERROR_CLASS_DNE,
+                array(
+                    'class' => $class,
+                    'property' => $property
+                ),
+                self::ERROR_CLASS_DNE . " Error: class '{$class}' does not exist."
+            );
         }
 
         $type = reset($definition);
@@ -51,11 +61,16 @@ class Schema
 
     public function getListDefinition($list)
     {
-        // TODO: throw exception
         $definition = &$this->schema['lists'][$list];
 
         if ($definition === null) {
-            return null;
+            throw new Exception(
+                self::ERROR_LIST_DNE,
+                array(
+                    'list' => $list
+                ),
+                self::ERROR_LIST_DNE . " Error: list '{$list}' does not exist."
+            );
         }
 
         // array($table, $expression, $hasZero)
@@ -64,11 +79,17 @@ class Schema
 
     public function getValueDefinition($tableIdentifier, $value)
     {
-        // TODO: throw exception
         $definition = &$this->schema['values'][$tableIdentifier][$value];
 
         if ($definition === null) {
-            return null;
+            throw new Exception(
+                self::ERROR_VALUE_DNE,
+                array(
+                    'tableIdentifier' => $tableIdentifier,
+                    'value' => $value
+                ),
+                self::ERROR_VALUE_DNE . " Error: value '{$value}' does not exist."
+            );
         }
 
         // array($expression, $hasZero)
@@ -77,8 +98,19 @@ class Schema
 
     public function getConnectionDefinition($tableIdentifier, $connection)
     {
-        // TODO: throw exception
         $definition = &$this->schema['connections'][$tableIdentifier][$connection];
+
+        if ($definition === null) {
+            throw new Exception(
+                self::ERROR_CONNECTION_DNE,
+                array(
+                    'tableIdentifier' => $tableIdentifier,
+                    'connection' => $connection
+                ),
+                self::ERROR_CONNECTION_DNE .
+                " Error: connection '{$tableIdentifier}->{$connection}' does not exist."
+            );
+        }
 
         return $definition;
     }

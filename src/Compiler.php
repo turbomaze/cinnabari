@@ -119,6 +119,7 @@ class Compiler
         }
 
         list($class, $path) = $this->schema->getPropertyDefinition('Database', $array);
+
         if (!isset($class, $path)) {
             return false;
         }
