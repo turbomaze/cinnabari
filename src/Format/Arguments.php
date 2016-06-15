@@ -24,8 +24,6 @@
 
 namespace Datto\Cinnabari\Format;
 
-use Datto\Cinnabari\Php\Output;
-
 class Arguments
 {
     /** @var array */

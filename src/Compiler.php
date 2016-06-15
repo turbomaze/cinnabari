@@ -589,7 +589,7 @@ class Compiler
         }
     }
 
-    private function getStringPath($class, $tableId, $tokens, &$output, $type=null)
+    private function getStringPath($class, $tableId, $tokens, &$output, $type = null)
     {
         $token = reset($tokens);
 
@@ -604,7 +604,7 @@ class Compiler
         $tableIdentifier = $this->mysql->getTable($tableId);
         $this->connections($tableId, $tableIdentifier, $path);
 
-        if (count($tokens) < 2) {
+        if (count($tokens) === 1) {
             $request = array_shift($tokens);
         } else {
             array_unshift($tokens, Parser::TYPE_PATH);
@@ -790,7 +790,7 @@ class Compiler
 
     private function getOptionalSortFunction()
     {
-        $token = current($this->request);
+        $token = reset($this->request);
 
         if (!self::scanFunction($token, $name, $arguments)) {
             return false;
@@ -833,6 +833,16 @@ class Compiler
         return true;
     }
 
+    private static function scanParameter($token, &$name)
+    {
+        if (!self::isParameterToken($token)) {
+            return false;
+        }
+
+        $name = $token[1];
+        return true;
+    }
+
     private static function scanProperty($token, &$name)
     {
         if (!self::isPropertyToken($token)) {
@@ -869,6 +879,11 @@ class Compiler
         return is_array($token) && ($token[0] === Parser::TYPE_PATH);
     }
 
+    private static function isParameterToken($token)
+    {
+        return is_array($token) && ($token[0] === Parser::TYPE_PARAMETER);
+    }
+
     private static function isPropertyToken($token)
     {
         return is_array($token) && ($token[0] === Parser::TYPE_PROPERTY);
@@ -877,25 +892,5 @@ class Compiler
     private static function isFunctionToken($token)
     {
         return is_array($token) && ($token[0] === Parser::TYPE_FUNCTION);
-    }
-
-    private function getState()
-    {
-        return array(
-            'mysql' => $this->mysql,
-            'arguments' => $this->arguments,
-            'phpOutput' => $this->phpOutput,
-            'class' => $this->class,
-            'table' => $this->table
-        );
-    }
-
-    private function setState($state)
-    {
-        $this->mysql = $state['mysql'];
-        $this->arguments = $state['arguments'];
-        $this->phpOutput = $state['phpOutput'];
-        $this->class = $state['class'];
-        $this->table = $state['table'];
     }
 }
