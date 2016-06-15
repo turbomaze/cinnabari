@@ -31,6 +31,8 @@ class Select
     const JOIN_INNER = 1;
     const JOIN_LEFT = 2;
 
+    const ERROR_BAD_TABLE_ID = 201;
+
     /** @var string[] */
     private $tables;
 
@@ -71,7 +73,14 @@ class Select
     public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $type)
     {
         if (!self::isDefined($this->tables, $tableAId)) {
-            return null;
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $id,
+                    'name' => $name
+                ),
+                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+            );
         }
 
         $tableIdentifierA = self::getIdentifier($tableAId);
@@ -89,7 +98,14 @@ class Select
     public function setOrderBy($tableId, $column, $isAscending)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            return null;
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $id,
+                    'name' => $name
+                ),
+                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+            );
         }
 
         $table = self::getIdentifier($tableId);
@@ -109,7 +125,14 @@ class Select
     public function addValue($tableId, $column)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            return null;
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $id,
+                    'name' => $name
+                ),
+                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+            );
         }
 
         $table = self::getIdentifier($tableId);
@@ -121,7 +144,11 @@ class Select
     public function getMysql()
     {
         if (!$this->isValid()) {
-            return null;
+            throw new Exception(
+                self::ERROR_INVALID_MYSQL,
+                array(),
+                self::ERROR_INVALID_MYSQL . " Error: SQL queries must reference at least one table and column."
+            );
         }
 
         $mysql = $this->getColumns() .
@@ -136,7 +163,14 @@ class Select
         $name = array_search($id, $this->tables, true);
 
         if (!is_string($name)) {
-            return null;
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $id,
+                    'name' => $name
+                ),
+                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+            );
         }
 
         if (0 < $id) {
