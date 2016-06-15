@@ -4,6 +4,8 @@ namespace Datto\Cinnabari\Php;
 
 class Output
 {
+    const ERROR_UNKNOWN_TYPECAST = 401;
+
     const TYPE_NULL = 0;
     const TYPE_BOOLEAN = 1;
     const TYPE_INTEGER = 2;
@@ -112,7 +114,14 @@ class Output
                 return '';
 
             default:
-                return null;
+                throw new Exception(
+                    self::ERROR_UNKNOWN_TYPECAST,
+                    array(
+                        'type' => $type 
+                    ),
+                    self::ERROR_UNKNOWN_TYPECAST .
+                    " Error: failed to typecast unknown type '{$type}'."
+                );
         }
     }
 
