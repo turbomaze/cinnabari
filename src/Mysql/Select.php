@@ -31,8 +31,6 @@ class Select
     const JOIN_INNER = 1;
     const JOIN_LEFT = 2;
 
-    const ERROR_BAD_TABLE_ID = 201;
-
     /** @var string[] */
     private $tables;
 
@@ -74,12 +72,12 @@ class Select
     {
         if (!self::isDefined($this->tables, $tableAId)) {
             throw new Exception(
-                self::ERROR_BAD_TABLE_ID,
+                Exception::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $id,
                     'name' => $name
                 ),
-                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+                Exception::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
             );
         }
 
@@ -99,12 +97,12 @@ class Select
     {
         if (!self::isDefined($this->tables, $tableId)) {
             throw new Exception(
-                self::ERROR_BAD_TABLE_ID,
+                Exception::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $id,
                     'name' => $name
                 ),
-                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+                Exception::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
             );
         }
 

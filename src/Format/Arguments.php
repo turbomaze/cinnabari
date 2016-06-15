@@ -29,9 +29,6 @@ use Datto\Cinnabari\Php\Output;
 
 class Arguments
 {
-    const ERROR_WRONG_INPUT_TYPE = 301;
-    const ERROR_INPUT_NOT_PROVIDED = 302;
-
     /** @var array */
     private $input;
 
@@ -48,13 +45,13 @@ class Arguments
     {
         if (!array_key_exists($name, $this->input)) {
             throw new Exception(
-                self::ERROR_INPUT_NOT_PROVIDED,
+                Exception::ERROR_INPUT_NOT_PROVIDED,
                 array(
                     'name' => $name,
                     'neededType' => $neededType,
                     'inputArray' => $this->input
                 ),
-                self::ERROR_INPUT_NOT_PROVIDED .
+                Exception::ERROR_INPUT_NOT_PROVIDED .
                 " Error: input parameter '{$name}' not provided."
             );
         }
@@ -63,12 +60,12 @@ class Arguments
 
         if (($userType !== 'NULL') && ($userType !== $neededType)) {
             throw new Exception(
-                self::ERROR_WRONG_INPUT_TYPE,
+                Exception::ERROR_WRONG_INPUT_TYPE,
                 array(
                     'userType' => $userType,
                     'neededType' => $neededType
                 ),
-                self::ERROR_WRONG_INPUT_TYPE.
+                Exception::ERROR_WRONG_INPUT_TYPE.
                 " Error: '{$userType}' type provided, '{$neededType}' type expected."
             );
         }

@@ -26,10 +26,6 @@ namespace Datto\Cinnabari;
 
 class Schema
 {
-    const ERROR_CLASS_DNE = 101;
-    const ERROR_LIST_DNE = 102;
-    const ERROR_CONNECTION_DNE = 103;
-
     /** @var array */
     private $schema;
 
@@ -44,12 +40,12 @@ class Schema
 
         if ($definition === null) {
             throw new Exception(
-                self::ERROR_CLASS_DNE,
+                Exception::ERROR_CLASS_DNE,
                 array(
                     'class' => $class,
                     'property' => $property
                 ),
-                self::ERROR_CLASS_DNE . " Error: class '{$class}' does not exist."
+                Exception::ERROR_CLASS_DNE . " Error: class '{$class}' does not exist."
             );
         }
 
@@ -65,11 +61,11 @@ class Schema
 
         if ($definition === null) {
             throw new Exception(
-                self::ERROR_LIST_DNE,
+                Exception::ERROR_LIST_DNE,
                 array(
                     'list' => $list
                 ),
-                self::ERROR_LIST_DNE . " Error: list '{$list}' does not exist."
+                Exception::ERROR_LIST_DNE . " Error: list '{$list}' does not exist."
             );
         }
 
@@ -83,12 +79,12 @@ class Schema
 
         if ($definition === null) {
             throw new Exception(
-                self::ERROR_VALUE_DNE,
+                Exception::ERROR_VALUE_DNE,
                 array(
                     'tableIdentifier' => $tableIdentifier,
                     'value' => $value
                 ),
-                self::ERROR_VALUE_DNE . " Error: value '{$value}' does not exist."
+                Exception::ERROR_VALUE_DNE . " Error: value '{$value}' does not exist."
             );
         }
 
@@ -102,12 +98,12 @@ class Schema
 
         if ($definition === null) {
             throw new Exception(
-                self::ERROR_CONNECTION_DNE,
+                Exception::ERROR_CONNECTION_DNE,
                 array(
                     'tableIdentifier' => $tableIdentifier,
                     'connection' => $connection
                 ),
-                self::ERROR_CONNECTION_DNE .
+                Exception::ERROR_CONNECTION_DNE .
                 " Error: connection '{$tableIdentifier}->{$connection}' does not exist."
             );
         }

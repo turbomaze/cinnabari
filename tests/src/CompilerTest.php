@@ -733,7 +733,7 @@ EOS;
                     $exception->getData()
                 ),
                 array(
-                    Arguments::ERROR_WRONG_INPUT_TYPE,
+                    Exception::ERROR_WRONG_INPUT_TYPE,
                     array('userType' => 'string', 'neededType' => 'integer')
                 )
             );
