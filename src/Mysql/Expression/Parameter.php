@@ -32,6 +32,7 @@ class Parameter extends AbstractExpression
     public function __construct($name)
     {
         $this->name = $name;
+        $this->nullable = false;
     }
 
     public function getMysql()

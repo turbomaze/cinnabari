@@ -26,5 +26,8 @@ namespace Datto\Cinnabari\Mysql\Expression;
 
 abstract class AbstractExpression
 {
+    /** @var boolean */
+    public $nullable;
+
     abstract public function getMysql();
 }

@@ -41,7 +41,6 @@ use Datto\Cinnabari\Mysql\Expression\OperatorOr;
 use Datto\Cinnabari\Mysql\Expression\OperatorPlus;
 use Datto\Cinnabari\Mysql\Expression\OperatorRegexpBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
-use Datto\Cinnabari\Mysql\Expression\Parameter;
 
 /**
  * Class Compiler
@@ -149,15 +148,11 @@ class Compiler
     {
         $token = current($this->request);
 
-        if (!self::scanFunction($token, $name, $arguments)) {
-            return false;
-        }
-
-        if ($name !== 'filter') {
-            return false;
-        }
-
-        if (!$this->getExpression($this->class, $this->table, $arguments[0], $where)) {
+        if (
+            !self::scanFunction($token, $name, $arguments) ||
+            $name !== 'filter' ||
+            !$this->getExpression($this->class, $this->table, $arguments[0], $where)
+        ) {
             return false;
         }
 
@@ -230,13 +225,12 @@ class Compiler
 
     private function getParameter($name, $type, &$output)
     {
-        $id = $this->arguments->useArgument($name, $type);
+        $id = $this->arguments->useArgument($name, $type, $output);
 
         if ($id === null) {
             return false;
         }
 
-        $output = new Parameter($id);
         return true;
     }
 
@@ -639,13 +633,13 @@ class Compiler
             return false;
         }
 
-        list($column, ) = $this->schema->getValueDefinition($tableIdentifier, $value);
+        list($column, $nullable) = $this->schema->getValueDefinition($tableIdentifier, $value);
 
         $this->connections($tableId, $tableIdentifier, $path);
 
         $tableAliasIdentifier = "`{$tableId}`";
         $columnExpression = Select::getAbsoluteExpression($tableAliasIdentifier, $column);
-        $output = new Column($columnExpression);
+        $output = new Column($columnExpression, $nullable);
 
         return true;
     }
@@ -752,17 +746,17 @@ class Compiler
 
     private function readMap()
     {
-        if (!self::scanFunction($this->request, $name, $arguments)) {
-            return false;
-        }
-
-        if ($name !== 'map') {
+        if (
+            !self::scanFunction($this->request, $name, $arguments) ||
+            $name !== 'map'
+        ) {
             return false;
         }
 
         $this->request = reset($arguments);
 
-        return $this->readExpression();
+        $result = $this->readExpression();
+        return $result;
     }
 
     private function connections(&$contextId, &$tableAIdentifier, $connections)
@@ -792,19 +786,14 @@ class Compiler
     {
         $token = reset($this->request);
 
-        if (!self::scanFunction($token, $name, $arguments)) {
+        if (
+            !self::scanFunction($token, $name, $arguments) ||
+            $name !== 'sort' ||
+            !self::scanProperty($arguments[0], $property)
+        ) {
             return false;
         }
 
-        if ($name !== 'sort') {
-            return false;
-        }
-
-        $token = $arguments[0];
-
-        if (!self::scanProperty($token, $property)) {
-            return false;
-        }
 
         $propertyDefinition = $this->schema->getPropertyDefinition($this->class, $property);
         $path = $propertyDefinition[1];

@@ -35,11 +35,21 @@ abstract class AbstractOperatorBinary extends AbstractExpression
     /** @var AbstractExpression */
     private $right;
 
-    public function __construct($operator, $left, $right)
+    public function __construct($operator, &$left, &$right)
     {
         $this->operator = $operator;
+
+        // copy over the nullability of its sibling
+        if (is_a($left, 'Datto\Cinnabari\Mysql\Expression\Parameter')) {
+            $left->nullable = $right->nullable;
+        } else if (is_a($right, 'Datto\Cinnabari\Mysql\Expression\Parameter')) {
+            $right->nullable = $left->nullable;
+        }
+
+        // make the assignment
         $this->left = $left;
         $this->right = $right;
+        $this->nullable = $left->nullable && $right->nullable;
     }
 
     public function getMysql()

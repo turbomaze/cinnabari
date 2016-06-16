@@ -29,9 +29,10 @@ class Column extends AbstractExpression
     /** @var string */
     private $mysql;
 
-    public function __construct($mysql)
+    public function __construct($mysql, $nullable)
     {
         $this->mysql = $mysql;
+        $this->nullable = $nullable;
     }
 
     public function getMysql()

@@ -24,6 +24,8 @@
 
 namespace Datto\Cinnabari\Format;
 
+use Datto\Cinnabari\Mysql\Expression\Parameter;
+
 class Arguments
 {
     /** @var array */
@@ -32,13 +34,23 @@ class Arguments
     /** @var array */
     private $output;
 
+    /** @var array */
+    private $neededTypes;
+
+    private static $typeCheckingFunctions = array(
+        'integer' => 'is_integer',
+        'float' => 'is_float',
+        'bool' => 'is_bool',
+        'string' => 'is_string'
+    );
+
     public function __construct($input)
     {
         $this->input = $input;
         $this->output = array();
     }
 
-    public function useArgument($name, $neededType)
+    public function useArgument($name, $neededType, &$parameter)
     {
         if (!array_key_exists($name, $this->input)) {
             return null;
@@ -46,15 +58,21 @@ class Arguments
 
         $userType = gettype($this->input[$name]);
 
+        // bad type
         if (($userType !== 'NULL') && ($userType !== $neededType)) {
             return null;
         }
 
+        // get its id
         $id = &$this->output[$name];
 
         if ($id === null) {
             $id = count($this->output) - 1;
         }
+
+        // create the parameter object and store the required type information
+        $parameter = new Parameter($id);
+        $this->neededTypes[$name] = array($neededType, $parameter);
 
         return $id;
     }
@@ -63,7 +81,35 @@ class Arguments
     {
         $statements = array_map('self::getInputStatement', array_flip($this->output));
         $array = self::getArray($statements);
-        return self::getAssignment('$output', $array);
+        $assignment = self::getAssignment('$output', $array);
+
+        return self::surroundWithTypeCheckIf($assignment, $this->neededTypes);
+    }
+
+    protected static function surroundWithTypeCheckIf($inner, $requiredTypes)
+    {
+        if (count($requiredTypes) === 0) {
+            return $inner;
+        }
+
+        $statement = 'if (' . self::getTypeCheckConstraints($requiredTypes) . ") {\n";
+        $statement .= "\t" . preg_replace('/\\n/', "\n\t", $inner) . "\n";
+        $statement .= "}";
+        return $statement;
+    }
+
+    protected static function getTypeCheckConstraints($requiredTypes)
+    {
+        $checks = array();
+        foreach ($requiredTypes as $name => $typeInfo) {
+            $arrayKeyExists = "array_key_exists('{$name}', \$input)";
+            $typeCheck = self::$typeCheckingFunctions[$typeInfo[0]] . "(\$input['{$name}'])";
+            if ($typeInfo[1]->nullable) {
+                $typeCheck = "(\$input['{$name}'] === null || " . $typeCheck . ')';
+            }
+            $checks[] = "\n\t(" . $arrayKeyExists . ' && ' . $typeCheck . ')';
+        }
+        return join(" && ", $checks) . "\n";
     }
 
     protected static function getInputStatement($key)
