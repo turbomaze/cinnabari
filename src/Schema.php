@@ -36,21 +36,33 @@ class Schema
 
     public function getPropertyDefinition($class, $property)
     {
-        $definition = &$this->schema['classes'][$class][$property];
+        $classDefinition = &$this->schema['classes'][$class];
+        $propertyDefinition = &$this->schema['classes'][$class][$property];
 
-        if ($definition === null) {
+        if ($classDefinition === null) {
             throw new Exception(
                 Exception::ERROR_CLASS_DNE,
                 array(
-                    'class' => $class,
-                    'property' => $property
+                    'class' => $class
                 ),
                 Exception::ERROR_CLASS_DNE . " Error: class '{$class}' does not exist."
             );
         }
+        
+        if ($propertyDefinition === null) {
+            throw new Exception(
+                Exception::ERROR_PROPERTY_DNE,
+                array(
+                    'class' => $class,
+                    'property' => $property
+                ),
+                Exception::ERROR_PROPERTY_DNE . " Error: property '{$property}' " .
+                " of class '{$class}' does not exist."
+            );
+        }
 
-        $type = reset($definition);
-        $path = array_slice($definition, 1);
+        $type = reset($propertyDefinition);
+        $path = array_slice($propertyDefinition, 1);
 
         return array($type, $path);
     }
@@ -84,7 +96,8 @@ class Schema
                     'tableIdentifier' => $tableIdentifier,
                     'value' => $value
                 ),
-                Exception::ERROR_VALUE_DNE . " Error: value '{$value}' does not exist."
+                Exception::ERROR_VALUE_DNE . " Error: value '{$value}' in table " .
+                "'{$tableIdentifier}' does not exist."
             );
         }
 

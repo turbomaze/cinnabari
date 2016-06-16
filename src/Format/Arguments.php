@@ -62,11 +62,12 @@ class Arguments
             throw new Exception(
                 Exception::ERROR_WRONG_INPUT_TYPE,
                 array(
+                    'name' => $name,
                     'userType' => $userType,
                     'neededType' => $neededType
                 ),
                 Exception::ERROR_WRONG_INPUT_TYPE.
-                " Error: '{$userType}' type provided, '{$neededType}' type expected."
+                " Error: '{$userType}' type provided as ':{$name}', '{$neededType}' type expected."
             );
         }
 

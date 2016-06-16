@@ -55,8 +55,6 @@ use Datto\Cinnabari\Mysql\Expression\Parameter;
  */
 class Compiler
 {
-    const ERROR_SYNTAX = 1;
-
     /** @var Schema */
     private $schema;
 
@@ -115,7 +113,12 @@ class Compiler
         $token = array_shift($this->request);
 
         if (!self::scanProperty($token, $array)) {
-            return false;
+            throw new Exception(
+                Exception::NO_ERROR_INITIAL_PROPERTY,
+                array('token' => $token),
+                Exception::NO_ERROR_INITIAL_PROPERTY.
+                " Error: API requests must begin with a property."
+            );
         }
 
         list($class, $path) = $this->schema->getPropertyDefinition('Database', $array);
@@ -127,6 +130,7 @@ class Compiler
         $list = array_pop($path);
 
         list($table, $id, $hasZero) = $this->schema->getListDefinition($list);
+
         if (!isset($table, $id, $hasZero)) {
             return false;
         }
@@ -143,7 +147,12 @@ class Compiler
         $this->request = reset($this->request);
 
         if (!$this->readMap()) {
-            return false;
+            throw new Exception(
+                Exception::ERROR_NO_MAP_FUNCTION,
+                array('request' => $this->request),
+                Exception::ERROR_NO_MAP_FUNCTION .
+                " Error: API requests must end with a map function."
+            );
         }
 
         $this->phpOutput = Output::getList($idAlias, $hasZero, true, $this->phpOutput);
@@ -162,12 +171,27 @@ class Compiler
             return false;
         }
 
+        // at this point, we're sure they want to filter
         if (!isset($arguments) || count($arguments) === 0) {
-            return false;
+            throw new Exception(
+                Exception::ERROR_NO_FILTER_ARGUMENTS, 
+                array('token' => $token),
+                Exception::ERROR_NO_FILTER_ARGUMENTS .
+                " Error: filter functions take one expression argument, none provided."
+            );
         }
 
         if (!$this->getExpression($this->class, $this->table, $arguments[0], $where)) {
-            return false;
+            throw new Exception(
+                Exception::ERROR_BAD_FILTER_EXPRESSION, 
+                array(
+                    'class' => $this->class,
+                    'table' => $this->table,
+                    'arguments' => $arguments[0]
+                ),
+                Exception::ERROR_BAD_FILTER_EXPRESSION .
+                " Error: malformed expression supplied to the filter function."
+            );
         }
 
         $this->mysql->setWhere($where);
@@ -828,9 +852,19 @@ class Compiler
             return false;
         }
 
+        // at this point they definitely intend to use a map function
         $this->request = reset($arguments);
 
-        return $this->readExpression();
+        if (!$this->readExpression()) {
+            throw new Exception(
+                Exception::ERROR_BAD_MAP_ARGUMENT,
+                array('request' => $this->request),
+                Exception::ERROR_BAD_MAP_ARGUMENT .
+                " Error: map functions take a property, path, object, or function as an argument."
+            );
+        } else {
+            return true;
+        }
     }
 
     private function connections(&$contextId, &$tableAIdentifier, $connections)
@@ -874,8 +908,14 @@ class Compiler
             return false;
         }
 
+        // at this point, we're sure they want to sort
         if (!isset($arguments) || count($arguments) === 0) {
-            return false;
+            throw new Exception(
+                Exception::ERROR_NO_SORT_ARGUMENTS,
+                array('token' => $token),
+                Exception::ERROR_NO_SORT_ARGUMENTS .
+                " Error: sort functions take one property argument, none provided."
+            );
         }
 
         $token = $arguments[0];
