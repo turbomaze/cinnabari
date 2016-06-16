@@ -2,6 +2,8 @@
 
 namespace Datto\Cinnabari\Php;
 
+use Datto\Cinnabari\Exception;
+
 class Output
 {
     const TYPE_NULL = 0;
@@ -115,9 +117,9 @@ class Output
                 throw new Exception(
                     Exception::ERROR_UNKNOWN_TYPECAST,
                     array(
-                        'type' => $type 
+                        'type' => $type
                     ),
-                    self::Exception.
+                    Exception::ERROR_UNKNOWN_TYPECAST .
                     " Error: failed to typecast unknown type '{$type}'."
                 );
         }

@@ -13,6 +13,7 @@ class Exception extends \Exception
 
     // mysql errors
     const ERROR_BAD_TABLE_ID = 201;
+    const ERROR_INVALID_MYSQL = 202;
 
     // arguments errors
     const ERROR_WRONG_INPUT_TYPE = 301;

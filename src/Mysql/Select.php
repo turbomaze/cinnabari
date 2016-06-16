@@ -24,6 +24,7 @@
 
 namespace Datto\Cinnabari\Mysql;
 
+use Datto\Cinnabari\Exception;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 class Select
@@ -53,7 +54,7 @@ class Select
     /**
      * @param string $name
      * Mysql table identifier (e.g. "`people`")
-     * 
+     *
      * @return int
      * Numeric table identifier (e.g. 0)
      */
@@ -74,10 +75,9 @@ class Select
             throw new Exception(
                 Exception::ERROR_BAD_TABLE_ID,
                 array(
-                    'tableId' => $id,
-                    'name' => $name
+                    'tableId' => $tableAId
                 ),
-                Exception::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+                Exception::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$tableAId}'."
             );
         }
 
@@ -99,10 +99,9 @@ class Select
             throw new Exception(
                 Exception::ERROR_BAD_TABLE_ID,
                 array(
-                    'tableId' => $id,
-                    'name' => $name
+                    'tableId' => $tableId
                 ),
-                Exception::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+                Exception::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$tableId}'."
             );
         }
 
@@ -124,12 +123,11 @@ class Select
     {
         if (!self::isDefined($this->tables, $tableId)) {
             throw new Exception(
-                self::ERROR_BAD_TABLE_ID,
+                Exception::ERROR_BAD_TABLE_ID,
                 array(
-                    'tableId' => $id,
-                    'name' => $name
+                    'tableId' => $tableId
                 ),
-                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+                Exception::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$tableId}'."
             );
         }
 
@@ -143,9 +141,9 @@ class Select
     {
         if (!$this->isValid()) {
             throw new Exception(
-                self::ERROR_INVALID_MYSQL,
+                Exception::ERROR_INVALID_MYSQL,
                 array(),
-                self::ERROR_INVALID_MYSQL . " Error: SQL queries must reference at least one table and column."
+                Exception::ERROR_INVALID_MYSQL . " Error: SQL queries must reference at least one table and column."
             );
         }
 
@@ -162,12 +160,12 @@ class Select
 
         if (!is_string($name)) {
             throw new Exception(
-                self::ERROR_BAD_TABLE_ID,
+                Exception::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $id,
                     'name' => $name
                 ),
-                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+                Exception::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
             );
         }
 

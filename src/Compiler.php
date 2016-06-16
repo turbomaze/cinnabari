@@ -114,9 +114,9 @@ class Compiler
 
         if (!self::scanProperty($token, $array)) {
             throw new Exception(
-                Exception::NO_ERROR_INITIAL_PROPERTY,
+                Exception::ERROR_NO_INITIAL_PROPERTY,
                 array('token' => $token),
-                Exception::NO_ERROR_INITIAL_PROPERTY.
+                Exception::ERROR_NO_INITIAL_PROPERTY .
                 " Error: API requests must begin with a property."
             );
         }
@@ -174,7 +174,7 @@ class Compiler
         // at this point, we're sure they want to filter
         if (!isset($arguments) || count($arguments) === 0) {
             throw new Exception(
-                Exception::ERROR_NO_FILTER_ARGUMENTS, 
+                Exception::ERROR_NO_FILTER_ARGUMENTS,
                 array('token' => $token),
                 Exception::ERROR_NO_FILTER_ARGUMENTS .
                 " Error: filter functions take one expression argument, none provided."
@@ -183,7 +183,7 @@ class Compiler
 
         if (!$this->getExpression($this->class, $this->table, $arguments[0], $where)) {
             throw new Exception(
-                Exception::ERROR_BAD_FILTER_EXPRESSION, 
+                Exception::ERROR_BAD_FILTER_EXPRESSION,
                 array(
                     'class' => $this->class,
                     'table' => $this->table,

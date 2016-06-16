@@ -2,6 +2,7 @@
 
 namespace Datto\Cinnabari\Tests;
 
+use Datto\Cinnabari\Exception;
 use Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Lexer;
 use Datto\Cinnabari\Parser;
@@ -682,7 +683,8 @@ SELECT
     INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
     WHERE (`1`.`First` REGEXP BINARY :0)
 EOS;
-$phpInput = <<<'EOS'
+        
+        $phpInput = <<<'EOS'
 $output = array(
     $input['regex']
 );
@@ -702,10 +704,10 @@ EOS;
     public function testFailParameterPath()
     {
         // we're expecting an exception
-        $this->setExpectedException('Exception');
 
         // the api method call
         $scenario = json_decode(self::getRelationshipsScenario(), true);
+
         $method = <<<'EOS'
 people.filter(match(name.:a, :regex)).map(age)
 EOS;
@@ -714,35 +716,21 @@ EOS;
             'a' => 'foo'
         );
 
-        // cinnabari stuff
-        $lexer = new Lexer();
-        $parser = new Parser();
-        $schema = new Schema($scenario);
-        $compiler = new Compiler($schema);
-
-        $tokens = $lexer->tokenize($method);
-        $request = $parser->parse($tokens);
-
-        // try to compile
-        try {
-            $actual = $compiler->compile($request, $arguments);
-        } catch (Exception $exception) {
-            $this->assertSame(
-                array(
-                    $exception->getCode(),
-                    $exception->getData()
-                ),
-                array(
-                    Exception::ERROR_WRONG_INPUT_TYPE,
-                    array('userType' => 'string', 'neededType' => 'integer')
-                )
-            );
-        }
+        // verify the exception
+        $this->verifyException(
+            $scenario,
+            $method,
+            $arguments,
+            Exception::ERROR_WRONG_INPUT_TYPE,
+            array('name' => 'a', 'userType' => 'string', 'neededType' => 'integer')
+        );
     }
     
     public function testFailParameterPropertyPath()
     {
-        $scenario = self::getRelationshipsScenario();
+        // we're expecting an exception
+
+        $scenario = json_decode(self::getRelationshipsScenario(), true);
 
         $method = <<<'EOS'
 people.filter(match(name.:a.first, :regex)).map(age)
@@ -753,11 +741,28 @@ EOS;
             'a' => 'foo'
         );
 
-        $mysql = null;
-        $phpInput = null;
-        $phpOutput = null;
-
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        // verify the exception
+        $this->verifyException(
+            $scenario,
+            $method,
+            $arguments,
+            Exception::ERROR_BAD_FILTER_EXPRESSION,
+            array(
+                'class' => 'Person',
+                'table' => 0,
+                'arguments' => array(
+                    3,
+                    'match',
+                    array(
+                        5,
+                        array(2, 'name'),
+                        array(1, 'a'),
+                        array(2, 'first')
+                    ),
+                    array(1, 'regex')
+                )
+            )
+        );
     }
 
     private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
@@ -787,5 +792,36 @@ EOS;
                 TestUtils::removePHPWhitespace($actual[$i])
             );
         }
+    }
+
+    private function verifyException($scenarioJson, $method, $arguments, $code, $data)
+    {
+        // cinnabari stuff
+        $lexer = new Lexer();
+        $parser = new Parser();
+        $schema = new Schema($scenarioJson);
+        $compiler = new Compiler($schema);
+
+        $tokens = $lexer->tokenize($method);
+        $request = $parser->parse($tokens);
+
+        // try to compile
+        try {
+            $compiler->compile($request, $arguments);
+            $actual = null;
+        } catch (Exception $exception) {
+            $actual = array(
+                'code' => $exception->getCode(),
+                'data' => $exception->getData()
+            );
+        }
+
+        $this->assertSame(
+            $actual,
+            array(
+                'code' => $code,
+                'data' => $data
+            )
+        );
     }
 }
