@@ -442,15 +442,22 @@ class Compiler
 
     private function getMatchFunction($class, $tableId, $property, $pattern, &$expression)
     {
-        if (($property[0] !== Parser::TYPE_PROPERTY) || !$this->getStringProperty($class, $tableId, $property[1], $propertyExpression)) {
-            return false;
+        if ($property[0] === Parser::TYPE_PATH) {
+            $tokens = array_slice($property, 1);
+            if (!$this->getStringPath($class, $tableId, $tokens, $argumentExpression, Parser::TYPE_PROPERTY)) {
+                return false;
+            }
+        } else {
+            if (!$this->getStringProperty($class, $tableId, $property[1], $argumentExpression)) {
+                return false;
+            }
         }
 
         if (($pattern[0] !== Parser::TYPE_PARAMETER) || !$this->getStringParameter($pattern[1], $patternExpression)) {
             return false;
         }
 
-        $expression = new OperatorRegexpBinary($propertyExpression, $patternExpression);
+        $expression = new OperatorRegexpBinary($argumentExpression, $patternExpression);
         return true;
     }
 
@@ -545,6 +552,23 @@ class Compiler
         }
     }
 
+    private function getStringPropertyExpression($class, $tableId, $token, &$output)
+    {
+        $type = $token[0];
+
+        switch ($type) {
+            case Parser::TYPE_PATH:
+                $tokens = array_slice($token, 1);
+                return $this->getStringPath($class, $tableId, $tokens, $output, Parser::TYPE_PROPERTY);
+
+            case Parser::TYPE_PROPERTY:
+                return $this->getStringProperty($class, $tableId, $token[1], $output);
+
+            default:
+                return false;
+        }
+    }
+
     private function getStringExpression($class, $tableId, $token, &$output)
     {
         $type = $token[0];
@@ -565,7 +589,7 @@ class Compiler
         }
     }
 
-    private function getStringPath($class, $tableId, $tokens, &$output)
+    private function getStringPath($class, $tableId, $tokens, &$output, $type = null)
     {
         $token = reset($tokens);
 
@@ -587,7 +611,11 @@ class Compiler
             $request = $tokens;
         }
 
-        return $this->getStringExpression($class, $tableId, $request, $output);
+        if ($type === Parser::TYPE_PROPERTY) {
+            return $this->getStringPropertyExpression($class, $tableId, $request, $output);
+        } else {
+            return $this->getStringExpression($class, $tableId, $request, $output);
+        }
     }
 
     private function getStringParameter($name, &$output)
