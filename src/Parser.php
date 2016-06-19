@@ -31,7 +31,6 @@ class Parser
     const TYPE_PROPERTY = 2;
     const TYPE_FUNCTION = 3;
     const TYPE_OBJECT = 4;
-    const TYPE_PATH = 5;
 
     // Operator Arity
     const UNARY = 1;
