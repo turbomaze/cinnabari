@@ -78,7 +78,7 @@ class Compiler
     /** @var int */
     private $table;
 
-    public function __construct(Schema $schema)
+    public function __construct($schema)
     {
         $this->schema = $schema;
     }

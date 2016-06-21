@@ -31,7 +31,7 @@ class Cinnabari
     /** @var Schema */
     private $schema;
 
-    public function __construct(Schema $schema)
+    public function __construct($schema)
     {
         $this->schema = $schema;
     }
@@ -40,7 +40,8 @@ class Cinnabari
     public function translate($query, $arguments)
     {
         $tokens = self::getTokens($query);
-        $request = self::getRequest($tokens);
+        $parseTree = self::getParseTree($tokens);
+        $request = self::getRequest($this->schema, $parseTree);
 
         return self::getResult($this->schema, $request, $arguments);
     }
@@ -57,17 +58,24 @@ class Cinnabari
         }
     }
 
-    private static function getRequest($tokens)
+    private static function getParseTree($tokens)
     {
         $parser = new Parser();
         return $parser->parse($tokens);
     }
 
-    private static function getResult(Schema $schema, $request, $arguments)
+    private static function getRequest($schema, $tree)
+    {
+        $translator = new Translator($schema);
+        return $translator->translate($tree);
+    }
+
+    private static function getResult($schema, $request, $arguments)
     {
         try {
             $compiler = new Compiler($schema);
-            return $compiler->compile($request, $arguments);
+            $foo = $compiler->compile($request, $arguments);
+            return $foo;
         } catch (Exception $exception) {
 
             // TODO:
