@@ -106,16 +106,9 @@ class Select
         $this->orderBy = $mysql;
     }
 
-    public function addValue($tableId, $column)
+    public function addValue($column)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
-        $table = self::getIdentifier($tableId);
-        $name = self::getAbsoluteExpression($table, $column);
-
-        return self::insert($this->columns, $name);
+        return self::insert($this->columns, $column);
     }
 
     public function getMysql()
