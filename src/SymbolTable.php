@@ -23,34 +23,48 @@ class SymbolTable
 
     public function getSymbols($tree, &$output)
     {
-        // where to save the symbols
-        $symbols = array();
+        $symbols = array(); // where to save the symbols
         $symbolLookup = array(); // helps avoid duplicates
+        $joins = array(); // keep track of the joins
 
         // first element in a Datto API tree is the context
         $context = $tree[1][1];
 
         // handle the first connection
+        $this->enterDatabase($symbols, $class, $tableName, $context);
+
+        // get rid of the first two components of the outermost path token
+        $treeSuffix = array_slice($tree, 2);
+
+        // traverse the tree (dfs) and keep track of the symbols
+        $output = array();
+        foreach ($treeSuffix as $node) {
+            $output[] = $this->traverse($symbols, $symbolLookup, $joins, $class, $tableName, $node);
+        }
+
+        // add in the preamble; entry table name and the joins
+        $prefix = array([Parser::TYPE_TABLE, $tableName, 0]); // initial table token
+        foreach ($joins as $join => $joinId) {
+            $symbolId = count($symbols);
+            $prefix[] = [Parser::TYPE_JOIN, $symbolId];
+            $symbols[] = $join;
+        }
+        $output = array_merge($prefix, $output);
+
+        return $symbols;
+    }
+
+    private function enterDatabase(&$symbols, &$class, &$tableName, $context)
+    {
         list($class, $path) = $this->schema->getPropertyDefinition('Database', $context);
         $list = array_pop($path);
         list($tableName, $id, $hasZero) = $this->schema->getListDefinition($list);
         $this->connections($tables, $startTable, $tableName, $path);
         $table = count($tables);
         $symbols[] = "`{$table}`.{$id}"; // this is a special symbol
-
-        // get rid of the first two components of the outermost path token
-        $treeSuffix = array_slice($tree, 2);
-
-        // traverse the tree (dfs) and keep track of the symbols
-        $output = array([Parser::TYPE_TABLE, $tableName, 0]); // initial table token
-        foreach ($treeSuffix as $node) {
-            $output[] = $this->traverse($symbols, $symbolLookup, $class, $tableName, $node);
-        }
-
-        return $symbols;
     }
 
-    public function traverse(&$symbols, &$symbolLookup, $class, $tableName, $node)
+    private function traverse(&$symbols, &$symbolLookup, &$joins, $class, $tableName, $node)
     {
         list($type, $value, ) = $node;
 
@@ -61,6 +75,7 @@ class SymbolTable
                     return $elem[1];
                 }, array_slice($node, 1));
                 // fall through and continue; this just sets the path
+
             case Parser::TYPE_PROPERTY:
                 if ($type === Parser::TYPE_PROPERTY) {
                     $path = array($value);
@@ -74,28 +89,31 @@ class SymbolTable
 
                 // get the property's MySQL and add it to the symbol table
                 $symbolId = count($symbols) - 1;
-                $symbols[] = $this->getMySQLIdentifier($class, $tableName, $path);
+                $symbols[] = $this->getMySQLIdentifier($class, $tableName, $path, $newJoins);
+                $joins = array_merge($joins, $newJoins);
                 $symbolLookup[$pathKey] = $symbolId;
                 return [Parser::TYPE_VALUE, $symbolId];
+
             // recurse on objects
             case Parser::TYPE_OBJECT:
                 $newTree = array();
                 foreach ($value as $key => $child) {
-                    $newTree[$key] = $this->traverse($symbols, $symbolLookup, $class, $tableName, $child);
+                    $newTree[$key] = $this->traverse($symbols, $symbolLookup, $joins, $class, $tableName, $child);
                 }
                 return [Parser::TYPE_OBJECT, $newTree];
+
             // recurse on functions
             case Parser::TYPE_FUNCTION:
                 $newTree = array_slice($node, 0, 2);
                 foreach (array_slice($node, 2) as $child) {
-                    $newTree[] = $this->traverse($symbols, $symbolLookup, $class, $tableName, $child);
+                    $newTree[] = $this->traverse($symbols, $symbolLookup, $joins, $class, $tableName, $child);
                 }
                 return $newTree;
         }
         return $node;
     }
 
-    private function getMySQLIdentifier($class, $tableName, $apiPath)
+    private function getMySQLIdentifier($class, $tableName, $apiPath, &$joins)
     {
         // initialize the table and class with the first connection
         $tables = array($tableName => 0);
@@ -115,6 +133,9 @@ class SymbolTable
         $this->connections($tables, $table, $tableName, $path);
         $tableName = $this->getTable($tables, $table);
         list($column, $isColumnNullable) = $this->schema->getValueDefinition($tableName, $value);
+
+        // add the joins
+        $joins = array_slice($tables, 1);
 
         // return the annotation
         return array("`{$table}`.{$column}", self::$NAME_FROM_TYPE[$type]);
