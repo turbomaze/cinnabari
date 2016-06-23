@@ -397,15 +397,8 @@ class Compiler
 
     private function getMatchFunction($property, $pattern, &$expression)
     {
-        if ($property[0] === Parser::TYPE_PATH) {
-            $tokens = array_slice($property, 1);
-            if (!$this->getStringPath($tokens, $argumentExpression, Parser::TYPE_VALUE)) {
-                return false;
-            }
-        } else {
-            if (!$this->getStringProperty($property[1], $argumentExpression)) {
-                return false;
-            }
+        if (!$this->getStringProperty($property[1], $argumentExpression)) {
+            return false;
         }
 
         if (($pattern[0] !== Parser::TYPE_PARAMETER) || !$this->getStringParameter($pattern[1], $patternExpression)) {
@@ -418,23 +411,25 @@ class Compiler
 
     private function getNumericExpression($token, &$output)
     {
-        $type = $token[0];
+        list($type, $name) = $token;
 
         switch ($type) {
             case Parser::TYPE_PARAMETER:
-                return $this->getNumericParameter($token[1], $output);
+                return $this->getNumericParameter($name, $output);
 
             case Parser::TYPE_VALUE:
-                return $this->getNumericProperty($token[1], $output);
+                return $this->getNumericProperty($name, $output);
 
             case Parser::TYPE_FUNCTION:
-                return $this->getNumericBinaryFunction($token[1], $token[2], $token[3], $output);
+                $arguments = $token[2];
+                return $this->getNumericBinaryFunction(
+                    $name, $arguments[0], $arguments[1], $output
+                );
 
             default:
                 return false;
         }
     }
-
 
     private function getNumericParameter($name, &$output)
     {
