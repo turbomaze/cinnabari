@@ -21,7 +21,7 @@ class SymbolTable
         $this->schema = $schema;
     }
 
-    public function getSymbols($tree, &$output)
+    public function getSymbols($tree)
     {
         $symbols = array(); // where to save the symbols
         $symbolLookup = array(); // helps avoid duplicates
@@ -43,15 +43,14 @@ class SymbolTable
         }
 
         // add in the preamble; entry table name and the joins
-        $prefix = array([Parser::TYPE_TABLE, $tableName, 0]); // initial table token
+        $preamble = array([Parser::TYPE_TABLE, $tableName, 0]); // initial table token
         foreach ($joins as $join => $joinId) {
             $symbolId = count($symbols);
-            $prefix[] = [Parser::TYPE_JOIN, $symbolId];
+            $preamble[] = [Parser::TYPE_JOIN, $symbolId];
             $symbols[] = $join;
         }
-        $output = array_merge($prefix, $output);
 
-        return $symbols;
+        return array($symbols, $preamble, $output);
     }
 
     private function enterDatabase(&$symbols, &$class, &$tableName, $context)
@@ -88,7 +87,7 @@ class SymbolTable
                 }
 
                 // get the property's MySQL and add it to the symbol table
-                $symbolId = count($symbols) - 1;
+                $symbolId = count($symbols);
                 $symbols[] = $this->getMySQLIdentifier($class, $tableName, $path, $newJoins);
                 $joins = array_merge($joins, $newJoins);
                 $symbolLookup[$pathKey] = $symbolId;

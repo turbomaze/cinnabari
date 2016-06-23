@@ -1,27 +1,5 @@
 <?php
 
-/**
- * Copyright (C) 2016 Datto, Inc.
- *
- * This file is part of Cinnabari.
- *
- * Cinnabari is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License, version 3,
- * as published by the Free Software Foundation.
- *
- * Cinnabari is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Cinnabari. If not, see <http://www.gnu.org/licenses/>.
- *
- * @author Spencer Mortensen <smortensen@datto.com>
- * @license http://www.gnu.org/licenses/lgpl-3.0.html LGPL-3.0
- * @copyright 2016 Datto, Inc.
- */
-
 namespace Datto\Cinnabari;
 
 use Datto\Cinnabari\Mysql\Select;
@@ -43,22 +21,16 @@ use Datto\Cinnabari\Mysql\Expression\OperatorRegexpBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 
-/**
- * Class Compiler
- * @package Datto\Cinnabari
- *
- * EBNF:
- *
- * request = list, [ filter-function ], map-function
- * map-argument = path | property | object | map
- * object-value = path | property | object | map
- */
-class Compiler
+class SymbolTableCompiler
 {
-    const ERROR_SYNTAX = 1;
-
     /** @var Schema */
     private $schema;
+
+    /** @var array */
+    private $symbols;
+
+    /** @var array */
+    private $preamble;
 
     /** @var array */
     private $request;
@@ -72,24 +44,22 @@ class Compiler
     /** @var string */
     private $phpOutput;
 
-    /** @var string */
-    private $class;
-
-    /** @var int */
-    private $table;
-
     public function __construct(Schema $schema)
     {
         $this->schema = $schema;
     }
 
-    public function compile($request, $arguments)
+    public function compile($symbols, $preamble, $annotatedTree, $arguments)
     {
-        $this->request = $request;
+        $this->symbols = $symbols;
+        $this->preamble = $preamble;
+        $this->request = $annotatedTree;
 
         $this->mysql = new Select();
         $this->arguments = new Arguments($arguments);
         $this->phpOutput = null;
+
+        $this->initializeMySQL($preamble);
 
         if (!$this->getArrayProperty()) {
             return null;
@@ -105,25 +75,32 @@ class Compiler
         return array($mysql, $formatInput, $this->phpOutput);
     }
 
+    private function initializeMySQL()
+    {
+        // the table entry point
+        $this->mysql->setTable($this->preamble[0][1]);
+        $idReference = $this->symbols[$this->preamble[0][2]];
+        $this->mysql->addValue($idReference);
+
+        // the joins
+        foreach (array_slice($this->preamble, 1) as list($joinToken, $joinId)) {
+            $join = $this->symbols[$joinId];
+            $this->mysql->insertIntoTables($join);
+        }
+    }
+
     private function getArrayProperty()
     {
-        $token = array_shift($this->request);
-
-        // get list
-        $table = $token[1];
-        $this->table = $this->mysql->setTable($table);
-
-        // add the id value
-        $id = $token[2];
-        $idAlias = $this->mysql->addValue($id);
-
         // get functions
         $this->getOptionalFilterFunction();
         $this->getOptionalSortFunction();
 
+        $this->request = reset($this->request);
+
         // process map
         $this->readMap();
 
+        $idAlias = 0; // TODO
         $this->phpOutput = Output::getList($idAlias, false, true, $this->phpOutput);
         return true;
     }
@@ -140,7 +117,7 @@ class Compiler
             return false;
         }
 
-        if (!$this->getExpression($arguments, $where)) {
+        if (!$this->getExpression($arguments[0], $where)) {
             return false;
         }
 
@@ -159,7 +136,6 @@ class Compiler
 
     private function getBooleanExpression($token, &$output)
     {
-        $token = $token[0];
         list($type, $name) = $token;
 
         switch ($type) {
@@ -170,7 +146,7 @@ class Compiler
                 return $this->getBooleanProperty($name, $output);
 
             case Parser::TYPE_FUNCTION:
-                $arguments = $token[2];
+                $arguments = array_slice($token, 2);
                 return $this->getBooleanFunction($name, $arguments, $output);
 
             default:
@@ -421,7 +397,7 @@ class Compiler
                 return $this->getNumericProperty($name, $output);
 
             case Parser::TYPE_FUNCTION:
-                $arguments = $token[2];
+                $arguments = array_slice($token, 2);
                 return $this->getNumericBinaryFunction(
                     $name, $arguments[0], $arguments[1], $output
                 );
@@ -437,10 +413,10 @@ class Compiler
         || $this->getParameter($name, 'double', $output);
     }
 
-    private function getNumericProperty($name, &$output)
+    private function getNumericProperty($propertyId, &$output)
     {
-        return $this->getProperty($name, Output::TYPE_INTEGER, $output)
-        || $this->getProperty($name, Output::TYPE_FLOAT, $output);
+        return $this->getProperty($propertyId, Output::TYPE_INTEGER, $output)
+        || $this->getProperty($propertyId, Output::TYPE_FLOAT, $output);
     }
 
     private function getNumericBinaryFunction($name, $argumentA, $argumentB, &$expression)
@@ -474,19 +450,6 @@ class Compiler
         }
     }
 
-    private function getStringPropertyExpression($token, &$output)
-    {
-        $type = $token[0];
-
-        switch ($type) {
-            case Parser::TYPE_VALUE:
-                return $this->getStringProperty($token[1], $output);
-
-            default:
-                return false;
-        }
-    }
-
     private function getStringExpression($token, &$output)
     {
         $type = $token[0];
@@ -508,14 +471,15 @@ class Compiler
         return $this->getParameter($name, 'string', $output);
     }
 
-    private function getStringProperty($name, &$output)
+    private function getStringProperty($propertyId, &$output)
     {
-        return $this->getProperty($name, Output::TYPE_STRING, $output);
+        return $this->getProperty($propertyId, Output::TYPE_STRING, $output);
     }
 
-    private function getProperty($name, $neededType, &$output)
+    private function getProperty($propertyId, $neededType, &$output)
     {
-        $output = new Column($name);
+        list($columnReference, $type) = $this->symbols[$propertyId];
+        $output = new Column($columnReference);
         return true;
     }
 
@@ -546,8 +510,8 @@ class Compiler
             return false;
         }
 
-        $type = $this->request[2];
-        $columnId = $this->mysql->addValue($property);
+        list($columnReference, $type) = $this->symbols[$property];
+        $columnId = $this->mysql->addValue($columnReference);
         $this->phpOutput = Output::getValue($columnId, true, $type);
         return true;
     }
@@ -574,7 +538,6 @@ class Compiler
 
     private function readMap()
     {
-        $this->request = $this->request[0];
         if (!self::scanFunction($this->request, $name, $arguments)) {
             return false;
         }
@@ -586,29 +549,6 @@ class Compiler
         $this->request = reset($arguments);
 
         return $this->readExpression();
-    }
-
-    private function connections(&$contextId, &$tableAIdentifier, $connections)
-    {
-        foreach ($connections as $key => $connection) {
-            $definition = $this->schema->getConnectionDefinition($tableAIdentifier, $connection);
-
-            list($tableBIdentifier, $expression, $id, $allowsZeroMatches, $allowsMultipleMatches) = $definition;
-
-            if (!$allowsZeroMatches && !$allowsMultipleMatches) {
-                $joinType = Select::JOIN_INNER;
-            } else {
-                $joinType = Select::JOIN_LEFT;
-
-                if ($this->phpOutput !== null) {
-                    $idAlias = $this->mysql->addValue($this->table, $id);
-                    $this->phpOutput = Output::getList($idAlias, $allowsZeroMatches, $allowsMultipleMatches, $this->phpOutput);
-                }
-            }
-
-            $contextId = $this->mysql->addJoin($contextId, $tableBIdentifier, $expression, $joinType);
-            $tableAIdentifier = $tableBIdentifier;
-        }
     }
 
     private function getOptionalSortFunction()
@@ -625,23 +565,12 @@ class Compiler
 
         $token = $arguments[0];
 
-        if (!self::scanProperty($token, $property)) {
+        if (!$this->scanProperty($token, $propertyId)) {
             return false;
         }
 
-        $propertyDefinition = $this->schema->getPropertyDefinition($this->class, $property);
-        $path = $propertyDefinition[1];
-
-        $value = array_pop($path);
-
-        $tableIdentifier = $this->mysql->getTable($this->table);
-        $this->connections($this->table, $tableIdentifier, $path);
-
-        $valueDefinition = $this->schema->getValueDefinition($tableIdentifier, $value);
-        $column = $valueDefinition[0];
-
-        $this->mysql->setOrderBy($this->table, $column, true);
-
+        list($columnReference, $type) = $this->symbols[$propertyId];
+        $this->mysql->setOrderBy($columnReference, true);
         array_shift($this->request);
         return true;
     }
@@ -656,13 +585,13 @@ class Compiler
         return true;
     }
 
-    private static function scanProperty($token, &$name)
+    private static function scanProperty($token, &$propertyId)
     {
         if (!self::isPropertyToken($token)) {
             return false;
         }
 
-        $name = $token[1];
+        $propertyId = $token[1];
         return true;
     }
 
@@ -673,7 +602,7 @@ class Compiler
         }
 
         $name = $input[1];
-        $arguments = $input[2];
+        $arguments = array_slice($input, 2);
         return true;
     }
 
