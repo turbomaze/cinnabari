@@ -44,9 +44,7 @@ class SymbolTable
         // traverse the tree (dfs) and keep track of the symbols
         $output = array([Parser::TYPE_TABLE, $tableName, 0]); // initial table token
         foreach ($treeSuffix as $node) {
-            $output[] = $this->traverse(
-                $symbols, $symbolLookup, $class, $tableName, $node
-            );
+            $output[] = $this->traverse($symbols, $symbolLookup, $class, $tableName, $node);
         }
 
         return $symbols;
@@ -56,12 +54,13 @@ class SymbolTable
     {
         list($type, $value, ) = $node;
 
-        switch($type) {
+        switch ($type) {
             // terminal values: paths and properties
             case Parser::TYPE_PATH:
-                $path = array_map(function($elem) {
-                    return $elem[1]; 
+                $path = array_map(function ($elem) {
+                    return $elem[1];
                 }, array_slice($node, 1));
+                // fall through and continue; this just sets the path
             case Parser::TYPE_PROPERTY:
                 if ($type === Parser::TYPE_PROPERTY) {
                     $path = array($value);
@@ -75,27 +74,21 @@ class SymbolTable
 
                 // get the property's MySQL and add it to the symbol table
                 $symbolId = count($symbols) - 1;
-                $symbols[] = $this->getMySQLIdentifier(
-                    $class, $tableName, $path
-                );
+                $symbols[] = $this->getMySQLIdentifier($class, $tableName, $path);
                 $symbolLookup[$pathKey] = $symbolId;
                 return [Parser::TYPE_VALUE, $symbolId];
             // recurse on objects
             case Parser::TYPE_OBJECT:
                 $newTree = array();
                 foreach ($value as $key => $child) {
-                    $newTree[$key] = $this->traverse(
-                        $symbols, $symbolLookup, $class, $tableName, $child
-                    );
+                    $newTree[$key] = $this->traverse($symbols, $symbolLookup, $class, $tableName, $child);
                 }
                 return [Parser::TYPE_OBJECT, $newTree];
             // recurse on functions
-            case Parser::TYPE_FUNCTION;
+            case Parser::TYPE_FUNCTION:
                 $newTree = array_slice($node, 0, 2);
                 foreach (array_slice($node, 2) as $child) {
-                    $newTree[] = $this->traverse(
-                        $symbols, $symbolLookup, $class, $tableName, $child
-                    );
+                    $newTree[] = $this->traverse($symbols, $symbolLookup, $class, $tableName, $child);
                 }
                 return $newTree;
         }
@@ -117,9 +110,7 @@ class SymbolTable
         }
 
         // handle the final element separately to get its value
-        list($type, $path) = $this->schema->getPropertyDefinition(
-            $class, $apiPath[count($apiPath)-1]
-        );
+        list($type, $path) = $this->schema->getPropertyDefinition($class, $apiPath[count($apiPath)-1]);
         $value = array_pop($path);
         $this->connections($tables, $table, $tableName, $path);
         $tableName = $this->getTable($tables, $table);
