@@ -6,6 +6,9 @@ use Datto\Cinnabari\Exception;
 
 class Output
 {
+    // php output errors
+    const ERROR_UNKNOWN_TYPECAST = 401;
+
     const TYPE_NULL = 0;
     const TYPE_BOOLEAN = 1;
     const TYPE_INTEGER = 2;
@@ -115,11 +118,11 @@ class Output
 
             default:
                 throw new Exception(
-                    Exception::ERROR_UNKNOWN_TYPECAST,
+                    self::ERROR_UNKNOWN_TYPECAST,
                     array(
                         'type' => $type
                     ),
-                    Exception::ERROR_UNKNOWN_TYPECAST .
+                    self::ERROR_UNKNOWN_TYPECAST .
                     " Error: failed to typecast unknown type '{$type}'."
                 );
         }

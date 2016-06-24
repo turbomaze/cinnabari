@@ -4,8 +4,9 @@ namespace Datto\Cinnabari\Tests;
 
 use Datto\Cinnabari\Exception;
 use Datto\Cinnabari\Compiler;
-use Datto\Cinnabari\Lexer;
 use Datto\Cinnabari\Parser;
+use Datto\Cinnabari\Lexer;
+use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Schema;
 use PHPUnit_Framework_TestCase;
 
@@ -706,7 +707,7 @@ EOS;
         // we're expecting an exception
 
         // the api method call
-        $scenario = json_decode(self::getRelationshipsScenario(), true);
+        $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
 people.filter(match(name.:a, :regex)).map(age)
@@ -721,7 +722,7 @@ EOS;
             $scenario,
             $method,
             $arguments,
-            Exception::ERROR_WRONG_INPUT_TYPE,
+            Arguments::ERROR_WRONG_INPUT_TYPE,
             array('name' => 'a', 'userType' => 'string', 'neededType' => 'integer')
         );
     }
@@ -746,7 +747,7 @@ EOS;
             $scenario,
             $method,
             $arguments,
-            Exception::ERROR_BAD_FILTER_EXPRESSION,
+            Compiler::ERROR_BAD_FILTER_EXPRESSION,
             array(
                 'class' => 'Person',
                 'table' => 0,
@@ -799,7 +800,7 @@ EOS;
         // cinnabari stuff
         $lexer = new Lexer();
         $parser = new Parser();
-        $schema = new Schema($scenarioJson);
+        $schema = new Schema(json_decode($scenarioJson, true));
         $compiler = new Compiler($schema);
 
         $tokens = $lexer->tokenize($method);

@@ -55,6 +55,14 @@ use Datto\Cinnabari\Mysql\Expression\Parameter;
  */
 class Compiler
 {
+    // compiler errors
+    const ERROR_NO_INITIAL_PROPERTY = 501;
+    const ERROR_NO_MAP_FUNCTION = 502;
+    const ERROR_NO_FILTER_ARGUMENTS = 503;
+    const ERROR_BAD_FILTER_EXPRESSION = 504;
+    const ERROR_NO_SORT_ARGUMENTS = 505;
+    const ERROR_BAD_MAP_ARGUMENT = 506;
+
     /** @var Schema */
     private $schema;
 
@@ -114,9 +122,9 @@ class Compiler
 
         if (!self::scanProperty($token, $array)) {
             throw new Exception(
-                Exception::ERROR_NO_INITIAL_PROPERTY,
+                self::ERROR_NO_INITIAL_PROPERTY,
                 array('token' => $token),
-                Exception::ERROR_NO_INITIAL_PROPERTY .
+                self::ERROR_NO_INITIAL_PROPERTY .
                 " Error: API requests must begin with a property."
             );
         }
@@ -148,10 +156,10 @@ class Compiler
 
         if (!$this->readMap()) {
             throw new Exception(
-                Exception::ERROR_NO_MAP_FUNCTION,
+                self::ERROR_NO_MAP_FUNCTION,
                 array('request' => $this->request),
-                Exception::ERROR_NO_MAP_FUNCTION .
-                " Error: API requests must end with a map function."
+                self::ERROR_NO_MAP_FUNCTION .
+                " Error: API requests must contain a map function after the optional filter/sort functions."
             );
         }
 
@@ -174,22 +182,22 @@ class Compiler
         // at this point, we're sure they want to filter
         if (!isset($arguments) || count($arguments) === 0) {
             throw new Exception(
-                Exception::ERROR_NO_FILTER_ARGUMENTS,
+                self::ERROR_NO_FILTER_ARGUMENTS,
                 array('token' => $token),
-                Exception::ERROR_NO_FILTER_ARGUMENTS .
+                self::ERROR_NO_FILTER_ARGUMENTS .
                 " Error: filter functions take one expression argument, none provided."
             );
         }
 
         if (!$this->getExpression($this->class, $this->table, $arguments[0], $where)) {
             throw new Exception(
-                Exception::ERROR_BAD_FILTER_EXPRESSION,
+                self::ERROR_BAD_FILTER_EXPRESSION,
                 array(
                     'class' => $this->class,
                     'table' => $this->table,
                     'arguments' => $arguments[0]
                 ),
-                Exception::ERROR_BAD_FILTER_EXPRESSION .
+                self::ERROR_BAD_FILTER_EXPRESSION .
                 " Error: malformed expression supplied to the filter function."
             );
         }
@@ -524,10 +532,15 @@ class Compiler
                 return $this->getNumericProperty($class, $tableId, $token[1], $output);
 
             case Parser::TYPE_FUNCTION:
-                if (count($token) < 4) {
+                if (!self::scanFunction($token, $name, $arguments)) {
                     return false;
                 }
-                return $this->getNumericBinaryFunction($class, $tableId, $token[1], $token[2], $token[3], $output);
+
+                if (count($arguments) < 2) {
+                    return false;
+                }
+
+                return $this->getNumericBinaryFunction($class, $tableId, $name, $arguments[0], $arguments[1], $output);
 
             default:
                 return false;
@@ -857,9 +870,9 @@ class Compiler
 
         if (!$this->readExpression()) {
             throw new Exception(
-                Exception::ERROR_BAD_MAP_ARGUMENT,
+                self::ERROR_BAD_MAP_ARGUMENT,
                 array('request' => $this->request),
-                Exception::ERROR_BAD_MAP_ARGUMENT .
+                self::ERROR_BAD_MAP_ARGUMENT .
                 " Error: map functions take a property, path, object, or function as an argument."
             );
         } else {
@@ -911,9 +924,9 @@ class Compiler
         // at this point, we're sure they want to sort
         if (!isset($arguments) || count($arguments) === 0) {
             throw new Exception(
-                Exception::ERROR_NO_SORT_ARGUMENTS,
+                self::ERROR_NO_SORT_ARGUMENTS,
                 array('token' => $token),
-                Exception::ERROR_NO_SORT_ARGUMENTS .
+                self::ERROR_NO_SORT_ARGUMENTS .
                 " Error: sort functions take one property argument, none provided."
             );
         }
@@ -981,7 +994,11 @@ class Compiler
 
     private static function scanObject($input, &$object)
     {
-        if ($input === null || count($input) < 2 || $input[0] !== Parser::TYPE_OBJECT) {
+        if (!self::isObjectToken($input)) {
+            return false;
+        }
+
+        if (count($input) < 2) {
             return false;
         }
 
@@ -1002,6 +1019,11 @@ class Compiler
     private static function isFunctionToken($token)
     {
         return is_array($token) && count($token) > 0 && ($token[0] === Parser::TYPE_FUNCTION);
+    }
+
+    private static function isObjectToken($token)
+    {
+        return is_array($token) && count($token) > 0 && ($token[0] === Parser::TYPE_OBJECT);
     }
 
     private function getState()

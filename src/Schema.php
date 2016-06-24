@@ -26,6 +26,13 @@ namespace Datto\Cinnabari;
 
 class Schema
 {
+    // schema errors
+    const ERROR_NO_CLASS = 101;
+    const ERROR_NO_PROPERTY = 102;
+    const ERROR_NO_LIST = 103;
+    const ERROR_NO_VALUE = 104;
+    const ERROR_NO_CONNECTION = 105;
+
     /** @var array */
     private $schema;
 
@@ -41,22 +48,22 @@ class Schema
 
         if ($classDefinition === null) {
             throw new Exception(
-                Exception::ERROR_CLASS_DNE,
+                self::ERROR_NO_CLASS,
                 array(
                     'class' => $class
                 ),
-                Exception::ERROR_CLASS_DNE . " Error: class '{$class}' does not exist."
+                self::ERROR_NO_CLASS . " Error: class '{$class}' does not exist."
             );
         }
         
         if ($propertyDefinition === null) {
             throw new Exception(
-                Exception::ERROR_PROPERTY_DNE,
+                self::ERROR_NO_PROPERTY,
                 array(
                     'class' => $class,
                     'property' => $property
                 ),
-                Exception::ERROR_PROPERTY_DNE . " Error: property '{$property}' " .
+                self::ERROR_NO_PROPERTY . " Error: property '{$property}' " .
                 " of class '{$class}' does not exist."
             );
         }
@@ -73,11 +80,11 @@ class Schema
 
         if ($definition === null) {
             throw new Exception(
-                Exception::ERROR_LIST_DNE,
+                self::ERROR_NO_LIST,
                 array(
                     'list' => $list
                 ),
-                Exception::ERROR_LIST_DNE . " Error: list '{$list}' does not exist."
+                self::ERROR_NO_LIST. " Error: list '{$list}' does not exist."
             );
         }
 
@@ -91,12 +98,12 @@ class Schema
 
         if ($definition === null) {
             throw new Exception(
-                Exception::ERROR_VALUE_DNE,
+                self::ERROR_NO_VALUE,
                 array(
                     'tableIdentifier' => $tableIdentifier,
                     'value' => $value
                 ),
-                Exception::ERROR_VALUE_DNE . " Error: value '{$value}' in table " .
+                self::ERROR_NO_VALUE. " Error: value '{$value}' in table " .
                 "'{$tableIdentifier}' does not exist."
             );
         }
@@ -111,12 +118,12 @@ class Schema
 
         if ($definition === null) {
             throw new Exception(
-                Exception::ERROR_CONNECTION_DNE,
+                self::ERROR_NO_CONNECTION,
                 array(
                     'tableIdentifier' => $tableIdentifier,
                     'connection' => $connection
                 ),
-                Exception::ERROR_CONNECTION_DNE .
+                self::ERROR_NO_CONNECTION.
                 " Error: connection '{$tableIdentifier}->{$connection}' does not exist."
             );
         }
