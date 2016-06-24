@@ -34,6 +34,9 @@ class Translator
     const TYPE_VALUE = 7;
 
     const EXCEPTION_UNKNOWN_PROPERTY = 1;
+    const EXCEPTION_UNKNOWN_LIST = 2;
+    const EXCEPTION_UNKNOWN_CONNECTION = 3;
+    const EXCEPTION_UNKNOWN_VALUE = 4;
 
     /** @var array */
     private $schema;
@@ -43,44 +46,41 @@ class Translator
         $this->schema = $schema;
     }
 
+    // NOTE: check for a valid $request before this method is executed
     public function translate($request)
     {
-        if ($request !== null) {
-            return null;
-        }
+        $this->getExpression('Database', null, $request, $expression);
 
-        $this->getExpression('Database', null, $request, $output);
-
-        return null;
+        return $expression;
     }
 
     private function getExpression($class, $table, $tokens, &$output)
     {
-        $token = array_shift($tokens);
+        foreach ($tokens as $token) {
+            $type = $token[0];
 
-        $type = $token[0];
+            switch ($type) {
+                case Parser::TYPE_PARAMETER:
+                    $parameter = $token[1];
+                    self::getParameter($parameter, $output);
+                    break;
 
-        switch ($type) {
-            case Parser::TYPE_PARAMETER:
-                $parameter = $token[1];
-                self::getParameter($parameter, $output);
-                break;
+                case Parser::TYPE_PROPERTY:
+                    $property = $token[1];
+                    $this->getProperty($class, $table, $property, $output);
+                    break;
 
-            case Parser::TYPE_PROPERTY:
-                $property = $token[1];
-                $this->getProperty($class, $table, $property, $output);
-                break;
+                case Parser::TYPE_FUNCTION:
+                    $function = $token[1];
+                    $arguments = array_slice($token, 2);
+                    $this->getFunction($class, $table, $function, $arguments, $output);
+                    break;
 
-            case Parser::TYPE_FUNCTION:
-                $function = $token[1];
-                $arguments = array_slice($token, 2);
-                $this->getFunction($class, $table, $function, $arguments, $output);
-                break;
-
-            default: // Parser::TYPE_OBJECT:
-                $object = $token[1];
-                $this->getObject($class, $table, $object, $output);
-                break;
+                default: // Parser::TYPE_OBJECT:
+                    $object = $token[1];
+                    $this->getObject($class, $table, $object, $output);
+                    break;
+            }
         }
     }
 
@@ -91,33 +91,96 @@ class Translator
         );
     }
 
-    private function getProperty($class, $table, $property, &$output)
+    private function getProperty(&$class, &$table, $property, &$output)
     {
         list($type, $path) = $this->getPropertyDefinition($class, $property);
+        $isPrimitiveProperty = is_int($type);
 
-        if (is_int($type)) {
-            $value = array_pop($path);
-        } else {
-            $value = null;
+        if ($table === null) {
+            $list = array_shift($path);
+            $this->getList($table, $list, $output);
         }
+
+        $value = $isPrimitiveProperty ? array_pop($path) : null;
 
         foreach ($path as $connection) {
-            // getConnection
+            $this->getConnection($table, $connection, $output);
         }
 
-        if ($value !== null) {
-            // getValue
+        if ($isPrimitiveProperty) {
+            $this->getValue($table, $value, $output);
+        } else {
+            $class = $type;
         }
     }
 
-    private function getFunction($class, $table, $function, $arguments, &$output)
+    private function getList(&$table, $list, &$output)
     {
-        return null;
+        list($table, $id, $hasZero) = $this->getListDefinition($list);
+
+        $output[] = array(
+            self::TYPE_TABLE => array(
+                'table' => $table,
+                'id' => $id,
+                'hasZero' => $hasZero
+            )
+        );
     }
 
-    private function getObject($class, $table, $object, &$output)
+    private function getConnection(&$table, $connection, &$output)
     {
-        return null;
+        $definition = $this->getConnectionDefinition($table, $connection);
+
+        $output[] = array(
+            self::TYPE_JOIN => array(
+                'tableA' => $table,
+                'tableB' => $definition[0],
+                'expression' => $definition[1],
+                'id' => $definition[2],
+                'hasZero' => $definition[3],
+                'hasMany' => $definition[4]
+            )
+        );
+
+        $table = $definition[0];
+    }
+
+    private function getValue($table, $value, &$output)
+    {
+        list($expression, $hasZero) = $this->getValueDefinition($table, $value);
+
+        $output[] = array(
+            self::TYPE_VALUE => array(
+                'table' => $table,
+                'expression' => $expression,
+                'hasZero' => $hasZero
+            )
+        );
+    }
+
+    private function getFunction(&$class, &$table, $function, $arguments, &$output)
+    {
+        foreach ($arguments as &$argument) {
+            $this->getExpression($class, $table, $argument, $argument);
+        }
+
+        $output[] = array(
+            self::TYPE_FUNCTION => array(
+                'function' => $function,
+                'arguments' => $arguments
+            )
+        );
+    }
+
+    private function getObject(&$class, &$table, $object, &$output)
+    {
+        foreach ($object as $key => &$value) {
+            $this->getExpression($class, $table, $value, $value);
+        }
+
+        $output[] = array(
+            self::TYPE_OBJECT => $object
+        );
     }
 
     private function getPropertyDefinition($class, $property)
@@ -134,6 +197,39 @@ class Translator
         return array($type, $path);
     }
 
+    private function getListDefinition($list)
+    {
+        $definition = &$this->schema['lists'][$list];
+
+        if ($definition === null) {
+            throw self::exceptionUnknownList($list);
+        }
+
+        return $definition;
+    }
+
+    private function getConnectionDefinition($table, $connection)
+    {
+        $definition = &$this->schema['connections'][$table][$connection];
+
+        if ($definition === null) {
+            throw self::exceptionUnknownConnection($table, $connection);
+        }
+
+        return $definition;
+    }
+
+    private function getValueDefinition($table, $value)
+    {
+        $definition = &$this->schema['values'][$table][$value];
+
+        if ($definition === null) {
+            throw self::exceptionUnknownValue($table, $value);
+        }
+
+        return $definition;
+    }
+
     private static function exceptionUnknownProperty($class, $property)
     {
         $code = self::EXCEPTION_UNKNOWN_PROPERTY;
@@ -147,6 +243,55 @@ class Translator
         $propertyName = json_encode($property);
 
         $message = "Unknown property {$propertyName} in class {$className}";
+
+        return new Exception($code, $data, $message);
+    }
+
+    private static function exceptionUnknownList($list)
+    {
+        $code = self::EXCEPTION_UNKNOWN_LIST;
+
+        $data = array(
+            'list' => $list
+        );
+
+        $listName = json_encode($list);
+
+        $message = "Unknown list {$listName}";
+
+        return new Exception($code, $data, $message);
+    }
+
+    private static function exceptionUnknownConnection($table, $connection)
+    {
+        $code = self::EXCEPTION_UNKNOWN_CONNECTION;
+
+        $data = array(
+            'table' => $table,
+            'connection' => $connection
+        );
+
+        $connectionName = json_encode($connection);
+        $tableName = json_encode($table);
+
+        $message = "Unknown connection {$connectionName} in table {$tableName}";
+
+        return new Exception($code, $data, $message);
+    }
+
+    private static function exceptionUnknownValue($table, $value)
+    {
+        $code = self::EXCEPTION_UNKNOWN_VALUE;
+
+        $data = array(
+            'table' => $table,
+            'value' => $value
+        );
+
+        $tableName = json_encode($table);
+        $valueName = json_encode($value);
+
+        $message = "Unknown value {$valueName} in table {$tableName}";
 
         return new Exception($code, $data, $message);
     }
