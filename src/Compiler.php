@@ -821,16 +821,13 @@ class Compiler
             return false;
         }
 
-        if (count($token) !== 4) {
+        if (count($arguments) !== 2) {
             return false;
         }
 
-        if (!self::isParameterToken($token[2]) || !self::isParameterToken($token[3])) {
+        if (!self::scanParameter($arguments[0], $nameA) || !self::scanParameter($arguments[1], $nameB)) {
             return false;
         }
-
-        $nameA = $token[2][1]; // these are both parameters so they take this form
-        $nameB = $token[3][1];
 
         if (!$this->getSubtractiveParameters($nameA, $nameB, 'integer', 'integer', $start, $end)) {
             return false;
@@ -849,6 +846,16 @@ class Compiler
         }
 
         $tokens = array_slice($token, 1);
+        return true;
+    }
+
+    private static function scanParameter($token, &$name)
+    {
+        if (!self::isParameterToken($token)) {
+            return false;
+        }
+
+        $name = $token[1];
         return true;
     }
 

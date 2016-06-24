@@ -51,7 +51,7 @@ class Select
         $this->tables = array();
         $this->columns = array();
         $this->where = null;
-        $this->orderBy= null;
+        $this->orderBy = null;
         $this->limit = null;
     }
 
@@ -117,9 +117,9 @@ class Select
             return null;
         }
 
-        $table = self::getIdentifier($tableId);
-
-        $mysql = "{$start->getMysql()}, {$length->getMysql()}";
+        $offset = $start->getMysql();
+        $count = $length->getMysql();
+        $mysql = "{$offset}, {$count}";
 
         $this->limit = $mysql;
     }
