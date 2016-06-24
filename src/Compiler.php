@@ -137,7 +137,7 @@ class Compiler
 
         $this->request = reset($this->request);
 
-        if (!$this->readFunction('map')) {
+        if (!$this->readMap()) {
             return false;
         }
 
@@ -507,7 +507,7 @@ class Compiler
         if ($this->getParameter($name, 'integer', $output)) {
             $type = Output::TYPE_INTEGER;
             return true;
-        } else if ($this->getParameter($name, 'double', $output)) {
+        } elseif ($this->getParameter($name, 'double', $output)) {
             $type = Output::TYPE_FLOAT;
             return true;
         } else {
@@ -520,7 +520,7 @@ class Compiler
         if ($this->getProperty($class, $tableId, $name, Output::TYPE_INTEGER, $output)) {
             $type = Output::TYPE_INTEGER;
             return true;
-        } else if ($this->getProperty($class, $tableId, $name, Output::TYPE_FLOAT, $output)) {
+        } elseif ($this->getProperty($class, $tableId, $name, Output::TYPE_FLOAT, $output)) {
             $type = Output::TYPE_FLOAT;
             return true;
         } else {
@@ -545,7 +545,7 @@ class Compiler
         if ($name === 'plus' || $name === 'minus' || $name === 'times' || $name === 'divides') {
             if ($aIsAnInteger && $bIsAnInteger) {
                 $type = Output::TYPE_INTEGER;
-            } else if ($aIsAnInteger && $bIsAFloat || $aIsAFloat && $bIsAnInteger || $aIsAFloat && $bIsAFloat) {
+            } elseif ($aIsAnInteger && $bIsAFloat || $aIsAFloat && $bIsAnInteger || $aIsAFloat && $bIsAFloat) {
                 $type = Output::TYPE_FLOAT;
             } else {
                 return false;
@@ -668,7 +668,7 @@ class Compiler
                 return $this->readObject();
 
             case Parser::TYPE_FUNCTION:
-                return $this->readFunction(false); // any function
+                return $this->readFunction(); // any function
 
             default:
                 return false;
@@ -751,30 +751,51 @@ class Compiler
         return true;
     }
 
-    private function readFunction($which)
+    private function getMap($arguments)
+    {
+        $this->request = reset($arguments);
+        return $this->readExpression();
+    }
+
+    private function readMap()
     {
         if (!self::scanFunction($this->request, $name, $arguments)) {
             return false;
         }
 
-        if ($which!== false && $name != $which) {
+        if ($name != 'map') {
             return false;
         }
 
-        if ($name === 'map') {
-            $this->request = reset($arguments);
-            return $this->readExpression();
-        } else {
-            if (!$this->getExpression($this->class, $this->table, $this->request, $expression, $type)) {
+        return $this->getMap($arguments);
+    }
+
+    private function readFunction()
+    {
+        if (!self::scanFunction($this->request, $name, $arguments)) {
+            return false;
+        }
+
+        switch ($name) {
+            case 'map':
+                return $this->getMap($arguments);
+
+            case 'plus':
+            case 'minus':
+            case 'times':
+            case 'divides':
+                if (!$this->getExpression($this->class, $this->table, $this->request, $expression, $type)) {
+                    return false;
+                }
+
+                $columnId = $this->mysql->addExpression($this->table, $expression->getMySql());
+                $nullable = true; // TODO
+                $this->phpOutput = Output::getValue($columnId, $nullable, $type);
+
+                return true;
+
+            default:
                 return false;
-            }
-
-            $columnId = $this->mysql->addExpression($this->table, $expression->getMySql());
-            $nullable = true; // TODO
-            echo $type . " <- \$type \n\n";
-            $this->phpOutput = Output::getValue($columnId, $nullable, $type);
-
-            return true;
         }
     }
 
