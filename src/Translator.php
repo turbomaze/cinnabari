@@ -160,27 +160,30 @@ class Translator
 
     private function getFunction(&$class, &$table, $function, $arguments, &$output)
     {
-        foreach ($arguments as &$argument) {
-            $this->getExpression($class, $table, $argument, $argument);
-        }
-
         $output[] = array(
             self::TYPE_FUNCTION => array(
                 'function' => $function,
-                'arguments' => $arguments
+                'arguments' => $this->translateArray($class, $table, $arguments)
             )
         );
     }
 
     private function getObject(&$class, &$table, $object, &$output)
     {
-        foreach ($object as $key => &$value) {
-            $this->getExpression($class, $table, $value, $value);
+        $output[] = array(
+            self::TYPE_OBJECT => $this->translateArray($class, $table, $object)
+        );
+    }
+
+    private function translateArray(&$class, &$table, $input)
+    {
+        $output = array();
+
+        foreach ($input as $key => $value) {
+            $this->getExpression($class, $table, $value, $output[$key]);
         }
 
-        $output[] = array(
-            self::TYPE_OBJECT => $object
-        );
+        return $output;
     }
 
     private function getPropertyDefinition($class, $property)

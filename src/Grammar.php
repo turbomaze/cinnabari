@@ -249,6 +249,6 @@ abstract class Grammar
 
     protected static function quote($value)
     {
-        return var_export($value, true);
+        return json_encode($value);
     }
 }
