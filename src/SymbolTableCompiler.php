@@ -83,7 +83,9 @@ class SymbolTableCompiler
         $this->mysql->addValue($idReference);
 
         // the joins
-        foreach (array_slice($this->preamble, 1) as list($joinToken, $joinId)) {
+        foreach (array_slice($this->preamble, 1) as $token) {
+            $joinToken = $token[0];
+            $joinId= $token[1];
             $join = $this->symbols[$joinId];
             $this->mysql->insertIntoTables($join);
         }

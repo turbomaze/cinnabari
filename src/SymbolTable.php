@@ -43,10 +43,10 @@ class SymbolTable
         }
 
         // add in the preamble; entry table name and the joins
-        $preamble = array([Parser::TYPE_TABLE, $tableName, 0]); // initial table token
+        $preamble = array(array(Parser::TYPE_TABLE, $tableName, 0)); // initial table token
         foreach ($joins as $join => $joinId) {
             $symbolId = count($symbols);
-            $preamble[] = [Parser::TYPE_JOIN, $symbolId];
+            $preamble[] = array(Parser::TYPE_JOIN, $symbolId);
             $symbols[] = $join;
         }
 
@@ -83,7 +83,7 @@ class SymbolTable
                 // make sure this property isn't already in the symbol table
                 $pathKey = json_encode($path);
                 if (array_key_exists($pathKey, $symbolLookup)) {
-                    return [Parser::TYPE_VALUE, $symbolLookup[$pathKey]];
+                    return array(Parser::TYPE_VALUE, $symbolLookup[$pathKey]);
                 }
 
                 // get the property's MySQL and add it to the symbol table
@@ -91,7 +91,7 @@ class SymbolTable
                 $symbols[] = $this->getMySQLIdentifier($class, $tableName, $path, $newJoins);
                 $joins = array_merge($joins, $newJoins);
                 $symbolLookup[$pathKey] = $symbolId;
-                return [Parser::TYPE_VALUE, $symbolId];
+                return array(Parser::TYPE_VALUE, $symbolId);
 
             // recurse on objects
             case Parser::TYPE_OBJECT:
@@ -99,7 +99,7 @@ class SymbolTable
                 foreach ($value as $key => $child) {
                     $newTree[$key] = $this->traverse($symbols, $symbolLookup, $joins, $class, $tableName, $child);
                 }
-                return [Parser::TYPE_OBJECT, $newTree];
+                return array(Parser::TYPE_OBJECT, $newTree);
 
             // recurse on functions
             case Parser::TYPE_FUNCTION:
