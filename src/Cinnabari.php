@@ -45,8 +45,6 @@ class Cinnabari
 
             return self::getResult($this->schema, $request, $arguments);
         } catch (Exception $exception) {
-            echo $exception->getMessage() . "\n";
-
             return false;
         }
     }
@@ -71,14 +69,8 @@ class Cinnabari
 
     private static function getResult(Schema $schema, $request, $arguments)
     {
-        try {
-            $compiler = new Compiler($schema);
-            return $compiler->compile($request, $arguments);
-        } catch (Exception $exception) {
-            echo $exception->getMessage(), "\n";
-
-            return null;
-        }
+        $compiler = new Compiler($schema);
+        return $compiler->compile($request, $arguments);
     }
 
     private static function errorSyntax($query, $position)

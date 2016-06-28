@@ -731,7 +731,7 @@ EOS;
     {
         // we're expecting an exception
 
-        $scenario = json_decode(self::getRelationshipsScenario(), true);
+        $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
 people.filter(match(name.:a.first, :regex)).map(age)
@@ -743,6 +743,19 @@ EOS;
         );
 
         // verify the exception
+        $pathInformation = array(
+            5,
+            array(2, 'name'),
+            array(1, 'a'),
+            array(2, 'first')
+        );
+        $matchFunction = array(
+            3,
+            'match',
+            $pathInformation,
+            array(1, 'regex')
+        );
+
         $this->verifyException(
             $scenario,
             $method,
@@ -751,22 +764,12 @@ EOS;
             array(
                 'class' => 'Person',
                 'table' => 0,
-                'arguments' => array(
-                    3,
-                    'match',
-                    array(
-                        5,
-                        array(2, 'name'),
-                        array(1, 'a'),
-                        array(2, 'first')
-                    ),
-                    array(1, 'regex')
-                )
+                'arguments' => $matchFunction
             )
         );
     }
 
-    private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
+    private function compileMethod($scenarioJson, $method, $arguments)
     {
         $scenario = json_decode($scenarioJson, true);
 
@@ -778,6 +781,13 @@ EOS;
         $tokens = $lexer->tokenize($method);
         $request = $parser->parse($tokens);
         $actual = $compiler->compile($request, $arguments);
+
+        return $actual;
+    }
+
+    private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
+    {
+        $actual = $this->compileMethod($scenarioJson, $method, $arguments);
         $expected = array($mysql, $phpInput, $phpOutput);
         
         // strip nonessential mysql whitespace
@@ -797,18 +807,9 @@ EOS;
 
     private function verifyException($scenarioJson, $method, $arguments, $code, $data)
     {
-        // cinnabari stuff
-        $lexer = new Lexer();
-        $parser = new Parser();
-        $schema = new Schema(json_decode($scenarioJson, true));
-        $compiler = new Compiler($schema);
-
-        $tokens = $lexer->tokenize($method);
-        $request = $parser->parse($tokens);
-
-        // try to compile
+        // try to compile the request
         try {
-            $compiler->compile($request, $arguments);
+            $this->compileMethod($scenarioJson, $method, $arguments);
             $actual = null;
         } catch (Exception $exception) {
             $actual = array(

@@ -76,12 +76,13 @@ class Select
     public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $type)
     {
         if (!self::isDefined($this->tables, $tableAId)) {
+            $tableString = json_encode($tableAId);
             throw new Exception(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $tableAId
                 ),
-                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$tableAId}'."
+                "unknown table id {$tableString}."
             );
         }
 
@@ -100,12 +101,13 @@ class Select
     public function setOrderBy($tableId, $column, $isAscending)
     {
         if (!self::isDefined($this->tables, $tableId)) {
+            $tableString = json_encode($tableId);
             throw new Exception(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $tableId
                 ),
-                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$tableId}'."
+                "unknown table id {$tableString}."
             );
         }
 
@@ -126,12 +128,13 @@ class Select
     public function addValue($tableId, $column)
     {
         if (!self::isDefined($this->tables, $tableId)) {
+            $tableString = json_decode($tableId);
             throw new Exception(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $tableId
                 ),
-                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$tableId}'."
+                "unknown table id {$tableString}."
             );
         }
 
@@ -147,7 +150,7 @@ class Select
             throw new Exception(
                 self::ERROR_INVALID_MYSQL,
                 array(),
-                self::ERROR_INVALID_MYSQL . " Error: SQL queries must reference at least one table and column."
+                "SQL queries must reference at least one table and column."
             );
         }
 
@@ -163,13 +166,14 @@ class Select
         $name = array_search($id, $this->tables, true);
 
         if (!is_string($name)) {
+            $idString = json_decode($id);
             throw new Exception(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $id,
                     'name' => $name
                 ),
-                self::ERROR_BAD_TABLE_ID . " Error: unknown table id '{$id}'."
+                "unknown table id {$idString}."
             );
         }
 

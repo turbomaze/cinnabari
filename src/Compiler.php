@@ -57,11 +57,13 @@ class Compiler
 {
     // compiler errors
     const ERROR_NO_INITIAL_PROPERTY = 501;
-    const ERROR_NO_MAP_FUNCTION = 502;
-    const ERROR_NO_FILTER_ARGUMENTS = 503;
-    const ERROR_BAD_FILTER_EXPRESSION = 504;
-    const ERROR_NO_SORT_ARGUMENTS = 505;
-    const ERROR_BAD_MAP_ARGUMENT = 506;
+    const ERROR_NO_INITIAL_PATH = 502;
+    const ERROR_NO_MAP_FUNCTION = 503;
+    const ERROR_NO_FILTER_ARGUMENTS = 504;
+    const ERROR_BAD_FILTER_EXPRESSION = 505;
+    const ERROR_NO_SORT_ARGUMENTS = 506;
+    const ERROR_BAD_MAP_ARGUMENT = 507;
+    const ERROR_BAD_SCHEMA = 508;
 
     /** @var Schema */
     private $schema;
@@ -115,7 +117,11 @@ class Compiler
     private function getArrayProperty()
     {
         if (!self::scanPath($this->request, $this->request)) {
-            return false;
+            throw new Exception(
+                self::ERROR_NO_INITIAL_PATH,
+                array('request' => $request),
+                "API requests must begin with a path."
+            );
         }
 
         $token = array_shift($this->request);
@@ -124,15 +130,21 @@ class Compiler
             throw new Exception(
                 self::ERROR_NO_INITIAL_PROPERTY,
                 array('token' => $token),
-                self::ERROR_NO_INITIAL_PROPERTY .
-                " Error: API requests must begin with a property."
+                "API requests must begin with a property."
             );
         }
 
         list($class, $path) = $this->schema->getPropertyDefinition('Database', $array);
 
         if (!isset($class, $path)) {
-            return false;
+            throw new Exception(
+                self::ERROR_BAD_SCHEMA,
+                array(
+                    'accessType' => 'property',
+                    'arguments' => array($array)
+                ),
+                "schema failed to return a proper property definition."
+            );
         }
 
         $list = array_pop($path);
@@ -140,7 +152,14 @@ class Compiler
         list($table, $id, $hasZero) = $this->schema->getListDefinition($list);
 
         if (!isset($table, $id, $hasZero)) {
-            return false;
+            throw new Exception(
+                self::ERROR_BAD_SCHEMA,
+                array(
+                    'accessType' => 'list',
+                    'arguments' => array($list)
+                ),
+                "schema failed to return a proper list definition."
+            );
         }
 
         $this->class = $class;
@@ -158,8 +177,7 @@ class Compiler
             throw new Exception(
                 self::ERROR_NO_MAP_FUNCTION,
                 array('request' => $this->request),
-                self::ERROR_NO_MAP_FUNCTION .
-                " Error: API requests must contain a map function after the optional filter/sort functions."
+                "API requests must contain a map function after the optional filter/sort functions."
             );
         }
 
@@ -184,8 +202,7 @@ class Compiler
             throw new Exception(
                 self::ERROR_NO_FILTER_ARGUMENTS,
                 array('token' => $token),
-                self::ERROR_NO_FILTER_ARGUMENTS .
-                " Error: filter functions take one expression argument, none provided."
+                "filter functions take one expression argument, none provided."
             );
         }
 
@@ -197,8 +214,7 @@ class Compiler
                     'table' => $this->table,
                     'arguments' => $arguments[0]
                 ),
-                self::ERROR_BAD_FILTER_EXPRESSION .
-                " Error: malformed expression supplied to the filter function."
+                "malformed expression supplied to the filter function."
             );
         }
 
@@ -872,8 +888,7 @@ class Compiler
             throw new Exception(
                 self::ERROR_BAD_MAP_ARGUMENT,
                 array('request' => $this->request),
-                self::ERROR_BAD_MAP_ARGUMENT .
-                " Error: map functions take a property, path, object, or function as an argument."
+                "map functions take a property, path, object, or function as an argument."
             );
         } else {
             return true;
@@ -926,8 +941,7 @@ class Compiler
             throw new Exception(
                 self::ERROR_NO_SORT_ARGUMENTS,
                 array('token' => $token),
-                self::ERROR_NO_SORT_ARGUMENTS .
-                " Error: sort functions take one property argument, none provided."
+                "sort functions take one property argument, none provided."
             );
         }
 
@@ -1008,22 +1022,22 @@ class Compiler
 
     private static function isPathToken($token)
     {
-        return is_array($token) && count($token) > 0 && ($token[0] === Parser::TYPE_PATH);
+        return is_array($token) && (count($token) > 0) && ($token[0] === Parser::TYPE_PATH);
     }
 
     private static function isPropertyToken($token)
     {
-        return is_array($token) && count($token) > 0 && ($token[0] === Parser::TYPE_PROPERTY);
+        return is_array($token) && (count($token) > 0) && ($token[0] === Parser::TYPE_PROPERTY);
     }
 
     private static function isFunctionToken($token)
     {
-        return is_array($token) && count($token) > 0 && ($token[0] === Parser::TYPE_FUNCTION);
+        return is_array($token) && (count($token) > 0) && ($token[0] === Parser::TYPE_FUNCTION);
     }
 
     private static function isObjectToken($token)
     {
-        return is_array($token) && count($token) > 0 && ($token[0] === Parser::TYPE_OBJECT);
+        return is_array($token) && (count($token) > 0) && ($token[0] === Parser::TYPE_OBJECT);
     }
 
     private function getState()

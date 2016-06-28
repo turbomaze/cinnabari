@@ -47,24 +47,26 @@ class Schema
         $propertyDefinition = &$this->schema['classes'][$class][$property];
 
         if ($classDefinition === null) {
+            $classString = json_encode($class);
             throw new Exception(
                 self::ERROR_NO_CLASS,
                 array(
                     'class' => $class
                 ),
-                self::ERROR_NO_CLASS . " Error: class '{$class}' does not exist."
+                "class {$classString} does not exist."
             );
         }
         
         if ($propertyDefinition === null) {
+            $propertyString = json_encode($property);
+            $classString = json_encode($class);
             throw new Exception(
                 self::ERROR_NO_PROPERTY,
                 array(
                     'class' => $class,
                     'property' => $property
                 ),
-                self::ERROR_NO_PROPERTY . " Error: property '{$property}' " .
-                " of class '{$class}' does not exist."
+                "property {$propertyString} of class {$classString} does not exist."
             );
         }
 
@@ -79,12 +81,13 @@ class Schema
         $definition = &$this->schema['lists'][$list];
 
         if ($definition === null) {
+            $listString = json_encode($list);
             throw new Exception(
                 self::ERROR_NO_LIST,
                 array(
                     'list' => $list
                 ),
-                self::ERROR_NO_LIST. " Error: list '{$list}' does not exist."
+                "list {$listString} does not exist."
             );
         }
 
@@ -97,14 +100,15 @@ class Schema
         $definition = &$this->schema['values'][$tableIdentifier][$value];
 
         if ($definition === null) {
+            $valueString = json_encode($value);
+            $tableString = json_encode($tableIdentifier);
             throw new Exception(
                 self::ERROR_NO_VALUE,
                 array(
                     'tableIdentifier' => $tableIdentifier,
                     'value' => $value
                 ),
-                self::ERROR_NO_VALUE. " Error: value '{$value}' in table " .
-                "'{$tableIdentifier}' does not exist."
+                "value {$valueString} in table {$tableString} does not exist."
             );
         }
 
@@ -117,14 +121,14 @@ class Schema
         $definition = &$this->schema['connections'][$tableIdentifier][$connection];
 
         if ($definition === null) {
+            $connectionString = json_encode($tableIdentifier) . '->' . json_encode($connection);
             throw new Exception(
                 self::ERROR_NO_CONNECTION,
                 array(
                     'tableIdentifier' => $tableIdentifier,
                     'connection' => $connection
                 ),
-                self::ERROR_NO_CONNECTION.
-                " Error: connection '{$tableIdentifier}->{$connection}' does not exist."
+                "{$connectionString} does not exist."
             );
         }
 

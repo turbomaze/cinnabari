@@ -47,6 +47,7 @@ class Arguments
     public function useArgument($name, $neededType)
     {
         if (!array_key_exists($name, $this->input)) {
+            $nameString = json_encode($name);
             throw new Exception(
                 self::ERROR_INPUT_NOT_PROVIDED,
                 array(
@@ -54,14 +55,15 @@ class Arguments
                     'neededType' => $neededType,
                     'inputArray' => $this->input
                 ),
-                self::ERROR_INPUT_NOT_PROVIDED .
-                " Error: input parameter '{$name}' not provided."
+                "input parameter {$nameString} not provided."
             );
         }
 
         $userType = gettype($this->input[$name]);
 
         if (($userType !== 'NULL') && ($userType !== $neededType)) {
+            $nameString = json_encode($name); 
+            $typeString = json_encode($neededType); 
             throw new Exception(
                 self::ERROR_WRONG_INPUT_TYPE,
                 array(
@@ -69,8 +71,7 @@ class Arguments
                     'userType' => $userType,
                     'neededType' => $neededType
                 ),
-                self::ERROR_WRONG_INPUT_TYPE.
-                " Error: '{$userType}' type provided as ':{$name}', '{$neededType}' type expected."
+                "'{$userType}' type provided as :{$nameString}, {$typeString} type expected."
             );
         }
 
