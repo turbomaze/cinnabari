@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Copyright (C) 2016 Datto, Inc.
  *
@@ -26,6 +25,13 @@ namespace Datto\Cinnabari;
 
 class Schema
 {
+    // schema errors
+    const ERROR_NO_CLASS = 101;
+    const ERROR_NO_PROPERTY = 102;
+    const ERROR_NO_LIST = 103;
+    const ERROR_NO_VALUE = 104;
+    const ERROR_NO_CONNECTION = 105;
+
     /** @var array */
     private $schema;
 
@@ -36,50 +42,81 @@ class Schema
 
     public function getPropertyDefinition($class, $property)
     {
-        // TODO: throw exception
-        $definition = &$this->schema['classes'][$class][$property];
-
-        if ($definition === null) {
-            return null;
+        $classDefinition = &$this->schema['classes'][$class];
+        $propertyDefinition = &$this->schema['classes'][$class][$property];
+        if ($classDefinition === null) {
+            throw new Exception(
+                self::ERROR_NO_CLASS,
+                array(
+                    'class' => $class
+                ),
+                self::ERROR_NO_CLASS . " Error: class '{$class}' does not exist."
+            );
+        }
+        
+        if ($propertyDefinition === null || count($propertyDefinition) < 2) {
+            throw new Exception(
+                self::ERROR_NO_PROPERTY,
+                array(
+                    'class' => $class,
+                    'property' => $property
+                ),
+                self::ERROR_NO_PROPERTY . " Error: property '{$property}' " .
+                " of class '{$class}' does not exist."
+            );
         }
 
-        $type = reset($definition);
-        $path = array_slice($definition, 1);
-
+        $type = reset($propertyDefinition);
+        $path = array_slice($propertyDefinition, 1);
         return array($type, $path);
     }
 
     public function getListDefinition($list)
     {
-        // TODO: throw exception
         $definition = &$this->schema['lists'][$list];
-
-        if ($definition === null) {
-            return null;
+        if ($definition === null || count($definition) < 3) {
+            throw new Exception(
+                self::ERROR_NO_LIST,
+                array(
+                    'list' => $list
+                ),
+                self::ERROR_NO_LIST. " Error: list '{$list}' does not exist."
+            );
         }
-
-        // array($table, $expression, $hasZero)
         return $definition;
     }
 
     public function getValueDefinition($tableIdentifier, $value)
     {
-        // TODO: throw exception
         $definition = &$this->schema['values'][$tableIdentifier][$value];
-
-        if ($definition === null) {
-            return null;
+        if ($definition === null || count($definition) < 2) {
+            throw new Exception(
+                self::ERROR_NO_VALUE,
+                array(
+                    'tableIdentifier' => $tableIdentifier,
+                    'value' => $value
+                ),
+                self::ERROR_NO_VALUE. " Error: value '{$value}' in table " .
+                "'{$tableIdentifier}' does not exist."
+            );
         }
-
-        // array($expression, $hasZero)
         return $definition;
     }
 
     public function getConnectionDefinition($tableIdentifier, $connection)
     {
-        // TODO: throw exception
         $definition = &$this->schema['connections'][$tableIdentifier][$connection];
-
+        if ($definition === null || count($definition) < 5) {
+            throw new Exception(
+                self::ERROR_NO_CONNECTION,
+                array(
+                    'tableIdentifier' => $tableIdentifier,
+                    'connection' => $connection
+                ),
+                self::ERROR_NO_CONNECTION.
+                " Error: connection '{$tableIdentifier}->{$connection}' does not exist."
+            );
+        }
         return $definition;
     }
 

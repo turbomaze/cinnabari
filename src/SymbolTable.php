@@ -64,7 +64,7 @@ class SymbolTable
         list($type, $value, ) = $node;
 
         switch ($type) {
-            // terminal values: narameters, paths, and properties
+            // terminal values: parameters, paths, and properties
             case Parser::TYPE_PARAMETER:
                 $symbolId = count($this->symbols);
                 $this->symbols[] = array(':' . $value);
@@ -122,17 +122,16 @@ class SymbolTable
         $table = self::insert($tables, $tableName);
 
         // handle the connections of all but the final element
-        for ($i = 0; $i < count($apiPath)-1; $i++) {
+        for ($i = 0; $i < count($apiPath); $i++) {
             $waypoint = $apiPath[$i];
             list($class, $connections) = $this->schema->getPropertyDefinition($class, $waypoint);
-
+            if ($i === count($apiPath) - 1) {
+                $value = array_pop($connections);
+            }
             $this->connections($tables, $table, $tableName, $connections);
         }
 
-        // handle the final element separately to get its value
-        list($type, $path) = $this->schema->getPropertyDefinition($class, $apiPath[count($apiPath)-1]);
-        $value = array_pop($path);
-        $this->connections($tables, $table, $tableName, $path);
+        // get the path's value
         $tableName = $this->getTable($tables, $table);
         list($column, $isColumnNullable) = $this->schema->getValueDefinition($tableName, $value);
 
@@ -140,7 +139,7 @@ class SymbolTable
         $joins = array_slice($tables, 1);
 
         // return the annotation
-        return array("`{$table}`.{$column}", $type);
+        return array("`{$table}`.{$column}", $class);
     }
 
     private function connections(&$tables, &$contextId, &$tableAIdentifier, $connections)
