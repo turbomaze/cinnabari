@@ -27,6 +27,9 @@ namespace Datto\Cinnabari;
 use Datto\Cinnabari\Mysql\Select;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Php\Output;
+use Datto\Cinnabari\Php\OutputList;
+use Datto\Cinnabari\Php\OutputValue;
+use Datto\Cinnabari\Php\OutputObject;
 use Datto\Cinnabari\Mysql\Expression\Column;
 use Datto\Cinnabari\Mysql\Expression\OperatorAnd;
 use Datto\Cinnabari\Mysql\Expression\OperatorDivides;
@@ -141,7 +144,11 @@ class Compiler
             return false;
         }
 
-        $this->phpOutput = Output::getList($idAlias, $hasZero, true, $this->phpOutput);
+        echo "hz $hasZero\n\n";
+        $outputList = new OutputList($idAlias, $hasZero, true, $this->phpOutput);
+        $this->phpOutput = $outputList->getPhp();
+
+
         return true;
     }
 
@@ -719,7 +726,7 @@ class Compiler
 
         list($column, $isColumnNullable) = $this->schema->getValueDefinition($tableIdentifier, $value);
         $columnId = $this->mysql->addValue($this->table, $column);
-        $this->phpOutput = Output::getValue($columnId, $isColumnNullable, $type);
+        $this->phpOutput = new OutputValue($columnId, $isColumnNullable, $type);
 
         return true;
     }
@@ -746,7 +753,7 @@ class Compiler
             $this->table = $table;
         }
 
-        $this->phpOutput = Output::getObject($properties);
+        $this->phpOutput = new OutputObject($properties);
         return true;
     }
 
@@ -779,7 +786,7 @@ class Compiler
 
                 if ($this->phpOutput !== null) {
                     $idAlias = $this->mysql->addValue($this->table, $id);
-                    $this->phpOutput = Output::getList($idAlias, $allowsZeroMatches, $allowsMultipleMatches, $this->phpOutput);
+                    $this->phpOutput = new OutputList($idAlias, $allowsZeroMatches, $allowsMultipleMatches, $this->phpOutput);
                 }
             }
 
