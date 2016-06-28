@@ -27,11 +27,20 @@ namespace Datto\Cinnabari\Mysql\Expression;
 class Column extends AbstractExpression
 {
     /** @var string */
+    private $datatype;
+
+    /** @var string */
     private $mysql;
 
-    public function __construct($mysql)
+    public function __construct($datatype, $mysql)
     {
+        $this->datatype = $datatype;
         $this->mysql = $mysql;
+    }
+
+    public function getDatatype()
+    {
+        return $this->datatype;
     }
 
     public function getMysql()

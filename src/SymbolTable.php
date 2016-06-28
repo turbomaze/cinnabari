@@ -8,30 +8,26 @@ class SymbolTable
 {
     const JOIN_INNER = 1;
     const JOIN_LEFT = 2;
-    private static $NAME_FROM_TYPE = array(
-        Output::TYPE_NULL => 'null',
-        Output::TYPE_BOOLEAN => 'boolean',
-        Output::TYPE_INTEGER => 'integer',
-        Output::TYPE_FLOAT => 'float',
-        Output::TYPE_STRING => 'string'
-    );
+
+    private $symbols;
+    private $symbolLookup;
+    private $joins;
 
     public function __construct(Schema $schema)
     {
         $this->schema = $schema;
+        $this->symbols = array(); // keep track of the symbols
+        $this->symbolLookup = array(); // helps avoid duplicates
+        $this->joins = array(); // stores the join information
     }
 
     public function getSymbols($tree)
     {
-        $symbols = array(); // where to save the symbols
-        $symbolLookup = array(); // helps avoid duplicates
-        $joins = array(); // keep track of the joins
-
         // first element in a Datto API tree is the context
         $context = $tree[1][1];
 
         // handle the first connection
-        $this->enterDatabase($symbols, $class, $tableName, $context);
+        $this->enterDatabase($class, $tableName, $context);
 
         // get rid of the first two components of the outermost path token
         $treeSuffix = array_slice($tree, 2);
@@ -39,36 +35,42 @@ class SymbolTable
         // traverse the tree (dfs) and keep track of the symbols
         $output = array();
         foreach ($treeSuffix as $node) {
-            $output[] = $this->traverse($symbols, $symbolLookup, $joins, $class, $tableName, $node);
+            $output[] = $this->traverse($class, $tableName, $node);
         }
 
         // add in the preamble; entry table name and the joins
         $preamble = array(array(Parser::TYPE_TABLE, $tableName, 0)); // initial table token
-        foreach ($joins as $join => $joinId) {
-            $symbolId = count($symbols);
+        foreach ($this->joins as $join => $joinId) {
+            $symbolId = count($this->symbols);
             $preamble[] = array(Parser::TYPE_JOIN, $symbolId);
-            $symbols[] = $join;
+            $this->symbols[] = $join;
         }
 
-        return array($symbols, $preamble, $output);
+        return array($this->symbols, $preamble, $output);
     }
 
-    private function enterDatabase(&$symbols, &$class, &$tableName, $context)
+    private function enterDatabase(&$class, &$tableName, $context)
     {
         list($class, $path) = $this->schema->getPropertyDefinition('Database', $context);
         $list = array_pop($path);
         list($tableName, $id, $hasZero) = $this->schema->getListDefinition($list);
         $this->connections($tables, $startTable, $tableName, $path);
         $table = count($tables);
-        $symbols[] = "`{$table}`.{$id}"; // this is a special symbol
+        $this->symbols[] = "`{$table}`.{$id}"; // this is a special symbol
     }
 
-    private function traverse(&$symbols, &$symbolLookup, &$joins, $class, $tableName, $node)
+    private function traverse($class, $tableName, $node)
     {
         list($type, $value, ) = $node;
 
         switch ($type) {
-            // terminal values: paths and properties
+            // terminal values: narameters, paths, and properties
+            case Parser::TYPE_PARAMETER:
+                $symbolId = count($this->symbols);
+                $this->symbols[] = array(':' . $value);
+                $this->symbolLookup[':' . $value] = $symbolId;
+                return array(Parser::TYPE_PARAMETER, $symbolId);
+
             case Parser::TYPE_PATH:
                 $path = array_map(function ($elem) {
                     return $elem[1];
@@ -82,30 +84,31 @@ class SymbolTable
 
                 // make sure this property isn't already in the symbol table
                 $pathKey = json_encode($path);
-                if (array_key_exists($pathKey, $symbolLookup)) {
-                    return array(Parser::TYPE_VALUE, $symbolLookup[$pathKey]);
+                if (array_key_exists($pathKey, $this->symbolLookup)) {
+                    return array(Parser::TYPE_VALUE, $this->symbolLookup[$pathKey]);
                 }
 
                 // get the property's MySQL and add it to the symbol table
-                $symbolId = count($symbols);
-                $symbols[] = $this->getMySQLIdentifier($class, $tableName, $path, $newJoins);
-                $joins = array_merge($joins, $newJoins);
-                $symbolLookup[$pathKey] = $symbolId;
+                $symbolId = count($this->symbols);
+                $this->symbols[] = $this->getMySQLIdentifier($class, $tableName, $path, $newJoins);
+                $this->joins = array_merge($this->joins, $newJoins);
+                $this->symbolLookup[$pathKey] = $symbolId;
                 return array(Parser::TYPE_VALUE, $symbolId);
 
             // recurse on objects
             case Parser::TYPE_OBJECT:
                 $newTree = array();
                 foreach ($value as $key => $child) {
-                    $newTree[$key] = $this->traverse($symbols, $symbolLookup, $joins, $class, $tableName, $child);
+                    $newTree[$key] = $this->traverse($class, $tableName, $child);
                 }
                 return array(Parser::TYPE_OBJECT, $newTree);
 
             // recurse on functions
             case Parser::TYPE_FUNCTION:
                 $newTree = array_slice($node, 0, 2);
+                
                 foreach (array_slice($node, 2) as $child) {
-                    $newTree[] = $this->traverse($symbols, $symbolLookup, $joins, $class, $tableName, $child);
+                    $newTree[] = $this->traverse($class, $tableName, $child);
                 }
                 return $newTree;
         }
@@ -137,7 +140,7 @@ class SymbolTable
         $joins = array_slice($tables, 1);
 
         // return the annotation
-        return array("`{$table}`.{$column}", self::$NAME_FROM_TYPE[$type]);
+        return array("`{$table}`.{$column}", $type);
     }
 
     private function connections(&$tables, &$contextId, &$tableAIdentifier, $connections)
@@ -158,13 +161,10 @@ class SymbolTable
         }
     }
 
-
-    private function addJoin(&$tables, $tableAId, $tableBIdentifier, $mysqlExpression, $type)
+    private function addJoin(&$tables, $tableAId, $tableBIdentifier, $mysqlExpression, $joinType)
     {
         $tableIdentifierA = "`{$tableAId}`";
-
-        $key = json_encode(array($tableIdentifierA, $tableBIdentifier, $mysqlExpression, $type));
-
+        $key = json_encode(array($tableIdentifierA, $tableBIdentifier, $mysqlExpression, $joinType));
         return self::insert($tables, $key);
     }
 
@@ -186,11 +186,9 @@ class SymbolTable
     private static function insert(&$array, $key)
     {
         $id = &$array[$key];
-
         if (!isset($id)) {
             $id = count($array) - 1;
         }
-
         return $id;
     }
 }
