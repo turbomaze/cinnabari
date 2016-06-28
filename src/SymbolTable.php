@@ -139,7 +139,7 @@ class SymbolTable
         $joins = array_slice($tables, 1);
 
         // return the annotation
-        return array("`{$table}`.{$column}", $class);
+        return array("`{$table}`.{$column}", $class, $isColumnNullable);
     }
 
     private function connections(&$tables, &$contextId, &$tableAIdentifier, $connections)

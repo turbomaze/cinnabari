@@ -93,8 +93,8 @@ class SymbolTableCompiler
                 return new Parameter($id);
 
             case Parser::TYPE_VALUE:
-                list($columnReference, $dataType) = $this->symbols[$value];
-                return new Column($dataType, $columnReference);
+                list($columnReference, $dataType, $isNullable) = $this->symbols[$value];
+                return new Column($dataType, $columnReference, $isNullable);
 
             case Parser::TYPE_OBJECT:
                 $properties = array();
@@ -102,8 +102,9 @@ class SymbolTableCompiler
                     $column = $this->buildStructure($expression);
                     if ($column !== Parser::TYPE_OBJECT) {
                         $dataType = $column->getDatatype();
+                        $isNullable = $column->getIsNullable();
                         $columnId = $this->mysql->addValue($column->getMysql());
-                        $properties[$key] = Output::getValue($columnId, true, $dataType);
+                        $properties[$key] = Output::getValue($columnId, $isNullable, $dataType);
                     } else {
                         $properties[$key] = $this->phpOutput;
                     }

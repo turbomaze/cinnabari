@@ -32,10 +32,14 @@ class Column extends AbstractExpression
     /** @var string */
     private $mysql;
 
-    public function __construct($datatype, $mysql)
+    /** @var boolean */
+    private $isNullable;
+
+    public function __construct($datatype, $mysql, $isNullable)
     {
         $this->datatype = $datatype;
         $this->mysql = $mysql;
+        $this->isNullable = $isNullable;
     }
 
     public function getDatatype()
@@ -46,5 +50,10 @@ class Column extends AbstractExpression
     public function getMysql()
     {
         return $this->mysql;
+    }
+
+    public function getIsNullable()
+    {
+        return $this->isNullable;
     }
 }
