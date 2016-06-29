@@ -111,6 +111,17 @@ EOS;
     {
         $scenario = self::getPeopleScenario();
 
+        // TODO: MySQL returns an unpredictable result set when LIMIT is used
+        // on an unsorted table. As a result, the Datto API should insert an
+        // implicit "sort" method (using the "id" expression for the "People"
+        // table as the sorting key) before applying the "slice" method.
+        //
+        // Because of this complication, this unit test is incorrect.
+        // We should replace it with a unit test for this safer query instead:
+        // "people.sort(id).slice(:0, :1).map(id)"
+        // (Except, we should use descriptive parameter names, instead of
+        // "a" and "b", or "0" and "1", in the unit tests to make the intent
+        // clearer.)
         $method = <<<'EOS'
 people.slice(:a, :b).map(id)
 EOS;

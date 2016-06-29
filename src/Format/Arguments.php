@@ -50,13 +50,18 @@ class Arguments
             return null;
         }
 
-        $safeName = var_export($name, true);
-        $input = self::getParameterPhp($safeName);
+        $input = self::getInputPhp($name);
         $id = $this->insertParameter($input);
 
         return $id;
     }
 
+    /**
+     * TODO: this function currently inserts *two* expressions (the minuend is
+     * implicitly inserted along with the subtraction expression as a whole).
+     * To insert two independent expressions, we should use two independent
+     * function calls (e.g. useArgument(...); $useSubtractiveArgument(...);)
+     */
     public function useSubtractiveArgument($nameA, $nameB, $neededTypeA, $neededTypeB)
     {
         if (!array_key_exists($nameA, $this->input) || !array_key_exists($nameB, $this->input)) {
@@ -64,22 +69,22 @@ class Arguments
         }
 
         $userTypeA = gettype($this->input[$nameA]);
-        $userTypeB = gettype($this->input[$nameB]);
 
         if (($userTypeA !== 'NULL') && ($userTypeA !== $neededTypeA)) {
             return null;
         }
 
+        $userTypeB = gettype($this->input[$nameB]);
+
         if (($userTypeB !== 'NULL') && ($userTypeB !== $neededTypeB)) {
             return null;
         }
 
-        $safeNameA = var_export($nameA, true);
-        $safeNameB = var_export($nameB, true);
-        $inputA = self::getParameterPhp($safeNameA);
-        $inputB = self::getParameterPhp($safeNameB);
+        $inputA = self::getInputPhp($nameA);
         $idA = $this->insertParameter($inputA);
-        $idB = $this->insertParameter($inputB . ' - ' .  $inputA);
+
+        $inputB = self::getInputPhp($nameB);
+        $idB = $this->insertParameter("{$inputB} - {$inputA}");
 
         return array($idA, $idB);
     }
@@ -115,8 +120,9 @@ class Arguments
         return "{$variable} = {$value};";
     }
 
-    protected static function getParameterPhp($parameterName)
+    private static function getInputPhp($parameter)
     {
+        $parameterName = var_export($parameter, true);
         return "\$input[{$parameterName}]";
     }
 }

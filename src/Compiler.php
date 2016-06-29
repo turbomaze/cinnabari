@@ -24,9 +24,8 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Mysql\Select;
 use Datto\Cinnabari\Format\Arguments;
-use Datto\Cinnabari\Php\Output;
+use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\Column;
 use Datto\Cinnabari\Mysql\Expression\OperatorAnd;
 use Datto\Cinnabari\Mysql\Expression\OperatorDivides;
@@ -42,6 +41,8 @@ use Datto\Cinnabari\Mysql\Expression\OperatorPlus;
 use Datto\Cinnabari\Mysql\Expression\OperatorRegexpBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
+use Datto\Cinnabari\Mysql\Select;
+use Datto\Cinnabari\Php\Output;
 
 /**
  * Class Compiler
@@ -830,7 +831,8 @@ class Compiler
                     return false;
                 }
 
-                $columnId = $this->mysql->addExpression($this->table, $expression->getMySql());
+                /** @var AbstractExpression $expression */
+                $columnId = $this->mysql->addExpression($this->table, $expression->getMysql());
                 $nullable = true; // TODO
                 $this->phpOutput = Output::getValue($columnId, $nullable, $type);
 
@@ -929,16 +931,6 @@ class Compiler
         return true;
     }
 
-    private static function scanPath($token, &$tokens)
-    {
-        if (!self::isPathToken($token)) {
-            return false;
-        }
-
-        $tokens = array_slice($token, 1);
-        return true;
-    }
-
     private static function scanParameter($token, &$name)
     {
         if (!self::isParameterToken($token)) {
@@ -980,9 +972,14 @@ class Compiler
         return true;
     }
 
-    private static function isPathToken($token)
+    private static function scanPath($token, &$tokens)
     {
-        return is_array($token) && ($token[0] === Parser::TYPE_PATH);
+        if (!self::isPathToken($token)) {
+            return false;
+        }
+
+        $tokens = array_slice($token, 1);
+        return true;
     }
 
     private static function isParameterToken($token)
@@ -995,13 +992,13 @@ class Compiler
         return is_array($token) && ($token[0] === Parser::TYPE_PROPERTY);
     }
 
-    private static function isParameterToken($token)
-    {
-        return is_array($token) && ($token[0] === Parser::TYPE_PARAMETER);
-    }
-
     private static function isFunctionToken($token)
     {
         return is_array($token) && ($token[0] === Parser::TYPE_FUNCTION);
+    }
+
+    private static function isPathToken($token)
+    {
+        return is_array($token) && ($token[0] === Parser::TYPE_PATH);
     }
 }
