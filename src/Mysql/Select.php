@@ -118,6 +118,15 @@ class Select
         return self::insert($this->columns, $name);
     }
 
+    public function addExpression($tableId, $expression)
+    {
+        if (!self::isDefined($this->tables, $tableId)) {
+            return null;
+        }
+
+        return self::insert($this->columns, $expression);
+    }
+
     public function getMysql()
     {
         if (!$this->isValid()) {
