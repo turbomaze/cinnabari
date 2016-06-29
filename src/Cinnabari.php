@@ -66,8 +66,12 @@ class Cinnabari
     private static function getResult(Schema $schema, $request, $arguments)
     {
         try {
-            $compiler = new Compiler($schema);
-            return $compiler->compile($request, $arguments);
+            $symbolTable = new SymbolTable($schema);
+            $typeInferer = new TypeInferer();
+            $compiler = new Compiler();
+            list($symbols, $preamble, $annotatedTree) = $symbolTable->getSymbols($request);
+            list($symbols) = $typeInferer->infer($symbols, $annotatedTree);
+            return $compiler->compile($symbols, $preamble, $annotatedTree, $arguments);
         } catch (Exception $exception) {
 
             // TODO:

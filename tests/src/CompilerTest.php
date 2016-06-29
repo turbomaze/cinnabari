@@ -3,6 +3,8 @@
 namespace Datto\Cinnabari\Tests;
 
 use Datto\Cinnabari\Compiler;
+use Datto\Cinnabari\TypeInferer;
+use Datto\Cinnabari\SymbolTable;
 use Datto\Cinnabari\Lexer;
 use Datto\Cinnabari\Parser;
 use Datto\Cinnabari\Schema;
@@ -701,6 +703,8 @@ EOS;
     
     public function testFailParameterPath()
     {
+        $this->setExpectedException('Exception');
+        
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
@@ -721,6 +725,8 @@ EOS;
     
     public function testFailParameterPropertyPath()
     {
+        $this->setExpectedException('Exception');
+        
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
@@ -746,11 +752,15 @@ EOS;
         $lexer = new Lexer();
         $parser = new Parser();
         $schema = new Schema($scenario);
-        $compiler = new Compiler($schema);
+        $symbolTable = new SymbolTable($schema);
+        $typeInferer = new TypeInferer();
+        $compiler = new Compiler();
 
         $tokens = $lexer->tokenize($method);
         $request = $parser->parse($tokens);
-        $actual = $compiler->compile($request, $arguments);
+        list($symbols, $preamble, $annotatedTree) = $symbolTable->getSymbols($request);
+        list($symbols) = $typeInferer->infer($symbols, $annotatedTree);
+        $actual = $compiler->compile($symbols, $preamble, $annotatedTree, $arguments);
         $expected = array($mysql, $phpInput, $phpOutput);
         
         // strip nonessential mysql whitespace

@@ -34,9 +34,52 @@ abstract class Grammar
     /** @var array */
     private $rules;
 
-    public function __construct($rules)
+    public function __construct($ebnf)
     {
+        $rules = array();
+        foreach ($ebnf as $rule => $expansion) {
+            $rules[$rule] = $this->getRuleFromEBNF($ebnf, $expansion);
+        }
+
         $this->rules = $rules;
+    }
+
+    protected function getRuleFromEBNF($ebnf, $expansion)
+    {
+        $expansion = preg_replace('/\s+/', '', $expansion);
+
+        // or
+        if (strpos($expansion, '|') !== false) {
+            $orArguments = explode('|', $expansion);
+            $components = array();
+            foreach ($orArguments as $ebnfRule) {
+                $components[] = $this->getRuleFromEBNF($ebnf, $ebnfRule);
+            }
+            return array_merge(array(self::TYPE_OR), $components);
+        }
+
+        // and
+        elseif (strpos($expansion, ',') !== false) {
+            $andArguments = explode(',', $expansion);
+            $components = array();
+            foreach ($andArguments as $ebnfRule) {
+                $components[] = $this->getRuleFromEBNF($ebnf, $ebnfRule);
+            }
+            return array_merge(array(self::TYPE_AND), $components);
+        }
+
+        // repeat
+        elseif (strpos($expansion, '*') === strlen($expansion) - 1) {
+            $ebnfRule = substr($expansion, 0, -1);
+            return array_merge(array(self::TYPE_REPEAT), array($ebnfRule, 0, 10));
+        }
+
+        // method
+        elseif ($expansion[0] === '_') {
+            return array(self::TYPE_METHOD, substr($expansion, 1));
+        }
+
+        return $expansion;
     }
 
     abstract protected function getState();
@@ -45,7 +88,13 @@ abstract class Grammar
 
     public function applyRule($rule)
     {
-        $definition = $this->rules[$rule];
+        $ruleString = json_encode($rule);
+        echo "Attempting to apply $ruleString.\n\n";
+
+        $definition = $rule;
+        if (is_string($rule)) {
+            $definition = $this->rules[$rule];
+        }
 
         $type = array_shift($definition);
 
@@ -88,7 +137,8 @@ abstract class Grammar
 
         $this->setState($state);
 
-        $message = "Expected a {$rule}";
+        $ruleString = json_encode($rule);
+        $message = "Expected a {$ruleString}";
         throw new Exception(1, null, $message);
     }
 
