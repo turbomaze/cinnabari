@@ -106,6 +106,41 @@ EOS;
 
         $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
+    
+    public function testSlicesValue()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.slice(:a, :b).map(id)
+EOS;
+
+        $arguments = array('a' => 0, 'b' => 10);
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`
+    FROM `People` AS `0`
+    LIMIT :0, :1
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['a'],
+    $input['b'] - $input['a']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[0];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
 
     public function testMapBasicObject()
     {

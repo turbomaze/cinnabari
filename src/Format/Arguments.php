@@ -50,26 +50,54 @@ class Arguments
             return null;
         }
 
-        $id = &$this->output[$name];
-
-        if ($id === null) {
-            $id = count($this->output) - 1;
-        }
+        $safeName = var_export($name, true);
+        $input = self::getParameterPhp($safeName);
+        $id = $this->insertParameter($input);
 
         return $id;
     }
 
+    public function useSubtractiveArgument($nameA, $nameB, $neededTypeA, $neededTypeB)
+    {
+        if (!array_key_exists($nameA, $this->input) || !array_key_exists($nameB, $this->input)) {
+            return null;
+        }
+
+        $userTypeA = gettype($this->input[$nameA]);
+        $userTypeB = gettype($this->input[$nameB]);
+
+        if (($userTypeA !== 'NULL') && ($userTypeA !== $neededTypeA)) {
+            return null;
+        }
+
+        if (($userTypeB !== 'NULL') && ($userTypeB !== $neededTypeB)) {
+            return null;
+        }
+
+        $safeNameA = var_export($nameA, true);
+        $safeNameB = var_export($nameB, true);
+        $inputA = self::getParameterPhp($safeNameA);
+        $inputB = self::getParameterPhp($safeNameB);
+        $idA = $this->insertParameter($inputA);
+        $idB = $this->insertParameter($inputB . ' - ' .  $inputA);
+
+        return array($idA, $idB);
+    }
+
     public function getPhp()
     {
-        $statements = array_map('self::getInputStatement', array_flip($this->output));
+        $statements = array_flip($this->output);
         $array = self::getArray($statements);
         return self::getAssignment('$output', $array);
     }
 
-    protected static function getInputStatement($key)
+    private function insertParameter($inputString)
     {
-        $name = var_export($key, true);
-        return "\$input[{$name}]";
+        $id = &$this->output[$inputString];
+        if ($id === null) {
+            $id = count($this->output) - 1;
+        }
+        return $id;
     }
 
     protected static function getArray($statements)
@@ -85,5 +113,10 @@ class Arguments
     protected static function getAssignment($variable, $value)
     {
         return "{$variable} = {$value};";
+    }
+
+    protected static function getParameterPhp($parameterName)
+    {
+        return "\$input[{$parameterName}]";
     }
 }
