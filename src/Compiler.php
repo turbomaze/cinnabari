@@ -791,7 +791,7 @@ class Compiler
             return false;
         }
 
-        if ($name != 'map') {
+        if ($name !== 'map') {
             return false;
         }
 
