@@ -68,17 +68,9 @@ class Select
         return self::insert($this->tables, $name);
     }
 
-    public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $type)
+    public function insertIntoTables($key)
     {
-        if (!self::isDefined($this->tables, $tableAId)) {
-            return null;
-        }
-
-        $tableIdentifierA = self::getIdentifier($tableAId);
-
-        $key = json_encode(array($tableIdentifierA, $tableBIdentifier, $mysqlExpression, $type));
-
-        return self::insert($this->tables, $key);
+        self::insert($this->tables, $key);     
     }
 
     public function setWhere(AbstractExpression $expression)
@@ -86,16 +78,9 @@ class Select
         $this->where = $expression;
     }
 
-    public function setOrderBy($tableId, $column, $isAscending)
+    public function setOrderBy($columnReference, $isAscending)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
-        $table = self::getIdentifier($tableId);
-        $name = self::getAbsoluteExpression($table, $column);
-
-        $mysql = "ORDER BY {$name} ";
+        $mysql = "ORDER BY {$columnReference} ";
 
         if ($isAscending) {
             $mysql .= "ASC";
@@ -106,16 +91,9 @@ class Select
         $this->orderBy = $mysql;
     }
 
-    public function addValue($tableId, $column)
+    public function addValue($column)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
-        $table = self::getIdentifier($tableId);
-        $name = self::getAbsoluteExpression($table, $column);
-
-        return self::insert($this->columns, $name);
+        return self::insert($this->columns, $column);
     }
 
     public function getMysql()

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Copyright (C) 2016 Datto, Inc.
  *
@@ -27,11 +26,15 @@ namespace Datto\Cinnabari;
 class Parser
 {
     // Token types
+    const TYPE_PATH = 0; // remove
+    const TYPE_PROPERTY = 2; // remove
+
     const TYPE_PARAMETER = 1;
-    const TYPE_PROPERTY = 2;
     const TYPE_FUNCTION = 3;
     const TYPE_OBJECT = 4;
-    const TYPE_PATH = 5;
+    const TYPE_TABLE = 5;
+    const TYPE_JOIN = 6;
+    const TYPE_VALUE = 7;
 
     // Operator Arity
     const UNARY = 1;
