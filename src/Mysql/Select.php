@@ -111,7 +111,7 @@ class Select
         $this->orderBy = $mysql;
     }
 
-    public function setLimit($tableId, $start, $length)
+    public function setLimit($tableId, AbstractExpression $start, AbstractExpression $length)
     {
         if (!self::isDefined($this->tables, $tableId)) {
             return null;
@@ -119,11 +119,11 @@ class Select
 
         $offset = $start->getMysql();
         $count = $length->getMysql();
+
         $mysql = "{$offset}, {$count}";
 
         $this->limit = $mysql;
     }
-
 
     public function addValue($tableId, $column)
     {
@@ -155,6 +155,7 @@ class Select
         $mysql = $this->getColumns() .
             $this->getTables() .
             $this->getWhereClause() .
+            $this->getOrderByClause() .
             $this->getLimitClause();
 
         return rtrim($mysql, "\n");
@@ -248,10 +249,6 @@ class Select
             $mysql .= "\t{$mysqlJoin} {$tableBIdentifier} AS {$joinIdentifier} ON {$expression}\n";
         }
 
-        if (isset($this->orderBy)) {
-            $mysql .= "\t{$this->orderBy}\n";
-        }
-
         return $mysql;
     }
 
@@ -263,6 +260,15 @@ class Select
 
         $where = $this->where->getMysql();
         return "\tWHERE {$where}\n";
+    }
+
+    private function getOrderByClause()
+    {
+        if ($this->orderBy === null) {
+            return null;
+        }
+
+        return "\t{$this->orderBy}\n";
     }
 
     private function getLimitClause()

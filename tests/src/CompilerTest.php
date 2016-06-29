@@ -402,6 +402,39 @@ EOS;
         $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
+    public function testSortOnPath()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.sort(name.first).map(name.first)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`,
+    `1`.`First` AS `1`
+    FROM `People` AS `0`
+    INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
+    ORDER BY `1`.`First` ASC
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = $row[1];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
     
     public function testMapDepthZero()
     {
