@@ -2,23 +2,16 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Mysql\Select;
 use Datto\Cinnabari\Format\Arguments;
-use Datto\Cinnabari\Php\Output;
 use Datto\Cinnabari\Mysql\Expression\Column;
-use Datto\Cinnabari\Mysql\Expression\Parameter;
-use Datto\Cinnabari\Mysql\Expression\AbstractOperatorBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorNot;
+use Datto\Cinnabari\Mysql\Expression\Parameter;
+use Datto\Cinnabari\Mysql\Select;
+use Datto\Cinnabari\Php\Output;
 
 class Compiler
 {
-    /** @var array */
-    private $symbols;
-
-    /** @var array */
-    private $preamble;
-
     /** @var Arguments */
     private $arguments;
 
@@ -38,19 +31,14 @@ class Compiler
         'match' => 'REGEXP BINARY'
     );
 
-    public function compile($symbols, $preamble, $annotatedTree, $arguments)
+    public function compile($annotatedTree, $arguments)
     {
-        $this->symbols = $symbols;
-        $this->preamble = $preamble;
-
         $this->mysql = new Select();
         $this->arguments = new Arguments($arguments);
         $this->phpOutput = null;
 
-        $this->initializeMySQL($preamble);
-
         // solve recursively here
-        array_map(array($this, 'buildStructure'), $annotatedTree);
+        $this->buildStructure($annotatedTree, null);
         $this->phpOutput = Output::getList(0, false, true, $this->phpOutput);
 
         $mysql = $this->mysql->getMysql();
@@ -63,85 +51,124 @@ class Compiler
         return array($mysql, $formatInput, $this->phpOutput);
     }
 
-    private function initializeMySQL()
+    public function buildStructure($tree, $context)
     {
-        // the table entry point
-        $this->mysql->setTable($this->preamble[0][1]);
-        $idReference = $this->symbols[$this->preamble[0][2]];
-        $this->mysql->addValue($idReference);
+        $structures = array();
 
-        // the joins
-        foreach (array_slice($this->preamble, 1) as $token) {
-            $joinToken = $token[0];
-            $joinId= $token[1];
-            $join = $this->symbols[$joinId];
-            $this->mysql->insertIntoTables($join);
-        }
-    }
+        foreach ($tree as $key => $branch) {
+            list($type, $value) = each($branch);
 
-    public function buildStructure($branch) {
-        $type = $branch[0]; 
-        $value = $branch[1];
-        $kids = array_slice($branch, 2);
-        $builtKids = array_map(array($this, 'buildStructure'), $kids);
-
-        // build this branch based off of its children
-        switch ($type) {
-            case Parser::TYPE_PARAMETER:
-                list($name, $neededType) = $this->symbols[$value];
-                $id = $this->arguments->useArgument($name, $neededType);
-                return new Parameter($id);
-
-            case Parser::TYPE_VALUE:
-                list($columnReference, $dataType, $isNullable) = $this->symbols[$value];
-                return new Column($dataType, $columnReference, $isNullable);
-
-            case Parser::TYPE_OBJECT:
-                $properties = array();
-                foreach ($value as $key => $expression) {
-                    $column = $this->buildStructure($expression);
-                    // if it's not an object, then it's a property
-                    if ($column !== Parser::TYPE_OBJECT) {
-                        $properties[$key] = $this->addValue($column);
-                    } else {
-                        $properties[$key] = $this->phpOutput;
-                    }
+            $builtKids = array();
+            if (is_array($value) && array_key_exists('arguments', $value)) {
+                foreach ($value['arguments'] as $argumentIndex => $kid) {
+                    $builtKids[] = $this->buildStructure($kid, $context);
                 }
-                $this->phpOutput = Output::getObject($properties);
-                return Parser::TYPE_OBJECT;
+            }
 
-            case Parser::TYPE_FUNCTION:
-                switch ($value) {
-                    case 'filter':
-                        $this->mysql->setWhere($builtKids[0]);
-                        return true;
-                    case 'sort':
-                        $this->mysql->setOrderBy($builtKids[0]->getMysql(), true);
-                        return true;
-                    case 'map':
-                        // if it's not an object, then it's a column
-                        if ($builtKids[0] !== Parser::TYPE_OBJECT) {
-                            $this->phpOutput = $this->addValue($builtKids[0]);
+            // build this branch based off of its children
+            switch ($type) {
+                case Translator::TYPE_TABLE:
+                    // the table entry point
+                    $context = $this->mysql->setTable($value['table']);
+                    $idColumn = new Column($context, $value['id'], Output::TYPE_INTEGER, false);
+                    $this->mysql->addValue($idColumn->getMysql());
+                    $structures[] = true;
+                    break;
+
+                case Translator::TYPE_JOIN:
+                    $context = $this->mysql->addJoin(
+                        $context,
+                        $value['tableB'],
+                        $value['expression'],
+                        $value['hasZero'],
+                        $value['hasMany']
+                    );
+
+                    $structures[] = true;
+                    break;
+
+                case Translator::TYPE_PARAMETER:
+                    $name = $value;
+                    $neededType = 'integer'; // TODO: type inference
+                    $id = $this->arguments->useArgument($name, $neededType);
+                    $structures[] = new Parameter($id);
+                    break;
+
+                case Translator::TYPE_VALUE:
+                    $columnReference = $value['expression'];
+                    $dataType = Output::TYPE_INTEGER; // TODO: get this info from the Translator class
+                    $isNullable = $value['hasZero'];
+                    $structures[] = new Column($context, $columnReference, $dataType, $isNullable);
+                    break;
+
+                case Translator::TYPE_OBJECT:
+                    $properties = array();
+                    foreach ($value as $objectKey => $expression) {
+                        $column = end($this->buildStructure($expression, $context));
+
+                        // if it's not an object, then it's a property
+                        if ($column !== Translator::TYPE_OBJECT) {
+                            $properties[$objectKey] = $this->addValue($column);
+                        } else {
+                            $properties[$objectKey] = $this->phpOutput;
                         }
-                        return true;
-                    case 'not':
-                        return new OperatorNot($builtKids[0]);
-                    case 'notEqual':
-                        $operatorSymbol = self::$binaryOperatorMap[$value];
-                        return new OperatorNot(new OperatorBinary(
-                            $operatorSymbol, $builtKids[0], $builtKids[1]
-                        ));
-                    default:
-                        $operatorSymbol = self::$binaryOperatorMap[$value];
-                        return new OperatorBinary($operatorSymbol, $builtKids[0], $builtKids[1]);
-                }
-                return $value;
+                    }
+                    $this->phpOutput = Output::getObject($properties);
+                    $structures[] = Translator::TYPE_OBJECT;
+                    break;
+
+                case Translator::TYPE_FUNCTION:
+                    $functionName = $value['function'];
+                    $firstArgument = end($builtKids[0]);
+                    $secondArgument = (count($builtKids) > 1) ? end($builtKids[1]) : null;
+
+                    switch ($functionName) {
+                        case 'filter':
+                            $this->mysql->setWhere($firstArgument);
+                            $structures[] = true;
+                            break;
+
+                        case 'sort':
+                            $this->mysql->setOrderBy($firstArgument->getMysql(), true);
+                            $structures[] = true;
+                            break;
+
+                        case 'map':
+                            // if it's not an object, then it's a column
+                            if ($firstArgument !== Translator::TYPE_OBJECT) {
+                                $this->phpOutput = $this->addValue($firstArgument); // TODO: expression support
+                            }
+                            $structures[] = true;
+                            break;
+
+                        case 'not':
+                            $structures[] = new OperatorNot($firstArgument);
+                            break;
+
+                        case 'notEqual':
+                            $operatorSymbol = self::$binaryOperatorMap[$functionName];
+                            $structures[] = new OperatorNot(new OperatorBinary(
+                                $operatorSymbol,
+                                $firstArgument,
+                                $secondArgument
+                            ));
+                            break;
+
+                        default:
+                            $operatorSymbol = self::$binaryOperatorMap[$functionName];
+                            $structures[] = new OperatorBinary($operatorSymbol, $firstArgument, $secondArgument);
+                            break;
+                    }
+                    break;
+            }
         }
+
+        return $structures;
     }
 
-    private function addValue($column)
+    private function addValue(Column $column)
     {
         $columnId = $this->mysql->addValue($column->getMysql());
-        return Output::getValue($columnId, $column->getIsNullable(), $column->getDatatype());
+        return Output::getValue($columnId, $column->getIsNullable(), $column->getDataType());
     }
 }

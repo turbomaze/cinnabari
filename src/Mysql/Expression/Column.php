@@ -27,29 +27,33 @@ namespace Datto\Cinnabari\Mysql\Expression;
 class Column extends AbstractExpression
 {
     /** @var string */
-    private $datatype;
+    private $context;
 
     /** @var string */
-    private $mysql;
+    private $columnName;
+
+    /** @var string */
+    private $dataType;
 
     /** @var boolean */
     private $isNullable;
 
-    public function __construct($datatype, $mysql, $isNullable)
+    public function __construct($context, $columnName, $dataType, $isNullable)
     {
-        $this->datatype = $datatype;
-        $this->mysql = $mysql;
+        $this->context = $context;
+        $this->columnName = $columnName;
+        $this->dataType = $dataType;
         $this->isNullable = $isNullable;
     }
 
-    public function getDatatype()
+    public function getDataType()
     {
-        return $this->datatype;
+        return $this->dataType;
     }
 
     public function getMysql()
     {
-        return $this->mysql;
+        return "`{$this->context}`" . '.' . $this->columnName;
     }
 
     public function getIsNullable()

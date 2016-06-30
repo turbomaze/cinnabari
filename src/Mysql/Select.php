@@ -53,7 +53,7 @@ class Select
     /**
      * @param string $name
      * Mysql table identifier (e.g. "`people`")
-     * 
+     *
      * @return int
      * Numeric table identifier (e.g. 0)
      */
@@ -68,9 +68,9 @@ class Select
         return self::insert($this->tables, $name);
     }
 
-    public function insertIntoTables($key)
+    public function getTableCount()
     {
-        self::insert($this->tables, $key);     
+        return count($this->tables);
     }
 
     public function setWhere(AbstractExpression $expression)
@@ -91,9 +91,9 @@ class Select
         $this->orderBy = $mysql;
     }
 
-    public function addValue($column)
+    public function addValue($columnReference)
     {
-        return self::insert($this->columns, $column);
+        return self::insert($this->columns, $columnReference);
     }
 
     public function getMysql()
@@ -122,6 +122,28 @@ class Select
         }
 
         return $name;
+    }
+
+    public function findTable($tableName)
+    {
+        if (array_key_exists($tableName, $this->tables)) {
+            return $this->tables[$tableName];
+        }
+    
+        return false;
+    }
+
+    public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $hasZero, $hasMany)
+    {
+        if (!self::isDefined($this->tables, $tableAId)) {
+            return null;
+        }
+
+        $joinType = (!$hasZero && !$hasMany) ? self::JOIN_INNER : self::JOIN_LEFT;
+
+        $tableAIdentifier = self::getIdentifier($tableAId);
+        $key = json_encode(array($tableAIdentifier, $tableBIdentifier, $mysqlExpression, $joinType));
+        return self::insert($this->tables, $key);
     }
 
     public static function getAbsoluteExpression($context, $expression)

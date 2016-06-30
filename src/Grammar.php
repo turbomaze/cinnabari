@@ -57,7 +57,7 @@ abstract class Grammar
             }
             return array_merge(array(self::TYPE_OR), $components);
         }
-
+        
         // and
         elseif (strpos($expansion, ',') !== false) {
             $andArguments = explode(',', $expansion);
@@ -88,9 +88,6 @@ abstract class Grammar
 
     public function applyRule($rule)
     {
-        $ruleString = json_encode($rule);
-        echo "Attempting to apply $ruleString.\n\n";
-
         $definition = $rule;
         if (is_string($rule)) {
             $definition = $this->rules[$rule];
