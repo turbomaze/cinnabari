@@ -28,10 +28,10 @@ class Cinnabari
 {
     const ERROR_SYNTAX = 1;
 
-    /** @var Schema */
+    /** @var array */
     private $schema;
 
-    public function __construct(Schema $schema)
+    public function __construct($schema)
     {
         $this->schema = $schema;
     }
@@ -41,8 +41,9 @@ class Cinnabari
     {
         $tokens = self::getTokens($query);
         $request = self::getRequest($tokens);
+        $translation = self::getTranslation($this->schema, $request);
 
-        return self::getResult($this->schema, $request, $arguments);
+        return self::getResult($translation, $arguments);
     }
 
     private static function getTokens($query)
@@ -63,15 +64,17 @@ class Cinnabari
         return $parser->parse($tokens);
     }
 
-    private static function getResult(Schema $schema, $request, $arguments)
+    private static function getTranslation($schema, $request)
+    {
+        $translator = new Translator($schema); 
+        return $translator->translate($request);
+    }
+
+    private static function getResult($translatedRequest, $arguments)
     {
         try {
-            $symbolTable = new SymbolTable($schema);
-            $typeInferer = new TypeInferer();
             $compiler = new Compiler();
-            list($symbols, $preamble, $annotatedTree) = $symbolTable->getSymbols($request);
-            list($symbols) = $typeInferer->infer($symbols, $annotatedTree);
-            return $compiler->compile($symbols, $preamble, $annotatedTree, $arguments);
+            return $compiler->compile($translatedRequest, $arguments);
         } catch (Exception $exception) {
 
             // TODO:
