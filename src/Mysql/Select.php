@@ -24,10 +24,15 @@
 
 namespace Datto\Cinnabari\Mysql;
 
+use Datto\Cinnabari\Exception;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 class Select
 {
+    // mysql errors
+    const ERROR_BAD_TABLE_ID = 201;
+    const ERROR_INVALID_MYSQL = 202;
+
     const JOIN_INNER = 1;
     const JOIN_LEFT = 2;
 
@@ -58,7 +63,7 @@ class Select
     /**
      * @param string $name
      * Mysql table identifier (e.g. "`people`")
-     * 
+     *
      * @return int
      * Numeric table identifier (e.g. 0)
      */
@@ -76,7 +81,14 @@ class Select
     public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $type)
     {
         if (!self::isDefined($this->tables, $tableAId)) {
-            return null;
+            $tableString = json_encode($tableAId);
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $tableAId
+                ),
+                "unknown table id {$tableString}."
+            );
         }
 
         $tableIdentifierA = self::getIdentifier($tableAId);
@@ -94,7 +106,14 @@ class Select
     public function setOrderBy($tableId, $column, $isAscending)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            return null;
+            $tableString = json_encode($tableId);
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $tableId
+                ),
+                "unknown table id {$tableString}."
+            );
         }
 
         $table = self::getIdentifier($tableId);
@@ -128,7 +147,14 @@ class Select
     public function addValue($tableId, $column)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            return null;
+            $tableString = json_decode($tableId);
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $tableId
+                ),
+                "unknown table id {$tableString}."
+            );
         }
 
         $table = self::getIdentifier($tableId);
@@ -149,7 +175,11 @@ class Select
     public function getMysql()
     {
         if (!$this->isValid()) {
-            return null;
+            throw new Exception(
+                self::ERROR_INVALID_MYSQL,
+                array(),
+                "SQL queries must reference at least one table and column."
+            );
         }
 
         $mysql = $this->getColumns() .
@@ -166,7 +196,15 @@ class Select
         $name = array_search($id, $this->tables, true);
 
         if (!is_string($name)) {
-            return null;
+            $idString = json_decode($id);
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $id,
+                    'name' => $name
+                ),
+                "unknown table id {$idString}."
+            );
         }
 
         if (0 < $id) {

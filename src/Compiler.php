@@ -56,7 +56,15 @@ use Datto\Cinnabari\Php\Output;
  */
 class Compiler
 {
-    const ERROR_SYNTAX = 1;
+    // compiler errors
+    const ERROR_NO_INITIAL_PROPERTY = 501;
+    const ERROR_NO_INITIAL_PATH = 502;
+    const ERROR_NO_MAP_FUNCTION = 503;
+    const ERROR_NO_FILTER_ARGUMENTS = 504;
+    const ERROR_BAD_FILTER_EXPRESSION = 505;
+    const ERROR_NO_SORT_ARGUMENTS = 506;
+    const ERROR_BAD_MAP_ARGUMENT = 507;
+    const ERROR_BAD_SCHEMA = 508;
 
     /** @var Schema */
     private $schema;
@@ -97,6 +105,7 @@ class Compiler
         }
 
         $mysql = $this->mysql->getMysql();
+
         $formatInput = $this->arguments->getPhp();
 
         if (!isset($mysql, $formatInput, $this->phpOutput)) {
@@ -109,23 +118,50 @@ class Compiler
     private function getArrayProperty()
     {
         if (!self::scanPath($this->request, $this->request)) {
-            return false;
+            throw new Exception(
+                self::ERROR_NO_INITIAL_PATH,
+                array('request' => $this->request),
+                "API requests must begin with a path."
+            );
         }
 
         $token = array_shift($this->request);
 
         if (!self::scanProperty($token, $array)) {
-            return false;
+            throw new Exception(
+                self::ERROR_NO_INITIAL_PROPERTY,
+                array('token' => $token),
+                "API requests must begin with a property."
+            );
         }
 
         list($class, $path) = $this->schema->getPropertyDefinition('Database', $array);
-        $list = array_pop($path);
 
-        if (!isset($class, $path, $list)) {
-            return false;
+        if (!isset($class, $path)) {
+            throw new Exception(
+                self::ERROR_BAD_SCHEMA,
+                array(
+                    'accessType' => 'property',
+                    'arguments' => array($array)
+                ),
+                "schema failed to return a proper property definition."
+            );
         }
 
+        $list = array_pop($path);
+
         list($table, $id, $hasZero) = $this->schema->getListDefinition($list);
+
+        if (!isset($table, $id, $hasZero)) {
+            throw new Exception(
+                self::ERROR_BAD_SCHEMA,
+                array(
+                    'accessType' => 'list',
+                    'arguments' => array($list)
+                ),
+                "schema failed to return a proper list definition."
+            );
+        }
 
         $this->class = $class;
         $this->table = $this->mysql->setTable($table);
@@ -140,7 +176,11 @@ class Compiler
         $this->request = reset($this->request);
 
         if (!$this->readMap()) {
-            return false;
+            throw new Exception(
+                self::ERROR_NO_MAP_FUNCTION,
+                array('request' => $this->request),
+                "API requests must contain a map function after the optional filter/sort functions."
+            );
         }
 
         $this->phpOutput = Output::getList($idAlias, $hasZero, true, $this->phpOutput);
@@ -159,8 +199,25 @@ class Compiler
             return false;
         }
 
+        // at this point, we're sure they want to filter
+        if (!isset($arguments) || count($arguments) === 0) {
+            throw new Exception(
+                self::ERROR_NO_FILTER_ARGUMENTS,
+                array('token' => $token),
+                "filter functions take one expression argument, none provided."
+            );
+        }
+
         if (!$this->getExpression($this->class, $this->table, $arguments[0], $where, $type)) {
-            return false;
+            throw new Exception(
+                self::ERROR_BAD_FILTER_EXPRESSION,
+                array(
+                    'class' => $this->class,
+                    'table' => $this->table,
+                    'arguments' => $arguments[0]
+                ),
+                "malformed expression supplied to the filter function."
+            );
         }
 
         $this->mysql->setWhere($where);
@@ -211,6 +268,10 @@ class Compiler
         array_shift($tokens);
 
         list($class, $path) = $this->schema->getPropertyDefinition($class, $property);
+
+        if (!isset($class, $path)) {
+            return false;
+        }
 
         $tableIdentifier = $this->mysql->getTable($tableId);
         $this->connections($tableId, $tableIdentifier, $path);
@@ -457,6 +518,10 @@ class Compiler
 
     private function getMatchFunction($class, $tableId, $property, $pattern, &$expression)
     {
+        if (!isset($property) || count($property) < 2) {
+            return false;
+        }
+        
         if ($property[0] === Parser::TYPE_PATH) {
             $tokens = array_slice($property, 1);
             if (!$this->getStringPath($class, $tableId, $tokens, $argumentExpression, Parser::TYPE_PROPERTY)) {
@@ -492,7 +557,15 @@ class Compiler
                 return $this->getNumericProperty($class, $tableId, $token[1], $output, $type);
 
             case Parser::TYPE_FUNCTION:
-                return $this->getNumericBinaryFunction($class, $tableId, $token[1], $token[2], $token[3], $output, $type);
+                if (!self::scanFunction($token, $name, $arguments)) {
+                    return false;
+                }
+
+                if (count($arguments) < 2) {
+                    return false;
+                }
+
+                return $this->getNumericBinaryFunction($class, $tableId, $name, $arguments[0], $arguments[1], $output, $type);
 
             default:
                 return false;
@@ -510,6 +583,10 @@ class Compiler
         array_shift($tokens);
 
         list($class, $path) = $this->schema->getPropertyDefinition($class, $property);
+
+        if (!isset($class, $path)) {
+            return false;
+        }
 
         $tableIdentifier = $this->mysql->getTable($tableId);
         $this->connections($tableId, $tableIdentifier, $path);
@@ -598,6 +675,10 @@ class Compiler
 
     private function getStringPropertyExpression($class, $tableId, $token, &$output)
     {
+        if (count($token) < 2) {
+            return false;
+        }
+
         $type = $token[0];
 
         switch ($type) {
@@ -615,6 +696,10 @@ class Compiler
 
     private function getStringExpression($class, $tableId, $token, &$output)
     {
+        if (count($token) < 2) {
+            return false;
+        }
+
         $type = $token[0];
 
         switch ($type) {
@@ -644,6 +729,10 @@ class Compiler
         array_shift($tokens);
 
         list($class, $path) = $this->schema->getPropertyDefinition($class, $property);
+
+        if (!isset($class, $path)) {
+            return false;
+        }
 
         $tableIdentifier = $this->mysql->getTable($tableId);
         $this->connections($tableId, $tableIdentifier, $path);
@@ -677,13 +766,22 @@ class Compiler
         $tableIdentifier = $this->mysql->getTable($tableId);
 
         list($actualType, $path) = $this->schema->getPropertyDefinition($class, $name);
-        $value = array_pop($path);
+
+        if (!isset($actualType, $path)) {
+            return false;
+        }
 
         if ($neededType !== $actualType) {
             return false;
         }
 
+        $value = array_pop($path);
+
         list($column, ) = $this->schema->getValueDefinition($tableIdentifier, $value);
+
+        if (!isset($column)) {
+            return false;
+        }
 
         $this->connections($tableId, $tableIdentifier, $path);
 
@@ -717,6 +815,10 @@ class Compiler
     private function readExpression()
     {
         $token = $this->request;
+
+        if (!isset($token) || count($token) < 1) {
+            return false;
+        }
 
         $type = $token[0];
 
@@ -784,6 +886,10 @@ class Compiler
 
         list($this->class, $path) = $this->schema->getPropertyDefinition($this->class, $property);
 
+        if (!isset($this->class, $path)) {
+            return false;
+        }
+
         $tableIdentifier = $this->mysql->getTable($this->table);
         $this->connections($this->table, $tableIdentifier, $path);
         // TODO
@@ -827,12 +933,21 @@ class Compiler
 
         list($type, $path) = $this->schema->getPropertyDefinition($this->class, $property);
 
+        if (!isset($type, $path)) {
+            return false;
+        }
+
         $value = array_pop($path);
 
         $tableIdentifier = $this->mysql->getTable($this->table);
         $this->connections($this->table, $tableIdentifier, $path);
 
         list($column, $isColumnNullable) = $this->schema->getValueDefinition($tableIdentifier, $value);
+
+        if (!isset($column, $isColumnNullable)) {
+            return false;
+        }
+
         $columnId = $this->mysql->addValue($this->table, $column);
         $this->phpOutput = Output::getValue($columnId, $isColumnNullable, $type);
 
@@ -881,7 +996,18 @@ class Compiler
             return false;
         }
 
-        return $this->getMap($arguments);
+        // at this point they definitely intend to use a map function
+        $this->request = reset($arguments);
+
+        if (!$this->readExpression()) {
+            throw new Exception(
+                self::ERROR_BAD_MAP_ARGUMENT,
+                array('request' => $this->request),
+                'map functions take a property, path, object, or function as an argument.'
+            );
+        }
+
+        return true;
     }
 
     private function readFunction()
@@ -898,14 +1024,18 @@ class Compiler
             case 'minus':
             case 'times':
             case 'divides':
-                if (!$this->getExpression($this->class, $this->table, $this->request, $expression, $type)) {
+                if (!$this->getExpression($this->class, $this->table,
+                    $this->request, $expression, $type)
+                ) {
                     return false;
                 }
 
                 /** @var AbstractExpression $expression */
-                $columnId = $this->mysql->addExpression($this->table, $expression->getMysql());
+                $columnId = $this->mysql->addExpression($this->table,
+                    $expression->getMysql());
                 $nullable = true; // TODO
-                $this->phpOutput = Output::getValue($columnId, $nullable, $type);
+                $this->phpOutput = Output::getValue($columnId, $nullable,
+                    $type);
 
                 return true;
 
@@ -919,6 +1049,9 @@ class Compiler
         foreach ($connections as $key => $connection) {
             $definition = $this->schema->getConnectionDefinition($tableAIdentifier, $connection);
 
+            if (!isset($definition) || count($definition) < 5) {
+                return false;
+            }
 
             list($tableBIdentifier, $expression, $id, $allowsZeroMatches, $allowsMultipleMatches) = $definition;
 
@@ -936,6 +1069,8 @@ class Compiler
             $contextId = $this->mysql->addJoin($contextId, $tableBIdentifier, $expression, $joinType);
             $tableAIdentifier = $tableBIdentifier;
         }
+
+        return true;
     }
 
     private function getOptionalSortFunction()
@@ -948,6 +1083,15 @@ class Compiler
 
         if ($name !== 'sort') {
             return false;
+        }
+
+        // at this point, we're sure they want to sort
+        if (!isset($arguments) || count($arguments) !== 1) {
+            throw new Exception(
+                self::ERROR_NO_SORT_ARGUMENTS,
+                array('token' => $token),
+                "sort functions take one argument"
+            );
         }
 
         // preserve the state
@@ -1034,7 +1178,11 @@ class Compiler
 
     private static function scanObject($input, &$object)
     {
-        if (($input === null) || ($input[0] !== Parser::TYPE_OBJECT)) {
+        if (!self::isObjectToken($input)) {
+            return false;
+        }
+
+        if (count($input) < 2) {
             return false;
         }
 
@@ -1059,12 +1207,17 @@ class Compiler
 
     private static function isPropertyToken($token)
     {
-        return is_array($token) && ($token[0] === Parser::TYPE_PROPERTY);
+        return is_array($token) && (count($token) > 0) && ($token[0] === Parser::TYPE_PROPERTY);
     }
 
     private static function isFunctionToken($token)
     {
-        return is_array($token) && ($token[0] === Parser::TYPE_FUNCTION);
+        return is_array($token) && (count($token) > 0) && ($token[0] === Parser::TYPE_FUNCTION);
+    }
+
+    private static function isObjectToken($token)
+    {
+        return is_array($token) && (count($token) > 0) && ($token[0] === Parser::TYPE_OBJECT);
     }
 
     private static function isPathToken($token)

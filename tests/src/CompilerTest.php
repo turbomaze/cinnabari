@@ -2,9 +2,11 @@
 
 namespace Datto\Cinnabari\Tests;
 
+use Datto\Cinnabari\Exception;
 use Datto\Cinnabari\Compiler;
-use Datto\Cinnabari\Lexer;
 use Datto\Cinnabari\Parser;
+use Datto\Cinnabari\Lexer;
+use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Schema;
 use PHPUnit_Framework_TestCase;
 
@@ -761,7 +763,8 @@ SELECT
     INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
     WHERE (`1`.`First` REGEXP BINARY :0)
 EOS;
-$phpInput = <<<'EOS'
+        
+        $phpInput = <<<'EOS'
 $output = array(
     $input['regex']
 );
@@ -780,26 +783,33 @@ EOS;
     
     public function testFailParameterPath()
     {
+        // we're expecting an exception
+
+        // the api method call
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
 people.filter(match(name.:a, :regex)).map(age)
 EOS;
-
         $arguments = array(
             'regex' => '^',
             'a' => 'foo'
         );
 
-        $mysql = null;
-        $phpInput = null;
-        $phpOutput = null;
-
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        // verify the exception
+        $this->verifyException(
+            $scenario,
+            $method,
+            $arguments,
+            Arguments::ERROR_WRONG_INPUT_TYPE,
+            array('name' => 'a', 'userType' => 'string', 'neededType' => 'integer')
+        );
     }
     
     public function testFailParameterPropertyPath()
     {
+        // we're expecting an exception
+
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
@@ -811,14 +821,34 @@ EOS;
             'a' => 'foo'
         );
 
-        $mysql = null;
-        $phpInput = null;
-        $phpOutput = null;
+        // verify the exception
+        $pathInformation = array(
+            5,
+            array(2, 'name'),
+            array(1, 'a'),
+            array(2, 'first')
+        );
+        $matchFunction = array(
+            3,
+            'match',
+            $pathInformation,
+            array(1, 'regex')
+        );
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyException(
+            $scenario,
+            $method,
+            $arguments,
+            Compiler::ERROR_BAD_FILTER_EXPRESSION,
+            array(
+                'class' => 'Person',
+                'table' => 0,
+                'arguments' => $matchFunction
+            )
+        );
     }
 
-    private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
+    private function compileMethod($scenarioJson, $method, $arguments)
     {
         $scenario = json_decode($scenarioJson, true);
 
@@ -830,6 +860,13 @@ EOS;
         $tokens = $lexer->tokenize($method);
         $request = $parser->parse($tokens);
         $actual = $compiler->compile($request, $arguments);
+
+        return $actual;
+    }
+
+    private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
+    {
+        $actual = $this->compileMethod($scenarioJson, $method, $arguments);
         $expected = array($mysql, $phpInput, $phpOutput);
         
         // strip nonessential mysql whitespace
@@ -845,5 +882,27 @@ EOS;
                 TestUtils::removePHPWhitespace($actual[$i])
             );
         }
+    }
+
+    private function verifyException($scenarioJson, $method, $arguments, $code, $data)
+    {
+        // try to compile the request
+        try {
+            $this->compileMethod($scenarioJson, $method, $arguments);
+            $actual = null;
+        } catch (Exception $exception) {
+            $actual = array(
+                'code' => $exception->getCode(),
+                'data' => $exception->getData()
+            );
+        }
+
+        $this->assertSame(
+            $actual,
+            array(
+                'code' => $code,
+                'data' => $data
+            )
+        );
     }
 }
