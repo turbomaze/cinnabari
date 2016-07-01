@@ -9,6 +9,7 @@ use Datto\Cinnabari\Mysql\Expression\OperatorNot;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Mysql\Select;
 use Datto\Cinnabari\Php\Output;
+use Datto\Cinnabari\TypeInferer;
 
 class Compiler
 {
@@ -21,6 +22,9 @@ class Compiler
     /** @var string */
     private $phpOutput;
 
+    /** @var function signature */
+    private $functionSignatures;
+
     /** @var array */
     private static $binaryOperatorMap = array(
         'equal' => '<=>', 'notEqual' => '<=>',
@@ -31,16 +35,92 @@ class Compiler
         'match' => 'REGEXP BINARY'
     );
 
-    public function compile($annotatedTree, $arguments)
+    public function __construct()
+    {
+        // function signatures
+        $numericSignatures = array(
+            array(
+                'returnType' => Output::TYPE_INTEGER,
+                'argumentTypes' => array(Output::TYPE_INTEGER, Output::TYPE_INTEGER)
+            ),
+            array(
+                'returnType' => Output::TYPE_FLOAT,
+                'argumentTypes' => array(Output::TYPE_INTEGER, Output::TYPE_FLOAT)
+            ),
+            array(
+                'returnType' => Output::TYPE_FLOAT,
+                'argumentTypes' => array(Output::TYPE_FLOAT, Output::TYPE_INTEGER)
+            ),
+            array(
+                'returnType' => Output::TYPE_FLOAT,
+                'argumentTypes' => array(Output::TYPE_FLOAT, Output::TYPE_FLOAT)
+            )
+        );
+
+        $mapSignature = array(
+            array(
+                'returnType' => Output::TYPE_NULL,
+                'argumentTypes' => array(Output::TYPE_NULL)
+            )
+        );
+
+        $filterSignature = array(
+            array(
+                'returnType' => Output::TYPE_NULL,
+                'argumentTypes' => array(Output::TYPE_BOOLEAN)
+            )
+        );
+
+        $binaryBooleanSignatures = $numericSignatures;
+        $comparisonSignatures = array(
+            array(
+                'returnType' => Output::TYPE_BOOLEAN,
+                'argumentTypes' => array(Output::TYPE_STRING, Output::TYPE_STRING),
+            ),
+            array(
+                'returnType' => Output::TYPE_BOOLEAN,
+                'argumentTypes' => array(Output::TYPE_INTEGER, Output::TYPE_INTEGER),
+            ),
+            array(
+                'returnType' => Output::TYPE_BOOLEAN,
+                'argumentTypes' => array(Output::TYPE_INTEGER, Output::TYPE_FLOAT),
+            ),
+            array(
+                'returnType' => Output::TYPE_BOOLEAN,
+                'argumentTypes' => array(Output::TYPE_FLOAT, Output::TYPE_INTEGER),
+            ),
+            array(
+                'returnType' => Output::TYPE_BOOLEAN,
+                'argumentTypes' => array(Output::TYPE_FLOAT, Output::TYPE_FLOAT),
+            )
+        );
+        $equalitySignatures = $comparisonSignatures;
+
+
+        // define what all of the functions in the Datto API look like
+        $functionSignatures = array(
+            'filter' => $filterSignature,
+            'map' => $mapSignature,
+            'plus' => $numericSignatures,
+            'equal' => $equalitySignatures,
+            'less' => $comparisonSignatures
+        );
+
+        $this->typeInferer = new TypeInferer($functionSignatures);
+    }
+
+    public function compile($translation, $arguments)
     {
         $this->mysql = new Select();
         $this->arguments = new Arguments($arguments);
         $this->phpOutput = null;
 
+        $annotatedTree = $this->typeInferer->getTypes($translation);
+
         // solve recursively here
         $this->buildStructure($annotatedTree, null);
-        $this->phpOutput = Output::getList(0, false, true, $this->phpOutput);
 
+        $this->phpOutput = Output::getList(0, false, true, $this->phpOutput);
         $mysql = $this->mysql->getMysql();
         $formatInput = $this->arguments->getPhp();
 
@@ -91,12 +171,18 @@ class Compiler
                     $name = $value;
                     $neededType = 'integer'; // TODO: type inference
                     $id = $this->arguments->useArgument($name, $neededType);
+
+                    if ($id === null) {
+                        echo "ERROR! BAD TYPE\n\n"; // TODO: fix this
+                        return false;
+                    }
+ 
                     $structures[] = new Parameter($id);
                     break;
 
                 case Translator::TYPE_VALUE:
                     $columnReference = $value['expression'];
-                    $dataType = Output::TYPE_INTEGER; // TODO: get this info from the Translator class
+                    $dataType = $value['type'];
                     $isNullable = $value['hasZero'];
                     $structures[] = new Column($context, $columnReference, $dataType, $isNullable);
                     break;

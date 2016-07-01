@@ -108,7 +108,7 @@ class Translator
         }
 
         if ($isPrimitiveProperty) {
-            $this->getValue($table, $value, $output);
+            $this->getValue($table, $value, $type, $output);
         } else {
             $class = $type;
         }
@@ -145,7 +145,7 @@ class Translator
         $table = $definition[0];
     }
 
-    private function getValue($table, $value, &$output)
+    private function getValue($table, $value, $type, &$output)
     {
         list($expression, $hasZero) = $this->getValueDefinition($table, $value);
 
@@ -153,6 +153,7 @@ class Translator
             self::TYPE_VALUE => array(
                 'table' => $table,
                 'expression' => $expression,
+                'type' => $type,
                 'hasZero' => $hasZero
             )
         );
