@@ -66,8 +66,11 @@ class Cinnabari
 
     private static function getTranslation($schema, $request)
     {
+        $desugarer = new Desugarer(); 
+        $desugaredRequest = $desugarer->desugar($request);
+
         $translator = new Translator($schema); 
-        return $translator->translate($request);
+        return $translator->translate($desugaredRequest);
     }
 
     private static function getResult($translatedRequest, $arguments)

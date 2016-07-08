@@ -37,6 +37,12 @@ class Select
     /** @var string[] */
     private $columns;
 
+    /** @var string[] */
+    private $updatedColumns;
+
+    /** @var parameter[] */
+    private $updatedValues;
+
     /** @var AbstractExpression */
     private $where;
 
@@ -47,6 +53,8 @@ class Select
     {
         $this->tables = array();
         $this->columns = array();
+        $this->updatedColumns = array();
+        $this->updatedValues = array();
         $this->where = null;
     }
 
@@ -96,15 +104,29 @@ class Select
         return self::insert($this->columns, $columnReference);
     }
 
+    public function addUpdate($columnReference, $parameter)
+    {
+        $idA = self::insert($this->updatedColumns, $columnReference);
+        $idB = self::insert($this->updatedValues, $parameter->getMysql());
+        return array($idA, $idB);
+    }
+
     public function getMysql()
     {
         if (!$this->isValid()) {
             return null;
         }
 
-        $mysql = $this->getColumns() .
-            $this->getTables() .
-            $this->getWhereClause();
+        $mysql = null;
+        if (count($this->updatedColumns) === 0) {
+            $mysql = $this->getColumns() .
+                $this->getTables() .
+                $this->getWhereClause();
+        } else {
+            $mysql = $this->getTablesForUpdate() .
+                $this->getUpdatedPairs() .
+                $this->getWhereClause();
+        }
 
         return rtrim($mysql, "\n");
     }
@@ -182,6 +204,27 @@ class Select
         return "SELECT\n\t" . implode(",\n\t", $this->getColumnNames()) . "\n";
     }
 
+    private function getUpdatedPairs()
+    {
+        $pairs = "\tSET ";
+
+        $columnNames = $this->getUpdatedColumnNames();
+        $values = $this->getUpdatedValues();
+
+        foreach ($columnNames as $index => $columnName) {
+            // $pairs .= "\t";
+            $pairs .= $columnName . ' = ' . $values[$index];
+
+            if ($index < count($columnNames) - 1) {
+                $pairs .= ',';
+            }
+
+            // $pairs .= "\n";
+        }
+
+        return $pairs;
+    }
+
     private function getColumnNames()
     {
         $columns = array();
@@ -193,11 +236,53 @@ class Select
         return $columns;
     }
 
+    private function getUpdatedColumnNames()
+    {
+        return array_keys($this->updatedColumns);
+    }
+
+    public function getUpdatedValues() {
+        return array_keys($this->updatedValues);
+    }
+
     private function getTables()
     {
         list($table, $id) = each($this->tables);
 
         $mysql = "\tFROM " . self::getAliasedName($table, $id) . "\n";
+
+        $tables = array_slice($this->tables, 1);
+
+        foreach ($tables as $joinJson => $id) {
+            list($tableAIdentifier, $tableBIdentifier, $expression, $type) = json_decode($joinJson, true);
+
+            $joinIdentifier = self::getIdentifier($id);
+
+            $from = array('`0`', '`1`');
+            $to = array($tableAIdentifier, $joinIdentifier);
+            $expression = str_replace($from, $to, $expression);
+
+            if ($type === self::JOIN_INNER) {
+                $mysqlJoin = 'INNER JOIN';
+            } else {
+                $mysqlJoin = 'LEFT JOIN';
+            }
+
+            $mysql .= "\t{$mysqlJoin} {$tableBIdentifier} AS {$joinIdentifier} ON {$expression}\n";
+        }
+
+        if (isset($this->orderBy)) {
+            $mysql .= "\t{$this->orderBy}\n";
+        }
+
+        return $mysql;
+    }
+
+    private function getTablesForUpdate()
+    {
+        list($table, $id) = each($this->tables);
+
+        $mysql = "UPDATE\n\t" . self::getAliasedName($table, $id) . "\n";
 
         $tables = array_slice($this->tables, 1);
 

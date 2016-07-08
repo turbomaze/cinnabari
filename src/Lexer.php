@@ -30,7 +30,7 @@ namespace Datto\Cinnabari;
  *
  * EBNF:
  *
- * expression = binary-expression | unary-expression | object | group | function | property | parameter;
+ * expression = binary-expression | unary-expression | object | array | group | function | property | parameter;
  * binary-expression = expression, space, binary-operator, space, expression;
  * space = { whitespace };
  * whitespace = ? any character matching the "\s" regular expression ?;
@@ -40,6 +40,8 @@ namespace Datto\Cinnabari;
  * object = "{", space, pairs, space, "}";
  * pairs = pair, { space, ",", space, pair };
  * pair = json-string, space, ":", space, expression;
+ * array = "[", values, "]";
+ * values = expression, { space, ",", space, expression }
  * json-string = ? any JSON string (including the enclosing quotation marks) ?;
  * group = "(", space, expression, space, ")";
  * function = identifier, space, "(", space, [ arguments ], space, ")";
@@ -61,6 +63,7 @@ class Lexer
     const TYPE_OBJECT = 4;
     const TYPE_GROUP = 5;
     const TYPE_OPERATOR = 6;
+    const TYPE_ARRAY = 7;
 
     const ERROR_UNEXPECTED_INPUT = 1;
 
@@ -93,6 +96,7 @@ class Lexer
             || self::getPropertyOrFunction($input, $output)
             || self::getGroup($input, $output)
             || self::getObject($input, $output)
+            || self::getArray($input, $output)
         ) && (
             !self::getBinaryOperator($input, $output)
             || self::getExpression($input, $output)
@@ -203,6 +207,38 @@ class Lexer
         }
 
         $output[] = array(self::TYPE_OBJECT => $properties);
+        return true;
+    }
+
+    private static function getArray(&$input, &$output)
+    {
+        if (!self::scan('\[\s*', $input)) {
+            return false;
+        }
+
+        $values = array();
+
+        if (!self::getExpression($input, $value)) {
+            return false;
+        }
+
+        $values[] = $value;
+        self::clear($value);
+
+        while (self::scan('\s*,\s*', $input)) {
+            if (!self::getExpression($input, $value)) {
+                return false;
+            }
+
+            $values[] = $value;
+            self::clear($value);
+        }
+
+        if (!self::scan('\s*\]', $input)) {
+            return false;
+        }
+
+        $output[] = array(self::TYPE_ARRAY=> $values);
         return true;
     }
 

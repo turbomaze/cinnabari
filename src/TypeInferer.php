@@ -61,6 +61,11 @@ class TypeInferer
                 
                 return array(array('returnType' => Output::TYPE_NULL, 'parameters' => $parameters));
 
+            case Translator::TYPE_ARRAY:
+                $parameters = array();
+                
+                return array(array('returnType' => Output::TYPE_ARRAY, 'parameters' => $parameters));
+
             case Translator::TYPE_FUNCTION:
                 $functionName = $value['function'];
 
@@ -113,11 +118,6 @@ class TypeInferer
                                     }
                                 }
                                 $wasAddedAtLeastOnce = true; 
-
-                    if ($functionName === 'less') {
-                        echo json_encode($viableSignature) . " aa\n\n";
-                    }
-
                             }
                         }
 
@@ -131,17 +131,12 @@ class TypeInferer
                 $viableSignatures = array_filter($viableSignatures, function($viableSignature) {
                     return !array_key_exists('ignore', $viableSignature);
                 });
-                $foo = array_map(function($viableSignature) use ($signatures) {
+                return array_map(function($viableSignature) use ($signatures) {
                     $signature = $signatures[$viableSignature['index']];
                     return array(
                         'returnType' => $signature['returnType'], 'parameters' => $viableSignature['parameters']
                     );
                 }, $viableSignatures);
-
-                echo $functionName . "'s return\n";
-                echo json_encode($foo) . " JJ\n\n";
-
-                return $foo;
         }
 
         return null;

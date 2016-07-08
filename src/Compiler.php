@@ -71,6 +71,13 @@ class Compiler
             )
         );
 
+        $updateSignature = array(
+            array(
+                'returnType' => Output::TYPE_NULL,
+                'argumentTypes' => array(Output::TYPE_ARRAY, Output::TYPE_ARRAY)
+            )
+        );
+
         $binaryBooleanSignatures = $numericSignatures;
         $comparisonSignatures = array(
             array(
@@ -101,6 +108,7 @@ class Compiler
         $functionSignatures = array(
             'filter' => $filterSignature,
             'map' => $mapSignature,
+            'update' => $updateSignature,
             'plus' => $numericSignatures,
             'equal' => $equalitySignatures,
             'less' => $comparisonSignatures
@@ -169,7 +177,8 @@ class Compiler
 
                 case Translator::TYPE_PARAMETER:
                     $name = $value;
-                    $neededType = 'integer'; // TODO: type inference
+                    $typeArray = array('f' => 'float', 'i' => 'integer', 's' => 'string');
+                    $neededType = $typeArray[$name[0]]; // TODO: type inference
                     $id = $this->arguments->useArgument($name, $neededType);
 
                     if ($id === null) {
@@ -203,6 +212,16 @@ class Compiler
                     $structures[] = Translator::TYPE_OBJECT;
                     break;
 
+                case Translator::TYPE_ARRAY:
+                    // build all children and return list of properties / params
+                    $builtElements = array();
+                    foreach ($value as $key => $element) {
+                        $builtElement = $this->buildStructure($element, $context);
+                        $builtElements[] = end($builtElement);
+                    }
+                    $structures[] = $builtElements;
+                    break;
+
                 case Translator::TYPE_FUNCTION:
                     $functionName = $value['function'];
                     $firstArgument = end($builtKids[0]);
@@ -216,6 +235,16 @@ class Compiler
 
                         case 'sort':
                             $this->mysql->setOrderBy($firstArgument->getMysql(), true);
+                            $structures[] = true;
+                            break;
+
+                        case 'update':
+                            // expecting two array inputs
+                            foreach ($firstArgument as $index => $column) {
+                                $parameter = $secondArgument[$index];
+                                $this->phpOutput = $this->addUpdate($column, $parameter);
+                            }
+
                             $structures[] = true;
                             break;
 
@@ -255,6 +284,12 @@ class Compiler
     private function addValue(Column $column)
     {
         $columnId = $this->mysql->addValue($column->getMysql());
+        return Output::getValue($columnId, $column->getIsNullable(), $column->getDataType());
+    }
+
+    private function addUpdate(Column $column, Parameter $parameter)
+    {
+        list($columnId,) = $this->mysql->addUpdate($column->getMysql(), $parameter);
         return Output::getValue($columnId, $column->getIsNullable(), $column->getDataType());
     }
 }

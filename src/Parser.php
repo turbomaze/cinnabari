@@ -31,6 +31,7 @@ class Parser
     const TYPE_PROPERTY = 2;
     const TYPE_FUNCTION = 3;
     const TYPE_OBJECT = 4;
+    const TYPE_ARRAY = 5;
 
     // Operator Arity
     const UNARY = 1;
@@ -216,6 +217,9 @@ class Parser
             case Lexer::TYPE_OBJECT:
                 return self::getObjectExpression($value);
 
+            case Lexer::TYPE_ARRAY:
+                return self::getArrayExpression($value);
+
             case Lexer::TYPE_GROUP:
                 return self::getExpression($value);
 
@@ -259,6 +263,17 @@ class Parser
         }
 
         return array(array(self::TYPE_OBJECT, $output));
+    }
+
+    private static function getArrayExpression($input)
+    {
+        $output = array();
+
+        foreach ($input as $key => $value) {
+            $output[] = self::getExpression($value);
+        }
+
+        return array(array(self::TYPE_ARRAY, $output));
     }
 
     private static function getOperatorExpression($lexeme, &$tokens)

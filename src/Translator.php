@@ -29,9 +29,10 @@ class Translator
     const TYPE_PARAMETER = 1;
     const TYPE_FUNCTION = 3;
     const TYPE_OBJECT = 4;
-    const TYPE_TABLE = 5;
-    const TYPE_JOIN = 6;
-    const TYPE_VALUE = 7;
+    const TYPE_ARRAY = 5;
+    const TYPE_TABLE = 6;
+    const TYPE_JOIN = 7;
+    const TYPE_VALUE = 8;
 
     const EXCEPTION_UNKNOWN_PROPERTY = 1;
     const EXCEPTION_UNKNOWN_LIST = 2;
@@ -74,6 +75,11 @@ class Translator
                     $function = $token[1];
                     $arguments = array_slice($token, 2);
                     $this->getFunction($class, $table, $function, $arguments, $output);
+                    break;
+
+                case Parser::TYPE_ARRAY:
+                    $array = $token[1];
+                    $this->getArray($class, $table, $array, $output);
                     break;
 
                 default: // Parser::TYPE_OBJECT:
@@ -173,6 +179,13 @@ class Translator
     {
         $output[] = array(
             self::TYPE_OBJECT => $this->translateArray($class, $table, $object)
+        );
+    }
+
+    private function getArray(&$class, &$table, $array, &$output)
+    {
+        $output[] = array(
+            self::TYPE_ARRAY => $this->translateArray($class, $table, $array)
         );
     }
 

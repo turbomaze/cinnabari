@@ -9,6 +9,7 @@ class Output
     const TYPE_INTEGER = 2;
     const TYPE_FLOAT = 3;
     const TYPE_STRING = 4;
+    const TYPE_ARRAY = 5;
 
     private static $output = '$output';
 
