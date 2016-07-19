@@ -15,7 +15,9 @@ When joining from an origin table to a destination table:
  * Assume there is exactly one matching row in the destination table
  * If there is NO foreign key:
       Add the possibility of no matching rows in the destination table
- * If there is either (a) NO uniqueness constraint on the destination table, or (b) BOTH the origin and destination columns are nullable:
+      * If there is either:
+      * (a) NO uniqueness constraint on the destination table, or
+      * (b) BOTH the origin and destination columns are nullable:
       Add the possibility of many matching rows
 */
 
@@ -25,7 +27,6 @@ class CompilerTest extends PHPUnit_Framework_TestCase
     {
         /*
         DROP DATABASE IF EXISTS `database`;
-        CREATE DATABASE `database`;
         USE `database`;
 
         CREATE TABLE `People` (
@@ -847,7 +848,289 @@ EOS;
             )
         );
     }
+    
+    public function testBasicDelete()
+    {
+        $scenario = self::getPeopleScenario();
 
+        $method = <<<'EOS'
+people.filter(age < :age).sort(age).slice(:start, :end).delete()
+EOS;
+
+        $arguments = array(
+            'age' => 18,
+            'start' => 2,
+            'end' => 10
+        );
+
+        $mysql = <<<'EOS'
+DELETE FROM `People` AS `0`
+    WHERE `0`.`Age` < :0
+    ORDER BY `0`.`Age`
+    LIMIT :1, :2
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['age'],
+    $input['start'],
+    $input['end']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = (integer)$rowCount;
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testBasicUpdate()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.update({
+    age: :age,
+    email: :email
+})
+EOS;
+
+        $arguments = array(
+            'age' => 15,
+            'email' => 'foo@bar.com'
+        );
+
+        $mysql = <<<'EOS'
+UPDATE `People` AS `0`
+    SET `0`.`Age` = :0, `0`.`Email` = :1, 
+EOS;
+
+        $phpInput = <<<'EOS'
+$inputs = array(
+    $input['age'],
+    $input['email']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = (integer)$rowCount;
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testBasicInsert()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.insert({
+    age: :age,
+    email: :email,
+    height: :height
+})
+EOS;
+
+        $arguments = array(
+            'age' => 15,
+            'email' => 'foo@bar.com',
+            'height' => 157.4
+        );
+
+        $mysql = <<<'EOS'
+INSERT INTO `People` AS `0`
+    (`0`.`Age`, `0`.`Email`, `0`.`Height`)
+    VALUES (:0, :1, :2)
+EOS;
+
+        $phpInput = <<<'EOS'
+$inputs = array(
+    $input['age'],
+    $input['email'],
+    $input['height']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = (integer)$insertId;
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testUpdateWithPath()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.filter(age > :age).sort(age).slice(:start, :end).update({
+    age: :age,
+    email: :email,
+    name.first: :first
+})
+EOS;
+
+        $arguments = array(
+            'age' => 29,
+            'email' => 'foo@bar.com',
+            'first' => 'Alice',
+            'start' => 2,
+            'end' => 19,
+        );
+
+        $mysql = <<<'EOS'
+UPDATE `People` AS `0` LEFT JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
+    SET `0`.`Age` = :0, `0`.`Email` = :1, `1`.`First` = :2
+    WHERE `0`.`Age` > :0
+    ORDER BY `0`.`Age`
+    LIMIT :3, :4
+EOS;
+
+        $phpInput = <<<'EOS'
+$inputs = array(
+    $input['age'],
+    $input['email'],
+    $input['height'],
+    $input['start'],
+    $input['end']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = (integer)$insertId;
+EOS;
+    }
+    
+    public function testInsertWithPath()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.insert({
+    name.first: :first,
+    name.last: :last,
+    age: :age,
+})
+EOS;
+
+        $arguments = array(
+            'first' => 'Ronald',
+            'last' => 'McDonald',
+            'age' => 57
+        );
+
+
+        $firstInsert = <<<'EOS'
+INSERT INTO `Names` AS `0`
+    (`First`, `Last`)
+    VALUES (:0, :1)
+EOS;
+        $secondInsert = <<<'EOS'
+INSERT INTO `People` AS `0`
+    (`Age`, `Name`)
+    VALUES (:0, :1)
+EOS;
+        $mysql = array($firstInsert, $secondInsert);
+
+        $firstPhpInput = <<<'EOS'
+$inputs = array(
+    $input['first'],
+    $input['last']
+);
+EOS;
+        $secondPhpInput = <<<'EOS'
+$output = array(
+    $input['age'],
+    $LINKER_PARAMS[0]
+);
+EOS;
+        $phpInput = array($firstPhpInput, $secondPhpInput);
+
+        $firstPhpOutput = <<<'EOS'
+$LINKER_PARAMS[0] = (integer)$insertId;
+EOS;
+        $secondPhpOutput = <<<'EOS'
+$output = (integer)$;
+EOS;
+        $phpOutput = array($firstPhpInput, $secondPhpInput);
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testBasicSelectUpdate()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.filter(age > :age).sort(age).slice(:start, :end).select({
+    "name": name,
+    "email": email
+}).update({
+    name: :newName
+})
+EOS;
+
+        $arguments = array(
+            'age' => 18,
+            'start' => 2,
+            'end' => 10,
+            'newName' => 'Gilfoyle'
+        );
+
+
+        $select = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`
+    `0`.`Name` AS `1`,
+    `0`.`Email` AS `2`
+    FROM `People` AS `0`
+    WHERE `0`.`Age` > :0
+    ORDER BY `0`.`Age`
+    LIMIT :1, :2
+EOS;
+        $update = <<<'EOS'
+UPDATE `People` AS `0`
+    SET `0`.`Name` = :0
+    WHERE `0`.`Age` > :1
+    ORDER BY `0`.`Age`
+    LIMIT :2, :3
+EOS;
+        $mysql = array($select, $update);
+
+        $firstPhpInput = <<<'EOS'
+$inputs = array(
+    $input['age'],
+    $input['start'],
+    $input['end']
+);
+EOS;
+        $secondPhpInput = <<<'EOS'
+$output = array(
+    $input['newName'],
+    $input['age'],
+    $input['start'],
+    $input['end']
+);
+EOS;
+        $phpInput = array($firstPhpInput, $secondPhpInput);
+
+        $firstPhpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]]['name'] = $row[1];
+    $output[$row[0]]['email'] = $row[2];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+        $secondPhpOutput = <<<'EOS'
+$output = (integer)$rowCount;
+EOS;
+        $phpOutput = array($firstPhpInput, $secondPhpInput);
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+    
     private function compileMethod($scenarioJson, $method, $arguments)
     {
         $scenario = json_decode($scenarioJson, true);
