@@ -2,9 +2,11 @@
 
 namespace Datto\Cinnabari\Tests;
 
+use Datto\Cinnabari\Exception;
 use Datto\Cinnabari\Compiler;
-use Datto\Cinnabari\Lexer;
 use Datto\Cinnabari\Parser;
+use Datto\Cinnabari\Lexer;
+use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Schema;
 use PHPUnit_Framework_TestCase;
 
@@ -94,6 +96,52 @@ EOS;
 
         $phpInput = <<<'EOS'
 $output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[0];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+    
+    public function testSlicesValue()
+    {
+        $scenario = self::getPeopleScenario();
+
+        // TODO: MySQL returns an unpredictable result set when LIMIT is used
+        // on an unsorted table. As a result, the Datto API should insert an
+        // implicit "sort" method (using the "id" expression for the "People"
+        // table as the sorting key) before applying the "slice" method.
+        //
+        // Because of this complication, this unit test is incorrect.
+        // We should replace it with a unit test for this safer query instead:
+        // "people.sort(id).slice(:0, :1).map(id)"
+        // (Except, we should use descriptive parameter names, instead of
+        // "a" and "b", or "0" and "1", in the unit tests to make the intent
+        // clearer.)
+        $method = <<<'EOS'
+people.slice(:a, :b).map(id)
+EOS;
+
+        $arguments = array('a' => 0, 'b' => 10);
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`
+    FROM `People` AS `0`
+    LIMIT :0, :1
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['a'],
+    $input['b'] - $input['a']
+);
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -356,6 +404,39 @@ EOS;
         $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
+    public function testSortOnPath()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.sort(name.first).map(name.first)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`,
+    `1`.`First` AS `1`
+    FROM `People` AS `0`
+    INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
+    ORDER BY `1`.`First` ASC
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = $row[1];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
     
     public function testMapDepthZero()
     {
@@ -682,7 +763,8 @@ SELECT
     INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
     WHERE (`1`.`First` REGEXP BINARY :0)
 EOS;
-$phpInput = <<<'EOS'
+        
+        $phpInput = <<<'EOS'
 $output = array(
     $input['regex']
 );
@@ -701,26 +783,33 @@ EOS;
     
     public function testFailParameterPath()
     {
+        // we're expecting an exception
+
+        // the api method call
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
 people.filter(match(name.:a, :regex)).map(age)
 EOS;
-
         $arguments = array(
             'regex' => '^',
             'a' => 'foo'
         );
 
-        $mysql = null;
-        $phpInput = null;
-        $phpOutput = null;
-
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        // verify the exception
+        $this->verifyException(
+            $scenario,
+            $method,
+            $arguments,
+            Arguments::ERROR_WRONG_INPUT_TYPE,
+            array('name' => 'a', 'userType' => 'string', 'neededType' => 'integer')
+        );
     }
     
     public function testFailParameterPropertyPath()
     {
+        // we're expecting an exception
+
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
@@ -732,14 +821,34 @@ EOS;
             'a' => 'foo'
         );
 
-        $mysql = null;
-        $phpInput = null;
-        $phpOutput = null;
+        // verify the exception
+        $pathInformation = array(
+            5,
+            array(2, 'name'),
+            array(1, 'a'),
+            array(2, 'first')
+        );
+        $matchFunction = array(
+            3,
+            'match',
+            $pathInformation,
+            array(1, 'regex')
+        );
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyException(
+            $scenario,
+            $method,
+            $arguments,
+            Compiler::ERROR_BAD_FILTER_EXPRESSION,
+            array(
+                'class' => 'Person',
+                'table' => 0,
+                'arguments' => $matchFunction
+            )
+        );
     }
 
-    private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
+    private function compileMethod($scenarioJson, $method, $arguments)
     {
         $scenario = json_decode($scenarioJson, true);
 
@@ -751,6 +860,13 @@ EOS;
         $tokens = $lexer->tokenize($method);
         $request = $parser->parse($tokens);
         $actual = $compiler->compile($request, $arguments);
+
+        return $actual;
+    }
+
+    private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
+    {
+        $actual = $this->compileMethod($scenarioJson, $method, $arguments);
         $expected = array($mysql, $phpInput, $phpOutput);
         
         // strip nonessential mysql whitespace
@@ -766,5 +882,27 @@ EOS;
                 TestUtils::removePHPWhitespace($actual[$i])
             );
         }
+    }
+
+    private function verifyException($scenarioJson, $method, $arguments, $code, $data)
+    {
+        // try to compile the request
+        try {
+            $this->compileMethod($scenarioJson, $method, $arguments);
+            $actual = null;
+        } catch (Exception $exception) {
+            $actual = array(
+                'code' => $exception->getCode(),
+                'data' => $exception->getData()
+            );
+        }
+
+        $this->assertSame(
+            $actual,
+            array(
+                'code' => $code,
+                'data' => $data
+            )
+        );
     }
 }

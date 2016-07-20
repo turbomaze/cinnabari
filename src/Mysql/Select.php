@@ -24,10 +24,15 @@
 
 namespace Datto\Cinnabari\Mysql;
 
+use Datto\Cinnabari\Exception;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 class Select
 {
+    // mysql errors
+    const ERROR_BAD_TABLE_ID = 201;
+    const ERROR_INVALID_MYSQL = 202;
+
     const JOIN_INNER = 1;
     const JOIN_LEFT = 2;
 
@@ -43,17 +48,22 @@ class Select
     /** @var string */
     private $orderBy;
 
+    /** @var string */
+    private $limit;
+
     public function __construct()
     {
         $this->tables = array();
         $this->columns = array();
         $this->where = null;
+        $this->orderBy = null;
+        $this->limit = null;
     }
 
     /**
      * @param string $name
      * Mysql table identifier (e.g. "`people`")
-     * 
+     *
      * @return int
      * Numeric table identifier (e.g. 0)
      */
@@ -71,7 +81,14 @@ class Select
     public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $type)
     {
         if (!self::isDefined($this->tables, $tableAId)) {
-            return null;
+            $tableString = json_encode($tableAId);
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $tableAId
+                ),
+                "unknown table id {$tableString}."
+            );
         }
 
         $tableIdentifierA = self::getIdentifier($tableAId);
@@ -89,7 +106,14 @@ class Select
     public function setOrderBy($tableId, $column, $isAscending)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            return null;
+            $tableString = json_encode($tableId);
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $tableId
+                ),
+                "unknown table id {$tableString}."
+            );
         }
 
         $table = self::getIdentifier($tableId);
@@ -106,10 +130,31 @@ class Select
         $this->orderBy = $mysql;
     }
 
-    public function addValue($tableId, $column)
+    public function setLimit($tableId, AbstractExpression $start, AbstractExpression $length)
     {
         if (!self::isDefined($this->tables, $tableId)) {
             return null;
+        }
+
+        $offset = $start->getMysql();
+        $count = $length->getMysql();
+
+        $mysql = "{$offset}, {$count}";
+
+        $this->limit = $mysql;
+    }
+
+    public function addValue($tableId, $column)
+    {
+        if (!self::isDefined($this->tables, $tableId)) {
+            $tableString = json_decode($tableId);
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $tableId
+                ),
+                "unknown table id {$tableString}."
+            );
         }
 
         $table = self::getIdentifier($tableId);
@@ -118,15 +163,30 @@ class Select
         return self::insert($this->columns, $name);
     }
 
+    public function addExpression($tableId, $expression)
+    {
+        if (!self::isDefined($this->tables, $tableId)) {
+            return null;
+        }
+
+        return self::insert($this->columns, $expression);
+    }
+
     public function getMysql()
     {
         if (!$this->isValid()) {
-            return null;
+            throw new Exception(
+                self::ERROR_INVALID_MYSQL,
+                array(),
+                "SQL queries must reference at least one table and column."
+            );
         }
 
         $mysql = $this->getColumns() .
             $this->getTables() .
-            $this->getWhereClause();
+            $this->getWhereClause() .
+            $this->getOrderByClause() .
+            $this->getLimitClause();
 
         return rtrim($mysql, "\n");
     }
@@ -136,7 +196,15 @@ class Select
         $name = array_search($id, $this->tables, true);
 
         if (!is_string($name)) {
-            return null;
+            $idString = json_decode($id);
+            throw new Exception(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $id,
+                    'name' => $name
+                ),
+                "unknown table id {$idString}."
+            );
         }
 
         if (0 < $id) {
@@ -219,10 +287,6 @@ class Select
             $mysql .= "\t{$mysqlJoin} {$tableBIdentifier} AS {$joinIdentifier} ON {$expression}\n";
         }
 
-        if (isset($this->orderBy)) {
-            $mysql .= "\t{$this->orderBy}\n";
-        }
-
         return $mysql;
     }
 
@@ -234,6 +298,24 @@ class Select
 
         $where = $this->where->getMysql();
         return "\tWHERE {$where}\n";
+    }
+
+    private function getOrderByClause()
+    {
+        if ($this->orderBy === null) {
+            return null;
+        }
+
+        return "\t{$this->orderBy}\n";
+    }
+
+    private function getLimitClause()
+    {
+        if ($this->limit === null) {
+            return null;
+        }
+
+        return "\tLIMIT {$this->limit}\n";
     }
 
     private static function getAliasedName($name, $id)

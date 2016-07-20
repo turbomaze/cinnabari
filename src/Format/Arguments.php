@@ -24,8 +24,14 @@
 
 namespace Datto\Cinnabari\Format;
 
+use Datto\Cinnabari\Exception;
+
 class Arguments
 {
+    // arguments errors
+    const ERROR_WRONG_INPUT_TYPE = 301;
+    const ERROR_INPUT_NOT_PROVIDED = 302;
+
     /** @var array */
     private $input;
 
@@ -41,35 +47,87 @@ class Arguments
     public function useArgument($name, $neededType)
     {
         if (!array_key_exists($name, $this->input)) {
-            return null;
+            $nameString = json_encode($name);
+            throw new Exception(
+                self::ERROR_INPUT_NOT_PROVIDED,
+                array(
+                    'name' => $name,
+                    'neededType' => $neededType,
+                    'inputArray' => $this->input
+                ),
+                "input parameter {$nameString} not provided."
+            );
         }
 
         $userType = gettype($this->input[$name]);
 
         if (($userType !== 'NULL') && ($userType !== $neededType)) {
-            return null;
+            $nameString = json_encode($name); 
+            $typeString = json_encode($neededType); 
+            throw new Exception(
+                self::ERROR_WRONG_INPUT_TYPE,
+                array(
+                    'name' => $name,
+                    'userType' => $userType,
+                    'neededType' => $neededType
+                ),
+                "'{$userType}' type provided as :{$nameString}, {$typeString} type expected."
+            );
         }
 
-        $id = &$this->output[$name];
-
-        if ($id === null) {
-            $id = count($this->output) - 1;
-        }
+        $input = self::getInputPhp($name);
+        $id = $this->insertParameter($input);
 
         return $id;
     }
 
+    /**
+     * TODO: this function currently inserts *two* expressions (the minuend is
+     * implicitly inserted along with the subtraction expression as a whole).
+     * To insert two independent expressions, we should use two independent
+     * function calls (e.g. useArgument(...); $useSubtractiveArgument(...);)
+     */
+    public function useSubtractiveArgument($nameA, $nameB, $neededTypeA, $neededTypeB)
+    {
+        if (!array_key_exists($nameA, $this->input) || !array_key_exists($nameB, $this->input)) {
+            return null;
+        }
+
+        $userTypeA = gettype($this->input[$nameA]);
+
+        if (($userTypeA !== 'NULL') && ($userTypeA !== $neededTypeA)) {
+            return null;
+        }
+
+        $userTypeB = gettype($this->input[$nameB]);
+
+        if (($userTypeB !== 'NULL') && ($userTypeB !== $neededTypeB)) {
+            return null;
+        }
+
+        $inputA = self::getInputPhp($nameA);
+        $idA = $this->insertParameter($inputA);
+
+        $inputB = self::getInputPhp($nameB);
+        $idB = $this->insertParameter("{$inputB} - {$inputA}");
+
+        return array($idA, $idB);
+    }
+
     public function getPhp()
     {
-        $statements = array_map('self::getInputStatement', array_flip($this->output));
+        $statements = array_flip($this->output);
         $array = self::getArray($statements);
         return self::getAssignment('$output', $array);
     }
 
-    protected static function getInputStatement($key)
+    private function insertParameter($inputString)
     {
-        $name = var_export($key, true);
-        return "\$input[{$name}]";
+        $id = &$this->output[$inputString];
+        if ($id === null) {
+            $id = count($this->output) - 1;
+        }
+        return $id;
     }
 
     protected static function getArray($statements)
@@ -85,5 +143,11 @@ class Arguments
     protected static function getAssignment($variable, $value)
     {
         return "{$variable} = {$value};";
+    }
+
+    private static function getInputPhp($parameter)
+    {
+        $parameterName = var_export($parameter, true);
+        return "\$input[{$parameterName}]";
     }
 }

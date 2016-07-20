@@ -39,10 +39,14 @@ class Cinnabari
     // TODO: trim the query string before Cinnabari
     public function translate($query, $arguments)
     {
-        $tokens = self::getTokens($query);
-        $request = self::getRequest($tokens);
+        try {
+            $tokens = self::getTokens($query);
+            $request = self::getRequest($tokens);
 
-        return self::getResult($this->schema, $request, $arguments);
+            return self::getResult($this->schema, $request, $arguments);
+        } catch (Exception $exception) {
+            return false;
+        }
     }
 
     private static function getTokens($query)
@@ -65,16 +69,8 @@ class Cinnabari
 
     private static function getResult(Schema $schema, $request, $arguments)
     {
-        try {
-            $compiler = new Compiler($schema);
-            return $compiler->compile($request, $arguments);
-        } catch (Exception $exception) {
-
-            // TODO:
-            echo $exception->getMessage(), "\n";
-
-            return null;
-        }
+        $compiler = new Compiler($schema);
+        return $compiler->compile($request, $arguments);
     }
 
     private static function errorSyntax($query, $position)

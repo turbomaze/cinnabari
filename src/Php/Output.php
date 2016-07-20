@@ -2,8 +2,13 @@
 
 namespace Datto\Cinnabari\Php;
 
+use Datto\Cinnabari\Exception;
+
 class Output
 {
+    // php output errors
+    const ERROR_UNKNOWN_TYPECAST = 401;
+
     const TYPE_NULL = 0;
     const TYPE_BOOLEAN = 1;
     const TYPE_INTEGER = 2;
@@ -112,7 +117,14 @@ class Output
                 return '';
 
             default:
-                return null;
+                $typeString = json_decode($type);
+                throw new Exception(
+                    self::ERROR_UNKNOWN_TYPECAST,
+                    array(
+                        'type' => $type
+                    ),
+                    "failed to typecast unknown type {$typeString}'."
+                );
         }
     }
 
