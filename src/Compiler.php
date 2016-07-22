@@ -799,11 +799,9 @@ class Compiler
         $type = $token[0];
 
         switch ($type) {
-            // either paths
             case Parser::TYPE_PATH:
                 return $this->readPathAndGetTail($tailProperty);
 
-            // or properties; nothing else
             case Parser::TYPE_PROPERTY:
                 return $this->readPropertyAndGetColumn($tailProperty);
 
@@ -1085,8 +1083,8 @@ class Compiler
             return false;
         }
 
-        // at this point, we're sure they want to sort
         if (!isset($arguments) || count($arguments) !== 1) {
+            // TODO: add an explanation of the missing argument, or link to the documentation
             throw new Exception(
                 self::ERROR_NO_SORT_ARGUMENTS,
                 array('token' => $token),
@@ -1094,22 +1092,14 @@ class Compiler
             );
         }
 
-        // preserve the state
         $state = array($this->request, $this->class, $this->table);
 
-        // set the request to the path / property
+        // TODO: verify that the "$tailProperty" is valid before it is used
         $this->request = $arguments[0];
-
-        // read it and grab the final property at the end
         $this->readExpressionAndGetTail($tailProperty);
-
-        // use that final property in the order by
         $this->mysql->setOrderBy($this->table, $tailProperty, true);
 
-        // restore the initial state
         list($this->request, $this->class, $this->table) = $state;
-
-        // shift the request
         array_shift($this->request);
 
         return true;

@@ -106,55 +106,9 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
     
-    public function testSlicesValue()
-    {
-        $scenario = self::getPeopleScenario();
-
-        // TODO: MySQL returns an unpredictable result set when LIMIT is used
-        // on an unsorted table. As a result, the Datto API should insert an
-        // implicit "sort" method (using the "id" expression for the "People"
-        // table as the sorting key) before applying the "slice" method.
-        //
-        // Because of this complication, this unit test is incorrect.
-        // We should replace it with a unit test for this safer query instead:
-        // "people.sort(id).slice(:0, :1).map(id)"
-        // (Except, we should use descriptive parameter names, instead of
-        // "a" and "b", or "0" and "1", in the unit tests to make the intent
-        // clearer.)
-        $method = <<<'EOS'
-people.slice(:a, :b).map(id)
-EOS;
-
-        $arguments = array('a' => 0, 'b' => 10);
-
-        $mysql = <<<'EOS'
-SELECT
-    `0`.`Id` AS `0`
-    FROM `People` AS `0`
-    LIMIT :0, :1
-EOS;
-
-        $phpInput = <<<'EOS'
-$output = array(
-    $input['a'],
-    $input['b'] - $input['a']
-);
-EOS;
-
-        $phpOutput = <<<'EOS'
-foreach ($input as $row) {
-    $output[$row[0]] = (integer)$row[0];
-}
-
-$output = isset($output) ? array_values($output) : array();
-EOS;
-
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
-    }
-
     public function testMapBasicObject()
     {
         $scenario = self::getPeopleScenario();
@@ -197,7 +151,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
     public function testMapAdvancedObject()
@@ -236,67 +190,29 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
-    }
-
-    public function testFilterByName()
-    {
-        $scenario = self::getPeopleScenario();
-
-        $method = 'people.filter((name = :name0) or (name = :name1)).map(id)';
-
-        $arguments = array(
-            'name0' => 'Ann',
-            'name1' => 'Becca'
-        );
-
-        $mysql = <<<'EOS'
-SELECT
-    `0`.`Id` AS `0`
-    FROM `People` AS `0`
-    WHERE ((`0`.`Name` <=> :0) OR (`0`.`Name` <=> :1))
-EOS;
-
-        $phpInput = <<<'EOS'
-$output = array(
-    $input['name0'],
-    $input['name1']
-);
-EOS;
-
-        $phpOutput = <<<'EOS'
-foreach ($input as $row) {
-    $output[$row[0]] = (integer)$row[0];
-}
-
-$output = isset($output) ? array_values($output) : array();
-EOS;
-
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
     public function testFilter()
     {
         $scenario = self::getPeopleScenario();
 
-        $method = 'people.filter((age = :missingAge) or (age < :minimumAge)).map(id)';
+        $method = 'people.filter(age = :0).map(id)';
 
         $arguments = array(
-            'missingAge' => null,
-            'minimumAge' => 21
+            21
         );
 
         $mysql = <<<'EOS'
 SELECT
     `0`.`Id` AS `0`
     FROM `People` AS `0`
-    WHERE ((`0`.`Age` <=> :0) OR (`0`.`Age` < :1))
+    WHERE (`0`.`Age` <=> :0)
 EOS;
 
         $phpInput = <<<'EOS'
 $output = array(
-    $input['missingAge'],
-    $input['minimumAge']
+    $input['0']
 );
 EOS;
 
@@ -308,7 +224,177 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testAdvancedFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = 'people.filter(
+            age = :null
+            or (not :true or :ageA < age)
+            and age <= :ageB
+            and age != :ageC
+            and age <= :ageD
+            and age < :ageE
+        ).map(id)';
+
+        $arguments = array(
+            'null' => null,
+            'true' => true,
+            'ageA' => 20,
+            'ageB' => 21,
+            'ageC' => 22,
+            'ageD' => 23,
+            'ageE' => 24
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`
+    FROM `People` AS `0`
+    WHERE
+        (
+            (`0`.`Age` <=> :0)
+            OR (
+                (
+                    (
+                        (
+                            (
+                                (NOT :1) OR (:2 < `0`.`Age`)
+                            ) AND (`0`.`Age` <= :3)
+                        ) AND (NOT (`0`.`Age` <=> :4))
+                    ) AND (`0`.`Age` <= :5)
+                ) AND (`0`.`Age` < :6)
+            )
+        )
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['null'],
+    $input['true'],
+    $input['ageA'],
+    $input['ageB'],
+    $input['ageC'],
+    $input['ageD'],
+    $input['ageE']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[0];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testSort()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = 'people.sort(age).map(id)';
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`
+    FROM `People` AS `0`
+    ORDER BY `0`.`Age` ASC
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[0];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testAdvancedSort()
+    {
+        $scenario = self::getRelationshipsScenario();
+
+        $method = <<<'EOS'
+people.sort(name.first).map(age)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`,
+    `0`.`Age` AS `1`
+    FROM `People` AS `0`
+    INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
+    ORDER BY `1`.`First` ASC
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[1];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.sort(age).slice(:start, :stop).map(id)
+EOS;
+
+        $arguments = array(
+            'start' => 0,
+            'stop' => 10
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`
+    FROM `People` AS `0`
+    ORDER BY `0`.`Age` ASC
+    LIMIT :0, :1
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = (integer)$row[0];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
     private static function getFriendsScenario()
@@ -360,84 +446,6 @@ EOS;
 EOS;
     }
 
-    public function testStringComparisons()
-    {
-        $scenario = self::getPeopleScenario();
-
-        $method = 'people.filter(' .
-            'name < :otherName or ' .
-            'name > :otherName or ' .
-            'name <= :otherName or ' .
-            'name >= :otherName and ' .
-            'name != :otherName' .
-        ').map(id)';
-
-        $arguments = array(
-            'otherName' => 'cesium'
-        );
-
-        $mysql = 'SELECT ' .
-            '`0`.`Id` AS `0` ' .
-            'FROM `People` AS `0` ' .
-            'WHERE (' .
-            '(((`0`.`Name` < :0) OR ' .
-            '(`0`.`Name` > :0)) OR ' .
-            '(`0`.`Name` <= :0)) OR ' .
-            '((`0`.`Name` >= :0) AND ' .
-            '(NOT (`0`.`Name` <=> :0))' .
-        '))';
-
-        $phpInput = <<<'EOS'
-$output = array(
-    $input['otherName']
-);
-EOS;
-
-        $phpOutput = <<<'EOS'
-foreach ($input as $row) {
-    $output[$row[0]] = (integer)$row[0];
-}
-
-$output = isset($output) ? array_values($output) : array();
-EOS;
-
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
-    }
-
-    public function testSortOnPath()
-    {
-        $scenario = self::getRelationshipsScenario();
-
-        $method = <<<'EOS'
-people.sort(name.first).map(name.first)
-EOS;
-
-        $arguments = array();
-
-        $mysql = <<<'EOS'
-SELECT
-    `0`.`Id` AS `0`,
-    `1`.`First` AS `1`
-    FROM `People` AS `0`
-    INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
-    ORDER BY `1`.`First` ASC
-EOS;
-
-        $phpInput = <<<'EOS'
-$output = array();
-EOS;
-
-        $phpOutput = <<<'EOS'
-foreach ($input as $row) {
-    $output[$row[0]] = $row[1];
-}
-
-$output = isset($output) ? array_values($output) : array();
-EOS;
-
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
-    }
-    
     public function testMapDepthZero()
     {
         $scenario = self::getFriendsScenario();
@@ -468,9 +476,10 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
+    /*
     public function testMapDepthOne()
     {
         $scenario = self::getFriendsScenario();
@@ -514,7 +523,7 @@ foreach ($output as &$x0) {
 }
 EOS;
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
     public function testMapDepthTwo()
@@ -573,8 +582,9 @@ foreach ($output as &$x1) {
 }
 EOS;
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
+    */
 
     private static function getRelationshipsScenario()
     {
@@ -658,7 +668,6 @@ EOS;
         },
         "Person": {
             "name": ["Name", "Name"],
-            "city": [4, "City"],
             "age": [2, "Age"],
             "phones": [2, "Phones", "Number"],
             "spouse": ["Person", "Spouse", "Person"],
@@ -705,17 +714,17 @@ EOS;
 }
 EOS;
     }
-    
-    public function testMatchString()
+
+    public function testMatch()
     {
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
-people.filter(match(city, :regex)).map(age)
+people.filter(match(name.first, :firstName)).map(age)
 EOS;
 
         $arguments = array(
-            'regex' => '^'
+            'firstName' => '^[A-Z]a..$'
         );
 
         $mysql = <<<'EOS'
@@ -723,12 +732,13 @@ SELECT
     `0`.`Id` AS `0`,
     `0`.`Age` AS `1`
     FROM `People` AS `0`
-    WHERE (`0`.`City` REGEXP BINARY :0)
+    INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
+    WHERE (`1`.`First` REGEXP BINARY :0)
 EOS;
 
         $phpInput = <<<'EOS'
 $output = array(
-    $input['regex']
+    $input['firstName']
 );
 EOS;
 
@@ -740,7 +750,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
     
     public function testMatchPropertyPath()
@@ -778,14 +788,11 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verify($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
     
     public function testFailParameterPath()
     {
-        // we're expecting an exception
-
-        // the api method call
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
@@ -796,7 +803,6 @@ EOS;
             'a' => 'foo'
         );
 
-        // verify the exception
         $this->verifyException(
             $scenario,
             $method,
@@ -808,8 +814,6 @@ EOS;
     
     public function testFailParameterPropertyPath()
     {
-        // we're expecting an exception
-
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
@@ -821,13 +825,13 @@ EOS;
             'a' => 'foo'
         );
 
-        // verify the exception
         $pathInformation = array(
             5,
             array(2, 'name'),
             array(1, 'a'),
             array(2, 'first')
         );
+
         $matchFunction = array(
             3,
             'match',
@@ -848,7 +852,38 @@ EOS;
         );
     }
 
-    private function compileMethod($scenarioJson, $method, $arguments)
+    private function verifyResult($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
+    {
+        $actual = self::translate($scenarioJson, $method, $arguments);
+        $expected = array($mysql, $phpInput, $phpOutput);
+
+        $this->assertSame(
+            self::standardize($expected),
+            self::standardize($actual)
+        );
+    }
+
+    private function verifyException($scenarioJson, $method, $arguments, $code, $data)
+    {
+        $expected = array(
+            'code' => $code,
+            'data' => $data
+        );
+
+        try {
+            self::translate($scenarioJson, $method, $arguments);
+            $actual = null;
+        } catch (Exception $exception) {
+            $actual = array(
+                'code' => $exception->getCode(),
+                'data' => $exception->getData()
+            );
+        }
+
+        $this->assertSame($expected, $actual);
+    }
+
+    private static function translate($scenarioJson, $method, $arguments)
     {
         $scenario = json_decode($scenarioJson, true);
 
@@ -859,50 +894,40 @@ EOS;
 
         $tokens = $lexer->tokenize($method);
         $request = $parser->parse($tokens);
-        $actual = $compiler->compile($request, $arguments);
-
-        return $actual;
+        return $compiler->compile($request, $arguments);
     }
 
-    private function verify($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
+    private static function standardize($artifact)
     {
-        $actual = $this->compileMethod($scenarioJson, $method, $arguments);
-        $expected = array($mysql, $phpInput, $phpOutput);
-        
-        // strip nonessential mysql whitespace
-        $this->assertSame(
-            TestUtils::removeMySQLWhitespace($expected[0]),
-            TestUtils::removeMySQLWhitespace($actual[0])
+        list($mysql, $phpInput, $phpOutput) = $artifact;
+
+        return array(
+            self::standardizeMysql($mysql),
+            self::standardizePhp($phpInput),
+            self::standardizePhp($phpOutput)
         );
-        
-        // strip nonessential php whitespace
-        for ($i = 1; $i <= 2; $i++) {
-            $this->assertSame(
-                TestUtils::removePHPWhitespace($expected[$i]),
-                TestUtils::removePHPWhitespace($actual[$i])
-            );
-        }
     }
 
-    private function verifyException($scenarioJson, $method, $arguments, $code, $data)
+    private static function standardizePhp($php)
     {
-        // try to compile the request
-        try {
-            $this->compileMethod($scenarioJson, $method, $arguments);
-            $actual = null;
-        } catch (Exception $exception) {
-            $actual = array(
-                'code' => $exception->getCode(),
-                'data' => $exception->getData()
-            );
-        }
+        return preg_replace('~\t~', '    ', $php);
+    }
 
-        $this->assertSame(
-            $actual,
-            array(
-                'code' => $code,
-                'data' => $data
-            )
-        );
+    private static function standardizeMysql($mysql)
+    {
+        $mysql = preg_replace('~\s+~', ' ', $mysql);
+
+        // Remove any unnecessary whitespace after an opening parenthesis
+        // Example: "( `" => "(`"
+        // Example: "( (" => "(("
+        // Example: "( :" => "(:"
+        $mysql = preg_replace('~\( (?=`|\(|:)~', '(', $mysql);
+
+        // Remove any unnecessary whitespace before a closing parenthesis
+        // Example: "` )" => "`)"
+        // Example: ") )" => "))"
+        $mysql = preg_replace('~(?<=`|\)) \)~', ')', $mysql);
+
+        return $mysql;
     }
 }
