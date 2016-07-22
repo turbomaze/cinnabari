@@ -326,7 +326,7 @@ EOS;
 
         $this->verify($expected, $actual);
     }
-    
+
     private function verify($expected, $actual)
     {
         $this->assertSame(
