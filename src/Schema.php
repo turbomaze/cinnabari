@@ -49,26 +49,21 @@ class Schema
         $propertyDefinition = &$this->schema['classes'][$class][$property];
 
         if ($classDefinition === null) {
-            $classString = json_encode($class);
             throw new AbstractException(
                 self::ERROR_NO_CLASS,
                 array(
                     'class' => $class
-                ),
-                "class {$classString} does not exist."
+                )
             );
         }
         
         if ($propertyDefinition === null) {
-            $propertyString = json_encode($property);
-            $classString = json_encode($class);
             throw new AbstractException(
                 self::ERROR_NO_PROPERTY,
                 array(
                     'class' => $class,
                     'property' => $property
-                ),
-                "property {$propertyString} of class {$classString} does not exist."
+                )
             );
         }
 
@@ -83,13 +78,11 @@ class Schema
         $definition = &$this->schema['lists'][$list];
 
         if ($definition === null) {
-            $listString = json_encode($list);
             throw new AbstractException(
                 self::ERROR_NO_LIST,
                 array(
                     'list' => $list
-                ),
-                "list {$listString} does not exist."
+                )
             );
         }
 
@@ -102,15 +95,12 @@ class Schema
         $definition = &$this->schema['values'][$tableIdentifier][$value];
 
         if ($definition === null) {
-            $valueString = json_encode($value);
-            $tableString = json_encode($tableIdentifier);
             throw new AbstractException(
                 self::ERROR_NO_VALUE,
                 array(
                     'tableIdentifier' => $tableIdentifier,
                     'value' => $value
-                ),
-                "value {$valueString} in table {$tableString} does not exist."
+                )
             );
         }
 
@@ -123,14 +113,12 @@ class Schema
         $definition = &$this->schema['connections'][$tableIdentifier][$connection];
 
         if ($definition === null) {
-            $connectionString = json_encode($tableIdentifier) . '->' . json_encode($connection);
             throw new AbstractException(
                 self::ERROR_NO_CONNECTION,
                 array(
                     'tableIdentifier' => $tableIdentifier,
                     'connection' => $connection
-                ),
-                "{$connectionString} does not exist."
+                )
             );
         }
 

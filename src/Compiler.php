@@ -121,8 +121,7 @@ class Compiler
         if (!self::scanPath($this->request, $this->request)) {
             throw new AbstractException(
                 self::ERROR_NO_INITIAL_PATH,
-                array('request' => $this->request),
-                "API requests must begin with a path."
+                array('request' => $this->request)
             );
         }
 
@@ -131,8 +130,7 @@ class Compiler
         if (!self::scanProperty($token, $array)) {
             throw new AbstractException(
                 self::ERROR_NO_INITIAL_PROPERTY,
-                array('token' => $token),
-                "API requests must begin with a property."
+                array('token' => $token)
             );
         }
 
@@ -144,8 +142,7 @@ class Compiler
                 array(
                     'accessType' => 'property',
                     'arguments' => array($array)
-                ),
-                "schema failed to return a proper property definition."
+                )
             );
         }
 
@@ -159,8 +156,7 @@ class Compiler
                 array(
                     'accessType' => 'list',
                     'arguments' => array($list)
-                ),
-                "schema failed to return a proper list definition."
+                )
             );
         }
 
@@ -179,8 +175,7 @@ class Compiler
         if (!$this->readMap()) {
             throw new AbstractException(
                 self::ERROR_NO_MAP_FUNCTION,
-                array('request' => $this->request),
-                "API requests must contain a map function after the optional filter/sort functions."
+                array('request' => $this->request)
             );
         }
 
@@ -204,8 +199,7 @@ class Compiler
         if (!isset($arguments) || count($arguments) === 0) {
             throw new AbstractException(
                 self::ERROR_NO_FILTER_ARGUMENTS,
-                array('token' => $token),
-                "filter functions take one expression argument, none provided."
+                array('token' => $token)
             );
         }
 
@@ -216,8 +210,7 @@ class Compiler
                     'class' => $this->class,
                     'table' => $this->table,
                     'arguments' => $arguments[0]
-                ),
-                "malformed expression supplied to the filter function."
+                )
             );
         }
 
@@ -1001,8 +994,7 @@ class Compiler
         if (!$this->readExpression()) {
             throw new AbstractException(
                 self::ERROR_BAD_MAP_ARGUMENT,
-                array('request' => $this->request),
-                'map functions take a property, path, object, or function as an argument.'
+                array('request' => $this->request)
             );
         }
 
@@ -1088,8 +1080,7 @@ class Compiler
             // TODO: add an explanation of the missing argument, or link to the documentation
             throw new AbstractException(
                 self::ERROR_NO_SORT_ARGUMENTS,
-                array('token' => $token),
-                "sort functions take one argument"
+                array('token' => $token)
             );
         }
 

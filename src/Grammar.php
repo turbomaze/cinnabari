@@ -175,18 +175,8 @@ abstract class Grammar
 
         if ($i < $min) {
             $this->setState($state);
-            $ruleName = self::quote($rule);
 
-            $minMultiplicativeNumber = self::getMultiplicativeNumber($min);
-
-            if ($i === 0) {
-                $foundPhrase = "no repetitions";
-            } elseif ($i === 1) {
-                $foundPhrase = "only one repetition";
-            } else {
-                $iCardinal = self::getCardinalNumber($i);
-                $foundPhrase = "only {$iCardinal} repetitions";
-            }
+            $data = array('state' => $state, 'rule' => $rule);
 
             $message = "Expected {$ruleName} to appear at least {$minMultiplicativeNumber}, but found {$foundPhrase}.";
 
@@ -194,59 +184,6 @@ abstract class Grammar
         }
 
         return true;
-    }
-
-    private static function getMultiplicativeNumber($n)
-    {
-        switch ($n) {
-            case 1:
-                return 'once';
-
-            case 2:
-                return 'twice';
-
-            default:
-                $cardinal = self::getCardinalNumber($n);
-                return "{$cardinal} times";
-        }
-    }
-
-    private static function getCardinalNumber($n)
-    {
-        switch ($n) {
-            case 0:
-                return 'zero';
-
-            case 1:
-                return 'one';
-
-            case 2:
-                return 'two';
-
-            case 3:
-                return 'three';
-
-            case 4:
-                return 'four';
-
-            case 5:
-                return 'five';
-
-            case 6:
-                return 'six';
-
-            case 7:
-                return 'seven';
-
-            case 8:
-                return 'eight';
-
-            case 9:
-                return 'nine';
-
-            default:
-                return (string)$n;
-        }
     }
 
     protected static function quote($value)

@@ -117,13 +117,11 @@ class Output
                 return '';
 
             default:
-                $typeString = json_decode($type);
                 throw new AbstractException(
                     self::ERROR_UNKNOWN_TYPECAST,
                     array(
                         'type' => $type
-                    ),
-                    "failed to typecast unknown type {$typeString}'."
+                    )
                 );
         }
     }

@@ -81,13 +81,11 @@ class Select
     public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $type)
     {
         if (!self::isDefined($this->tables, $tableAId)) {
-            $tableString = json_encode($tableAId);
             throw new AbstractException(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $tableAId
-                ),
-                "unknown table id {$tableString}."
+                )
             );
         }
 
@@ -106,13 +104,11 @@ class Select
     public function setOrderBy($tableId, $column, $isAscending)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            $tableString = json_encode($tableId);
             throw new AbstractException(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $tableId
-                ),
-                "unknown table id {$tableString}."
+                )
             );
         }
 
@@ -147,13 +143,11 @@ class Select
     public function addValue($tableId, $column)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            $tableString = json_decode($tableId);
             throw new AbstractException(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $tableId
-                ),
-                "unknown table id {$tableString}."
+                )
             );
         }
 
@@ -177,8 +171,7 @@ class Select
         if (!$this->isValid()) {
             throw new AbstractException(
                 self::ERROR_INVALID_MYSQL,
-                array(),
-                "SQL queries must reference at least one table and column."
+                array()
             );
         }
 
@@ -196,14 +189,12 @@ class Select
         $name = array_search($id, $this->tables, true);
 
         if (!is_string($name)) {
-            $idString = json_decode($id);
             throw new AbstractException(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $id,
                     'name' => $name
-                ),
-                "unknown table id {$idString}."
+                )
             );
         }
 
