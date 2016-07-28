@@ -24,7 +24,7 @@
 
 namespace Datto\Cinnabari\Format;
 
-use Datto\Cinnabari\Exception;
+use Datto\Cinnabari\AbstractException;
 
 class Arguments
 {
@@ -48,7 +48,7 @@ class Arguments
     {
         if (!array_key_exists($name, $this->input)) {
             $nameString = json_encode($name);
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_INPUT_NOT_PROVIDED,
                 array(
                     'name' => $name,
@@ -64,7 +64,7 @@ class Arguments
         if (($userType !== 'NULL') && ($userType !== $neededType)) {
             $nameString = json_encode($name); 
             $typeString = json_encode($neededType); 
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_WRONG_INPUT_TYPE,
                 array(
                     'name' => $name,

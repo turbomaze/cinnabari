@@ -24,6 +24,8 @@
 
 namespace Datto\Cinnabari;
 
+use Datto\Cinnabari\Exception\AbstractException;
+
 abstract class Grammar
 {
     const TYPE_METHOD = 1;
@@ -66,7 +68,7 @@ abstract class Grammar
                 $ruleName = self::quote($rule);
                 $message = "Unknown rule {$ruleName}";
                 $state = $this->getState();
-                throw new Exception(2, $state, $message);
+                throw new AbstractException(2, $state, $message);
         }
     }
 
@@ -77,7 +79,7 @@ abstract class Grammar
         if (!is_callable($callable)) {
             $callableName = json_encode($callable);
             $message = "Unknown callable {$callableName}";
-            throw new Exception(2, null, $message);
+            throw new AbstractException(2, null, $message);
         }
 
         $state = $this->getState();
@@ -89,7 +91,7 @@ abstract class Grammar
         $this->setState($state);
 
         $message = "Expected a {$rule}";
-        throw new Exception(1, null, $message);
+        throw new AbstractException(1, null, $message);
     }
 
     private function getAnd($rules)
@@ -100,7 +102,7 @@ abstract class Grammar
             foreach ($rules as $rule) {
                 $this->applyRule($rule);
             }
-        } catch (Exception $exception) {
+        } catch (AbstractException $exception) {
             $this->setState($state);
             throw $exception;
         }
@@ -113,7 +115,7 @@ abstract class Grammar
         foreach ($rules as $rule) {
             try {
                 $this->applyRule($rule);
-            } catch (Exception $exception) {
+            } catch (AbstractException $exception) {
                 continue;
             }
 
@@ -122,7 +124,7 @@ abstract class Grammar
 
         $state = $this->getState();
         $rulesName = implode(' or ', array_map('self::quote', $rules));
-        throw new Exception(1, $state, "Expected {$rulesName}");
+        throw new AbstractException(1, $state, "Expected {$rulesName}");
     }
 
     private function getRepeat($rule, $min, $max)
@@ -131,13 +133,13 @@ abstract class Grammar
             $ruleName = self::quote($rule);
             $minName = self::quote($min);
             $message = "In the rule {$ruleName}, the minimum value ({$minName}) must be an integer.";
-            throw new Exception(2, array($rule, $min), $message);
+            throw new AbstractException(2, array($rule, $min), $message);
         }
 
         if ($min < 0) {
             $ruleName = self::quote($rule);
             $message = "In the rule {$ruleName}, the minimum value ({$min}) must be zero or more.";
-            throw new Exception(2, array($rule, $min), $message);
+            throw new AbstractException(2, array($rule, $min), $message);
         }
 
         if ($max !== null) {
@@ -145,19 +147,19 @@ abstract class Grammar
                 $ruleName = self::quote($rule);
                 $maxName = self::quote($max);
                 $message = "In the rule {$ruleName}, the maximum value ({$maxName}) must be an integer.";
-                throw new Exception(2, array($rule, $max), $message);
+                throw new AbstractException(2, array($rule, $max), $message);
             }
 
             if ($max < 1) {
                 $ruleName = self::quote($rule);
                 $message = "In the rule {$ruleName}, the maximum value ({$max}) must be greater than zero.";
-                throw new Exception(2, array($rule, $max), $message);
+                throw new AbstractException(2, array($rule, $max), $message);
             }
 
             if ($max < $min) {
                 $ruleName = self::quote($rule);
                 $message = "In the rule {$ruleName}, the minimum value ({$min}) must be less than or equal to the maximum value ({$max}).";
-                throw new Exception(2, array($rule, $min), $message);
+                throw new AbstractException(2, array($rule, $min), $message);
             }
         }
 
@@ -166,7 +168,7 @@ abstract class Grammar
         for ($i = 0; $i < $max; ++$i) {
             try {
                 $this->applyRule($rule);
-            } catch (Exception $exception) {
+            } catch (AbstractException $exception) {
                 break;
             }
         }
@@ -188,7 +190,7 @@ abstract class Grammar
 
             $message = "Expected {$ruleName} to appear at least {$minMultiplicativeNumber}, but found {$foundPhrase}.";
 
-            throw new Exception(1, $state, $message);
+            throw new AbstractException(1, $state, $message);
         }
 
         return true;

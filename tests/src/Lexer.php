@@ -2,7 +2,7 @@
 
 namespace Datto\Cinnabari\Tests;
 
-use Datto\Cinnabari\Exception;
+use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Lexer;
 use PHPUnit_Framework_TestCase;
 
@@ -505,7 +505,7 @@ class LexerTest extends PHPUnit_Framework_TestCase
             $this->lexer->tokenize($input);
 
             $actual = null;
-        } catch (Exception $exception) {
+        } catch (AbstractException $exception) {
             $actual = array(
                 'code' => $exception->getCode(),
                 'data' => $exception->getData()

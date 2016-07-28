@@ -2,7 +2,7 @@
 
 namespace Datto\Cinnabari\Tests;
 
-use Datto\Cinnabari\Exception;
+use Datto\Cinnabari\AbstractException;
 use Datto\Cinnabari\Lexer;
 use Datto\Cinnabari\Parser;
 use PHPUnit_Framework_TestCase;
