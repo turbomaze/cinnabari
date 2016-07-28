@@ -24,7 +24,7 @@
 
 namespace Datto\Cinnabari\Format;
 
-use Datto\Cinnabari\ArgumentsException;
+use Datto\Cinnabari\Exception\ArgumentsException;
 
 class Arguments
 {

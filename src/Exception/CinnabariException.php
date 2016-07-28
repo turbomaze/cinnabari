@@ -34,22 +34,10 @@ class CinnabariException extends AbstractException
     const OUTPUT = 6;
     const SCHEMA = 7;
 
-    private static $mapping = array(
-        'ArgumentsException' => self::ARGUMENTS,
-        'CompilerException' => self::COMPILER,
-        'GrammarException' => self::GRAMMAR,
-        'LexerException' => self::LEXER,
-        'MysqlException' => self::MYSQL,
-        'OutputException' => self::OUTPUT,
-        'SchemaException' => self::SCHEMA
-    );
-
     private $originalCode;
 
-    public function __construct($exception)
+    public function __construct($code, $exception)
     {
-        $exceptionName = array_pop(explode('\\', get_class($exception)));
-        $code = self::$mapping[$exceptionName];
         $this->originalCode = $exception->getCode();
             
         parent::__construct($code, $exception->getData(), $exception->getMessage());

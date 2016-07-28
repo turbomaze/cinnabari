@@ -24,8 +24,13 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\ArgumentsException;
 use Datto\Cinnabari\Exception\CinnabariException;
+use Datto\Cinnabari\Exception\CompilerException;
+use Datto\Cinnabari\Exception\LexerException;
+use Datto\Cinnabari\Exception\MysqlException;
+use Datto\Cinnabari\Exception\OutputException;
+use Datto\Cinnabari\Exception\SchemaException;
 
 class Cinnabari
 {
@@ -40,19 +45,19 @@ class Cinnabari
     // TODO: trim the query string before Cinnabari
     public function translate($query, $arguments)
     {
-        try {
-            $tokens = self::getTokens($query);
-            $request = self::getRequest($tokens);
-            return self::getResult($this->schema, $request, $arguments);
-        } catch (AbstractException $exception) {
-            throw new CinnabariException($exception);
-        }
+        $tokens = self::getTokens($query);
+        $request = self::getRequest($tokens);
+        return self::getResult($this->schema, $request, $arguments);
     }
 
     private static function getTokens($query)
     {
-        $lexer = new Lexer();
-        return $lexer->tokenize($query);
+        try {
+            $lexer = new Lexer();
+            return $lexer->tokenize($query);
+        } catch (LexerException $exception) {
+            throw new CinnabariException(CinnabariException::LEXER, $exception);
+        }
     }
 
     private static function getRequest($tokens)
@@ -63,7 +68,19 @@ class Cinnabari
 
     private static function getResult(Schema $schema, $request, $arguments)
     {
-        $compiler = new Compiler($schema);
-        return $compiler->compile($request, $arguments);
+        try {
+            $compiler = new Compiler($schema);
+            return $compiler->compile($request, $arguments);
+        } catch (ArgumentsException $exception) {
+            throw new CinnabariException(CinnabariException::ARGUMENTS, $exception);
+        } catch (CompilerException $exception) {
+            throw new CinnabariException(CinnabariException::COMPILER, $exception);
+        } catch (MysqlException $exception) {
+            throw new CinnabariException(CinnabariException::MYSQL, $exception);
+        } catch (OutputException $exception) {
+            throw new CinnabariException(CinnabariException::OUTPUT, $exception);
+        } catch (SchemaException $exception) {
+            throw new CinnabariException(CinnabariException::SCHEMA, $exception);
+        }
     }
 }
