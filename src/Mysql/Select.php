@@ -24,15 +24,11 @@
 
 namespace Datto\Cinnabari\Mysql;
 
-use Datto\Cinnabari\AbstractException;
+use Datto\Cinnabari\Exception\MysqlException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 class Select
 {
-    // mysql errors
-    const ERROR_BAD_TABLE_ID = 201;
-    const ERROR_INVALID_MYSQL = 202;
-
     const JOIN_INNER = 1;
     const JOIN_LEFT = 2;
 
@@ -81,12 +77,7 @@ class Select
     public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $type)
     {
         if (!self::isDefined($this->tables, $tableAId)) {
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $tableAId
-                )
-            );
+            throw MysqlException::badTableId($tableAId);
         }
 
         $tableIdentifierA = self::getIdentifier($tableAId);
@@ -104,12 +95,7 @@ class Select
     public function setOrderBy($tableId, $column, $isAscending)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $tableId
-                )
-            );
+            throw MysqlException::badTableId($tableId);
         }
 
         $table = self::getIdentifier($tableId);
@@ -143,12 +129,7 @@ class Select
     public function addValue($tableId, $column)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $tableId
-                )
-            );
+            throw MysqlException::badTableId($tableId);
         }
 
         $table = self::getIdentifier($tableId);
@@ -169,10 +150,7 @@ class Select
     public function getMysql()
     {
         if (!$this->isValid()) {
-            throw new AbstractException(
-                self::ERROR_INVALID_MYSQL,
-                array()
-            );
+            throw MysqlException::invalidSelect();
         }
 
         $mysql = $this->getColumns() .
@@ -189,13 +167,7 @@ class Select
         $name = array_search($id, $this->tables, true);
 
         if (!is_string($name)) {
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $id,
-                    'name' => $name
-                )
-            );
+            throw MysqlException::badTableId($id);
         }
 
         if (0 < $id) {

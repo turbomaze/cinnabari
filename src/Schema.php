@@ -24,17 +24,10 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\SchemaException;
 
 class Schema
 {
-    // schema errors
-    const ERROR_NO_CLASS = 101;
-    const ERROR_NO_PROPERTY = 102;
-    const ERROR_NO_LIST = 103;
-    const ERROR_NO_VALUE = 104;
-    const ERROR_NO_CONNECTION = 105;
-
     /** @var array */
     private $schema;
 
@@ -49,22 +42,11 @@ class Schema
         $propertyDefinition = &$this->schema['classes'][$class][$property];
 
         if ($classDefinition === null) {
-            throw new AbstractException(
-                self::ERROR_NO_CLASS,
-                array(
-                    'class' => $class
-                )
-            );
+            throw SchemaException::noClass($class);
         }
         
         if ($propertyDefinition === null) {
-            throw new AbstractException(
-                self::ERROR_NO_PROPERTY,
-                array(
-                    'class' => $class,
-                    'property' => $property
-                )
-            );
+            throw SchemaException::noProperty($class, $property);
         }
 
         $type = reset($propertyDefinition);
@@ -78,12 +60,7 @@ class Schema
         $definition = &$this->schema['lists'][$list];
 
         if ($definition === null) {
-            throw new AbstractException(
-                self::ERROR_NO_LIST,
-                array(
-                    'list' => $list
-                )
-            );
+            throw SchemaException::noList($list);
         }
 
         // array($table, $expression, $hasZero)
@@ -95,13 +72,7 @@ class Schema
         $definition = &$this->schema['values'][$tableIdentifier][$value];
 
         if ($definition === null) {
-            throw new AbstractException(
-                self::ERROR_NO_VALUE,
-                array(
-                    'tableIdentifier' => $tableIdentifier,
-                    'value' => $value
-                )
-            );
+            throw SchemaException::noValue($value, $tableIdentifier);
         }
 
         // array($expression, $hasZero)
@@ -113,13 +84,7 @@ class Schema
         $definition = &$this->schema['connections'][$tableIdentifier][$connection];
 
         if ($definition === null) {
-            throw new AbstractException(
-                self::ERROR_NO_CONNECTION,
-                array(
-                    'tableIdentifier' => $tableIdentifier,
-                    'connection' => $connection
-                )
-            );
+            throw SchemaException::noConnection($connection, $tableIdentifier);
         }
 
         return $definition;

@@ -25,11 +25,10 @@
 namespace Datto\Cinnabari;
 
 use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\CinnabariException;
 
 class Cinnabari
 {
-    const ERROR_SYNTAX = 1;
-
     /** @var Schema */
     private $schema;
 
@@ -45,10 +44,8 @@ class Cinnabari
             $tokens = self::getTokens($query);
             $request = self::getRequest($tokens);
             return self::getResult($this->schema, $request, $arguments);
-        } catch (LexerException $exception) {
-            return false;
         } catch (AbstractException $exception) {
-            return false;
+            throw new CinnabariException($exception);
         }
     }
 

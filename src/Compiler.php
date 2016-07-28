@@ -24,7 +24,7 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\Column;
@@ -57,16 +57,6 @@ use Datto\Cinnabari\Php\Output;
  */
 class Compiler
 {
-    // compiler errors
-    const ERROR_NO_INITIAL_PROPERTY = 501;
-    const ERROR_NO_INITIAL_PATH = 502;
-    const ERROR_NO_MAP_FUNCTION = 503;
-    const ERROR_NO_FILTER_ARGUMENTS = 504;
-    const ERROR_BAD_FILTER_EXPRESSION = 505;
-    const ERROR_NO_SORT_ARGUMENTS = 506;
-    const ERROR_BAD_MAP_ARGUMENT = 507;
-    const ERROR_BAD_SCHEMA = 508;
-
     /** @var Schema */
     private $schema;
 
@@ -119,31 +109,19 @@ class Compiler
     private function getArrayProperty()
     {
         if (!self::scanPath($this->request, $this->request)) {
-            throw new AbstractException(
-                self::ERROR_NO_INITIAL_PATH,
-                array('request' => $this->request)
-            );
+            throw CompilerException::noInitialPath($this->request);
         }
 
         $token = array_shift($this->request);
 
         if (!self::scanProperty($token, $array)) {
-            throw new AbstractException(
-                self::ERROR_NO_INITIAL_PROPERTY,
-                array('token' => $token)
-            );
+            throw CompilerException::noInitialProperty($token);
         }
 
         list($class, $path) = $this->schema->getPropertyDefinition('Database', $array);
 
         if (!isset($class, $path)) {
-            throw new AbstractException(
-                self::ERROR_BAD_SCHEMA,
-                array(
-                    'accessType' => 'property',
-                    'arguments' => array($array)
-                )
-            );
+            throw CompilerException::badSchema('property', array($array));
         }
 
         $list = array_pop($path);
@@ -151,13 +129,7 @@ class Compiler
         list($table, $id, $hasZero) = $this->schema->getListDefinition($list);
 
         if (!isset($table, $id, $hasZero)) {
-            throw new AbstractException(
-                self::ERROR_BAD_SCHEMA,
-                array(
-                    'accessType' => 'list',
-                    'arguments' => array($list)
-                )
-            );
+            throw CompilerException::badSchema('list', array($list));
         }
 
         $this->class = $class;
@@ -173,10 +145,7 @@ class Compiler
         $this->request = reset($this->request);
 
         if (!$this->readMap()) {
-            throw new AbstractException(
-                self::ERROR_NO_MAP_FUNCTION,
-                array('request' => $this->request)
-            );
+            throw CompilerException::invalidMethodSequence($this->request);
         }
 
         $this->phpOutput = Output::getList($idAlias, $hasZero, true, $this->phpOutput);
@@ -197,20 +166,14 @@ class Compiler
 
         // at this point, we're sure they want to filter
         if (!isset($arguments) || count($arguments) === 0) {
-            throw new AbstractException(
-                self::ERROR_NO_FILTER_ARGUMENTS,
-                array('token' => $token)
-            );
+            throw CompilerException::noFilterArguments($token);
         }
 
         if (!$this->getExpression($this->class, $this->table, $arguments[0], $where, $type)) {
-            throw new AbstractException(
-                self::ERROR_BAD_FILTER_EXPRESSION,
-                array(
-                    'class' => $this->class,
-                    'table' => $this->table,
-                    'arguments' => $arguments[0]
-                )
+            throw CompilerException::badFilterExpression(
+                $this->class,
+                $this->table,
+                $arguments[0]
             );
         }
 
@@ -992,10 +955,7 @@ class Compiler
         $this->request = reset($arguments);
 
         if (!$this->readExpression()) {
-            throw new AbstractException(
-                self::ERROR_BAD_MAP_ARGUMENT,
-                array('request' => $this->request)
-            );
+            throw CompilerException::badMapArgument($this->request);
         }
 
         return true;
@@ -1078,10 +1038,7 @@ class Compiler
 
         if (!isset($arguments) || count($arguments) !== 1) {
             // TODO: add an explanation of the missing argument, or link to the documentation
-            throw new AbstractException(
-                self::ERROR_NO_SORT_ARGUMENTS,
-                array('token' => $token)
-            );
+            throw CompilerException::noSortArguments($token);
         }
 
         $state = array($this->request, $this->class, $this->table);
