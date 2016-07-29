@@ -24,6 +24,8 @@
 
 namespace Datto\Cinnabari;
 
+use Datto\Cinnabari\Exception\AbstractException;
+
 class Cinnabari
 {
     const ERROR_SYNTAX = 1;
@@ -44,7 +46,7 @@ class Cinnabari
             $request = self::getRequest($tokens);
 
             return self::getResult($this->schema, $request, $arguments);
-        } catch (Exception $exception) {
+        } catch (AbstractException $exception) {
             return false;
         }
     }
@@ -54,7 +56,7 @@ class Cinnabari
         try {
             $lexer = new Lexer();
             return $lexer->tokenize($query);
-        } catch (Exception $exception) {
+        } catch (AbstractException $exception) {
             $position = $exception->getData();
             self::errorSyntax($query, $position);
             return null;
@@ -89,7 +91,7 @@ class Cinnabari
             $message = "Syntax error at position {$position}: {$queryCursorName}";
         }
 
-        throw new Exception(self::ERROR_SYNTAX, $position, $message);
+        throw new AbstractException(self::ERROR_SYNTAX, $position, $message);
     }
 
     private static function getType($value)

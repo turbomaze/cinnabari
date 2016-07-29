@@ -2,7 +2,7 @@
 
 namespace Datto\Cinnabari\Php;
 
-use Datto\Cinnabari\Exception;
+use Datto\Cinnabari\AbstractException;
 
 class Output
 {
@@ -118,7 +118,7 @@ class Output
 
             default:
                 $typeString = json_decode($type);
-                throw new Exception(
+                throw new AbstractException(
                     self::ERROR_UNKNOWN_TYPECAST,
                     array(
                         'type' => $type

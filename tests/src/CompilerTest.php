@@ -2,7 +2,7 @@
 
 namespace Datto\Cinnabari\Tests;
 
-use Datto\Cinnabari\Exception;
+use Datto\Cinnabari\AbstractException;
 use Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Parser;
 use Datto\Cinnabari\Lexer;
@@ -873,7 +873,7 @@ EOS;
         try {
             self::translate($scenarioJson, $method, $arguments);
             $actual = null;
-        } catch (Exception $exception) {
+        } catch (AbstractException $exception) {
             $actual = array(
                 'code' => $exception->getCode(),
                 'data' => $exception->getData()

@@ -24,6 +24,8 @@
 
 namespace Datto\Cinnabari;
 
+use Datto\Cinnabari\Exception\AbstractException;
+
 class Schema
 {
     // schema errors
@@ -48,7 +50,7 @@ class Schema
 
         if ($classDefinition === null) {
             $classString = json_encode($class);
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_NO_CLASS,
                 array(
                     'class' => $class
@@ -60,7 +62,7 @@ class Schema
         if ($propertyDefinition === null) {
             $propertyString = json_encode($property);
             $classString = json_encode($class);
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_NO_PROPERTY,
                 array(
                     'class' => $class,
@@ -82,7 +84,7 @@ class Schema
 
         if ($definition === null) {
             $listString = json_encode($list);
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_NO_LIST,
                 array(
                     'list' => $list
@@ -102,7 +104,7 @@ class Schema
         if ($definition === null) {
             $valueString = json_encode($value);
             $tableString = json_encode($tableIdentifier);
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_NO_VALUE,
                 array(
                     'tableIdentifier' => $tableIdentifier,
@@ -122,7 +124,7 @@ class Schema
 
         if ($definition === null) {
             $connectionString = json_encode($tableIdentifier) . '->' . json_encode($connection);
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_NO_CONNECTION,
                 array(
                     'tableIdentifier' => $tableIdentifier,

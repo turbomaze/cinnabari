@@ -24,6 +24,7 @@
 
 namespace Datto\Cinnabari;
 
+use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\Column;
@@ -118,7 +119,7 @@ class Compiler
     private function getArrayProperty()
     {
         if (!self::scanPath($this->request, $this->request)) {
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_NO_INITIAL_PATH,
                 array('request' => $this->request),
                 "API requests must begin with a path."
@@ -128,7 +129,7 @@ class Compiler
         $token = array_shift($this->request);
 
         if (!self::scanProperty($token, $array)) {
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_NO_INITIAL_PROPERTY,
                 array('token' => $token),
                 "API requests must begin with a property."
@@ -138,7 +139,7 @@ class Compiler
         list($class, $path) = $this->schema->getPropertyDefinition('Database', $array);
 
         if (!isset($class, $path)) {
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_BAD_SCHEMA,
                 array(
                     'accessType' => 'property',
@@ -153,7 +154,7 @@ class Compiler
         list($table, $id, $hasZero) = $this->schema->getListDefinition($list);
 
         if (!isset($table, $id, $hasZero)) {
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_BAD_SCHEMA,
                 array(
                     'accessType' => 'list',
@@ -176,7 +177,7 @@ class Compiler
         $this->request = reset($this->request);
 
         if (!$this->readMap()) {
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_NO_MAP_FUNCTION,
                 array('request' => $this->request),
                 "API requests must contain a map function after the optional filter/sort functions."
@@ -201,7 +202,7 @@ class Compiler
 
         // at this point, we're sure they want to filter
         if (!isset($arguments) || count($arguments) === 0) {
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_NO_FILTER_ARGUMENTS,
                 array('token' => $token),
                 "filter functions take one expression argument, none provided."
@@ -209,7 +210,7 @@ class Compiler
         }
 
         if (!$this->getExpression($this->class, $this->table, $arguments[0], $where, $type)) {
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_BAD_FILTER_EXPRESSION,
                 array(
                     'class' => $this->class,
@@ -998,7 +999,7 @@ class Compiler
         $this->request = reset($arguments);
 
         if (!$this->readExpression()) {
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_BAD_MAP_ARGUMENT,
                 array('request' => $this->request),
                 'map functions take a property, path, object, or function as an argument.'
@@ -1085,7 +1086,7 @@ class Compiler
 
         if (!isset($arguments) || count($arguments) !== 1) {
             // TODO: add an explanation of the missing argument, or link to the documentation
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_NO_SORT_ARGUMENTS,
                 array('token' => $token),
                 "sort functions take one argument"
