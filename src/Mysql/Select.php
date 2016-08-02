@@ -24,7 +24,7 @@
 
 namespace Datto\Cinnabari\Mysql;
 
-use Datto\Cinnabari\Exception;
+use Datto\Cinnabari\AbstractException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 class Select
@@ -82,7 +82,7 @@ class Select
     {
         if (!self::isDefined($this->tables, $tableAId)) {
             $tableString = json_encode($tableAId);
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $tableAId
@@ -107,7 +107,7 @@ class Select
     {
         if (!self::isDefined($this->tables, $tableId)) {
             $tableString = json_encode($tableId);
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $tableId
@@ -148,7 +148,7 @@ class Select
     {
         if (!self::isDefined($this->tables, $tableId)) {
             $tableString = json_decode($tableId);
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $tableId
@@ -175,7 +175,7 @@ class Select
     public function getMysql()
     {
         if (!$this->isValid()) {
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_INVALID_MYSQL,
                 array(),
                 "SQL queries must reference at least one table and column."
@@ -197,7 +197,7 @@ class Select
 
         if (!is_string($name)) {
             $idString = json_decode($id);
-            throw new Exception(
+            throw new AbstractException(
                 self::ERROR_BAD_TABLE_ID,
                 array(
                     'tableId' => $id,

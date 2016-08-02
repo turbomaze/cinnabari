@@ -24,6 +24,8 @@
 
 namespace Datto\Cinnabari;
 
+use Datto\Cinnabari\Exception\LexerException;
+
 /**
  * Class Lexer
  * @package Datto\Cinnabari
@@ -53,6 +55,7 @@ namespace Datto\Cinnabari;
  * property = identifier;
  * parameter = ":", identifier;
  */
+
 class Lexer
 {
     const TYPE_PARAMETER = 1;
@@ -62,24 +65,22 @@ class Lexer
     const TYPE_GROUP = 5;
     const TYPE_OPERATOR = 6;
 
-    const ERROR_UNEXPECTED_INPUT = 1;
-
     /**
      * @param string $input
      * @return array
-     * @throws Exception
+     * @throws LexerException
      */
     public function tokenize($input)
     {
         if (!is_string($input)) {
-            throw new Exception(self::ERROR_UNEXPECTED_INPUT, null);
+            throw LexerException::invalidType($input);
         }
 
-        $inputLength = strlen($input);
+        $inputOriginal = $input;
 
         if (!self::getExpression($input, $output) || ($input !== false)) {
-            $position = $inputLength - strlen($input);
-            throw new Exception(self::ERROR_UNEXPECTED_INPUT, $position);
+            $position = strlen($inputOriginal) - strlen($input);
+            throw LexerException::syntaxError($inputOriginal, $position);
         }
 
         return $output;

@@ -2,12 +2,11 @@
 
 namespace Datto\Cinnabari\Tests;
 
-use Datto\Cinnabari\Exception;
+use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Parser;
 use Datto\Cinnabari\Lexer;
 use Datto\Cinnabari\Format\Arguments;
-use Datto\Cinnabari\Schema;
 use PHPUnit_Framework_TestCase;
 
 /*
@@ -479,7 +478,6 @@ EOS;
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
-    /*
     public function testMapDepthOne()
     {
         $scenario = self::getFriendsScenario();
@@ -584,7 +582,6 @@ EOS;
 
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
-    */
 
     private static function getRelationshipsScenario()
     {
@@ -715,7 +712,7 @@ EOS;
 EOS;
     }
 
-    public function testMatch()
+    public function testMapMatch()
     {
         $scenario = self::getRelationshipsScenario();
 
@@ -753,7 +750,7 @@ EOS;
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
     
-    public function testMatchPropertyPath()
+    public function testMapMatchPropertyPath()
     {
         $scenario = self::getRelationshipsScenario();
 
@@ -791,7 +788,7 @@ EOS;
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
     
-    public function testFailParameterPath()
+    public function testMapParameterPath()
     {
         $scenario = self::getRelationshipsScenario();
 
@@ -812,7 +809,7 @@ EOS;
         );
     }
     
-    public function testFailParameterPropertyPath()
+    public function testMapParameterPropertyPath()
     {
         $scenario = self::getRelationshipsScenario();
 
@@ -852,6 +849,147 @@ EOS;
         );
     }
 
+    public function testDelete()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.delete()
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+DELETE
+    FROM `People`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testDeleteFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.filter(age < :age).delete()
+EOS;
+
+        $arguments = array(
+            'age' => 21
+        );
+
+        $mysql = <<<'EOS'
+DELETE
+    FROM `People`
+    WHERE `People`.`Age` < :0
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['age']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    /**
+     * Note: MySQL requires ":start = 0". No other value is possible in MySQL!
+     * When a user supplies a non-zero start value, Cinnabari should simply
+     * reject the request and provide an explanation.
+     *
+     * Note: MySQL behavior is unpredictable when a "LIMIT" clause is used
+     * without an "ORDER BY" clause. That's why the "sort" method and the
+     * "slice" method are tested together here.
+     *
+     * Because of this unpredictable behavior, Cinnabari should--at some point
+     * in the future--insert an implicit "sort" function (using the identifier
+     * expression) when a user-supplied query lacks an explicit "sort" function.
+     *
+     * The following unit test, however, is valid and will always be valid:
+     */
+    public function testDeleteSortSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.sort(age).slice(:start, :stop).delete()
+EOS;
+
+        $arguments = array(
+            'start' => 0,
+            'stop' => 2
+        );
+
+        $mysql = <<<'EOS'
+DELETE
+    FROM `People`
+    ORDER BY `People`.`Age` ASC
+    LIMIT :0
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testDeleteFilterSortSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.filter(:age <= age).sort(age).slice(:start, :stop).delete()
+EOS;
+
+        $arguments = array(
+            'age' => 18,
+            'start' => 0,
+            'stop' => 2
+        );
+
+        $mysql = <<<'EOS'
+DELETE
+    FROM `People`
+    WHERE :0 <= `People`.`Age`
+    ORDER BY `People`.`Age` ASC
+    LIMIT :1
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['age'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
     private function verifyResult($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
     {
         $actual = self::translate($scenarioJson, $method, $arguments);
@@ -873,7 +1011,7 @@ EOS;
         try {
             self::translate($scenarioJson, $method, $arguments);
             $actual = null;
-        } catch (Exception $exception) {
+        } catch (AbstractException $exception) {
             $actual = array(
                 'code' => $exception->getCode(),
                 'data' => $exception->getData()
