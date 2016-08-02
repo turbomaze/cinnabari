@@ -479,7 +479,6 @@ EOS;
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
-    /*
     public function testMapDepthOne()
     {
         $scenario = self::getFriendsScenario();
@@ -584,7 +583,6 @@ EOS;
 
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
-    */
 
     private static function getRelationshipsScenario()
     {
@@ -911,16 +909,16 @@ EOS;
 
     /**
      * Note: MySQL requires ":start = 0". No other value is possible in MySQL!
-     * If the user supplies a non-zero value, then Cinnabari should reject the
-     * request and provide an explanation.
+     * When a user supplies a non-zero start value, Cinnabari should simply
+     * reject the request and provide an explanation.
      *
      * Note: MySQL behavior is unpredictable when a "LIMIT" clause is used
      * without an "ORDER BY" clause. That's why the "sort" method and the
      * "slice" method are tested together here.
      *
-     * Because of this behavior, Cinnabari should--at some point in the future--
-     * insert an implicit "sort" function (using the identifier expression) when
-     * a user-supplied query lacks an explicit "sort" function.
+     * Because of this unpredictable behavior, Cinnabari should--at some point
+     * in the future--insert an implicit "sort" function (using the identifier
+     * expression) when a user-supplied query lacks an explicit "sort" function.
      *
      * The following unit test, however, is valid and will always be valid:
      */
