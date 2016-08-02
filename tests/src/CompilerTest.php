@@ -2,7 +2,7 @@
 
 namespace Datto\Cinnabari\Tests;
 
-use Datto\Cinnabari\AbstractException;
+use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Parser;
 use Datto\Cinnabari\Lexer;
@@ -715,7 +715,7 @@ EOS;
 EOS;
     }
 
-    public function testMatch()
+    public function testMapMatch()
     {
         $scenario = self::getRelationshipsScenario();
 
@@ -753,7 +753,7 @@ EOS;
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
     
-    public function testMatchPropertyPath()
+    public function testMapMatchPropertyPath()
     {
         $scenario = self::getRelationshipsScenario();
 
@@ -791,7 +791,7 @@ EOS;
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
     
-    public function testFailParameterPath()
+    public function testMapParameterPath()
     {
         $scenario = self::getRelationshipsScenario();
 
@@ -812,7 +812,7 @@ EOS;
         );
     }
     
-    public function testFailParameterPropertyPath()
+    public function testMapParameterPropertyPath()
     {
         $scenario = self::getRelationshipsScenario();
 
@@ -850,6 +850,147 @@ EOS;
                 'arguments' => $matchFunction
             )
         );
+    }
+
+    public function testDelete()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.delete()
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+DELETE
+    FROM `People`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testDeleteFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.filter(age < :age).delete()
+EOS;
+
+        $arguments = array(
+            'age' => 21
+        );
+
+        $mysql = <<<'EOS'
+DELETE
+    FROM `People`
+    WHERE `People`.`Age` < :0
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['age']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    /**
+     * Note: MySQL requires ":start = 0". No other value is possible in MySQL!
+     * If the user supplies a non-zero value, then Cinnabari should reject the
+     * request and provide an explanation.
+     *
+     * Note: The "sort" method and the "slice" method are tested together here,
+     * because the MySQL behavior is unpredictable when a "LIMIT" clause is
+     * used without an "ORDER BY" clause.
+     *
+     * Because of this, Cinnabari should--at some point in the future--insert
+     * an implicit "sort" function (using the identifier expression) when the
+     * user query lacks an explicit "sort" function.
+     *
+     * The following unit test, however, will always be valid:
+     */
+    public function testDeleteSortSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.sort(age).slice(:start, :stop).delete()
+EOS;
+
+        $arguments = array(
+            'start' => 0,
+            'stop' => 2
+        );
+
+        $mysql = <<<'EOS'
+DELETE
+    FROM `People`
+    ORDER BY `People`.`Age` ASC
+    LIMIT :0
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testDeleteFilterSortSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+people.filter(:age <= age).sort(age).slice(:start, :stop).delete()
+EOS;
+
+        $arguments = array(
+            'age' => 18,
+            'start' => 0,
+            'stop' => 2
+        );
+
+        $mysql = <<<'EOS'
+DELETE
+    FROM `People`
+    WHERE :0 <= `People`.`Age`
+    ORDER BY `People`.`Age` ASC
+    LIMIT :1
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['age'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
     private function verifyResult($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
