@@ -914,15 +914,15 @@ EOS;
      * If the user supplies a non-zero value, then Cinnabari should reject the
      * request and provide an explanation.
      *
-     * Note: The "sort" method and the "slice" method are tested together here,
-     * because the MySQL behavior is unpredictable when a "LIMIT" clause is
-     * used without an "ORDER BY" clause.
+     * Note: MySQL behavior is unpredictable when a "LIMIT" clause is used
+     * without an "ORDER BY" clause. That's why the "sort" method and the
+     * "slice" method are tested together here.
      *
-     * Because of this, Cinnabari should--at some point in the future--insert
-     * an implicit "sort" function (using the identifier expression) when the
-     * user query lacks an explicit "sort" function.
+     * Because of this behavior, Cinnabari should--at some point in the future--
+     * insert an implicit "sort" function (using the identifier expression) when
+     * a user-supplied query lacks an explicit "sort" function.
      *
-     * The following unit test, however, will always be valid:
+     * The following unit test, however, is valid and will always be valid:
      */
     public function testDeleteSortSlice()
     {
