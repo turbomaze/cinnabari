@@ -24,12 +24,14 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\ArgumentsException;
+use Datto\Cinnabari\Exception\CinnabariException;
+use Datto\Cinnabari\Exception\CompilerException;
+use Datto\Cinnabari\Exception\LexerException;
+use Datto\Cinnabari\Exception\SchemaException;
 
 class Cinnabari
 {
-    const ERROR_SYNTAX = 1;
-
     /** @var Schema */
     private $schema;
 
@@ -41,14 +43,9 @@ class Cinnabari
     // TODO: trim the query string before Cinnabari
     public function translate($query, $arguments)
     {
-        try {
-            $tokens = self::getTokens($query);
-            $request = self::getRequest($tokens);
-
-            return self::getResult($this->schema, $request, $arguments);
-        } catch (AbstractException $exception) {
-            return false;
-        }
+        $tokens = self::getTokens($query);
+        $request = self::getRequest($tokens);
+        return self::getResult($this->schema, $request, $arguments);
     }
 
     private static function getTokens($query)
@@ -56,10 +53,8 @@ class Cinnabari
         try {
             $lexer = new Lexer();
             return $lexer->tokenize($query);
-        } catch (AbstractException $exception) {
-            $position = $exception->getData();
-            self::errorSyntax($query, $position);
-            return null;
+        } catch (LexerException $exception) {
+            throw new CinnabariException(CinnabariException::LEXER, $exception);
         }
     }
 
@@ -71,84 +66,15 @@ class Cinnabari
 
     private static function getResult(Schema $schema, $request, $arguments)
     {
-        $compiler = new Compiler($schema);
-        return $compiler->compile($request, $arguments);
-    }
-
-    private static function errorSyntax($query, $position)
-    {
-        if ($position === null) {
-            $queryType = self::getType($query);
-            $queryName = var_export($query, true);
-            $indefiniteArticle = self::getIndefiniteArticle($queryType);
-
-            $message = "Syntax error: expected string input, but received {$indefiniteArticle} {$queryType} value instead ({$queryName})";
-        } elseif (strlen($query) === 0) {
-            $message = "Syntax error: expected a query string, but received an empty string instead";
-        } else {
-            $queryCursorName = self::underline($query, $position);
-
-            $message = "Syntax error at position {$position}: {$queryCursorName}";
+        try {
+            $compiler = new Compiler($schema);
+            return $compiler->compile($request, $arguments);
+        } catch (ArgumentsException $exception) {
+            throw new CinnabariException(CinnabariException::ARGUMENTS, $exception);
+        } catch (CompilerException $exception) {
+            throw new CinnabariException(CinnabariException::COMPILER, $exception);
+        } catch (SchemaException $exception) {
+            throw new CinnabariException(CinnabariException::SCHEMA, $exception);
         }
-
-        throw new AbstractException(self::ERROR_SYNTAX, $position, $message);
-    }
-
-    private static function getType($value)
-    {
-        $type = gettype($value);
-
-        if ($type === 'NULL') {
-            return 'null';
-        }
-
-        if ($type === 'double') {
-            return 'float';
-        }
-
-        return $type;
-    }
-
-    private static function getIndefiniteArticle($word)
-    {
-        $firstLetter = substr($word, 0, 1);
-
-        if (
-            ($firstLetter === 'a') ||
-            ($firstLetter === 'e') ||
-            ($firstLetter === 'i') ||
-            ($firstLetter === 'o') ||
-            ($firstLetter === 'u')
-        ) {
-            return 'an';
-        }
-
-        return 'a';
-    }
-
-    private static function underline($text, $beg = null, $end = null)
-    {
-        $underlineCharacter = pack("CC", 0xcc, 0xb2);
-
-        $textEnd = strlen($text) - 1;
-
-        $beg = is_null($beg) ? 0 : max($beg, 0);
-        $end = is_null($end) ? $textEnd : min($end, $textEnd);
-
-        $input = json_encode($text);
-        $output = '';
-
-        ++$beg;
-        ++$end;
-
-        for ($i = 0, $length = strlen($input); $i < $length; ++$i) {
-            if (($beg <= $i) && ($i <= $end)) {
-                $output .= $underlineCharacter;
-            }
-
-            $output .= $input[$i];
-        }
-
-        return $output;
     }
 }

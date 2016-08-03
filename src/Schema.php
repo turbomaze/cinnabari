@@ -24,17 +24,10 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\SchemaException;
 
 class Schema
 {
-    // schema errors
-    const ERROR_NO_CLASS = 101;
-    const ERROR_NO_PROPERTY = 102;
-    const ERROR_NO_LIST = 103;
-    const ERROR_NO_VALUE = 104;
-    const ERROR_NO_CONNECTION = 105;
-
     /** @var array */
     private $schema;
 
@@ -49,27 +42,11 @@ class Schema
         $propertyDefinition = &$this->schema['classes'][$class][$property];
 
         if ($classDefinition === null) {
-            $classString = json_encode($class);
-            throw new AbstractException(
-                self::ERROR_NO_CLASS,
-                array(
-                    'class' => $class
-                ),
-                "class {$classString} does not exist."
-            );
+            throw SchemaException::noClass($class);
         }
         
         if ($propertyDefinition === null) {
-            $propertyString = json_encode($property);
-            $classString = json_encode($class);
-            throw new AbstractException(
-                self::ERROR_NO_PROPERTY,
-                array(
-                    'class' => $class,
-                    'property' => $property
-                ),
-                "property {$propertyString} of class {$classString} does not exist."
-            );
+            throw SchemaException::noProperty($class, $property);
         }
 
         $type = reset($propertyDefinition);
@@ -83,14 +60,7 @@ class Schema
         $definition = &$this->schema['lists'][$list];
 
         if ($definition === null) {
-            $listString = json_encode($list);
-            throw new AbstractException(
-                self::ERROR_NO_LIST,
-                array(
-                    'list' => $list
-                ),
-                "list {$listString} does not exist."
-            );
+            throw SchemaException::noList($list);
         }
 
         // array($table, $expression, $hasZero)
@@ -102,16 +72,7 @@ class Schema
         $definition = &$this->schema['values'][$tableIdentifier][$value];
 
         if ($definition === null) {
-            $valueString = json_encode($value);
-            $tableString = json_encode($tableIdentifier);
-            throw new AbstractException(
-                self::ERROR_NO_VALUE,
-                array(
-                    'tableIdentifier' => $tableIdentifier,
-                    'value' => $value
-                ),
-                "value {$valueString} in table {$tableString} does not exist."
-            );
+            throw SchemaException::noValue($value, $tableIdentifier);
         }
 
         // array($expression, $hasZero)
@@ -123,15 +84,7 @@ class Schema
         $definition = &$this->schema['connections'][$tableIdentifier][$connection];
 
         if ($definition === null) {
-            $connectionString = json_encode($tableIdentifier) . '->' . json_encode($connection);
-            throw new AbstractException(
-                self::ERROR_NO_CONNECTION,
-                array(
-                    'tableIdentifier' => $tableIdentifier,
-                    'connection' => $connection
-                ),
-                "{$connectionString} does not exist."
-            );
+            throw SchemaException::noConnection($connection, $tableIdentifier);
         }
 
         return $definition;

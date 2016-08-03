@@ -2,11 +2,13 @@
 
 namespace Datto\Cinnabari\Tests;
 
-use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Compiler;
-use Datto\Cinnabari\Parser;
-use Datto\Cinnabari\Lexer;
+use Datto\Cinnabari\Exception\ArgumentsException;
+use Datto\Cinnabari\Exception\CinnabariException;
+use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
+use Datto\Cinnabari\Lexer;
+use Datto\Cinnabari\Parser;
 use Datto\Cinnabari\Schema;
 use PHPUnit_Framework_TestCase;
 
@@ -805,7 +807,7 @@ EOS;
             $scenario,
             $method,
             $arguments,
-            Arguments::ERROR_WRONG_INPUT_TYPE,
+            ArgumentsException::WRONG_INPUT_TYPE,
             array('name' => 'a', 'userType' => 'string', 'neededType' => 'integer')
         );
     }
@@ -841,7 +843,7 @@ EOS;
             $scenario,
             $method,
             $arguments,
-            Compiler::ERROR_BAD_FILTER_EXPRESSION,
+            CompilerException::BAD_FILTER_EXPRESSION,
             array(
                 'class' => 'Person',
                 'table' => 0,
@@ -1012,7 +1014,7 @@ EOS;
         try {
             self::translate($scenarioJson, $method, $arguments);
             $actual = null;
-        } catch (AbstractException $exception) {
+        } catch (CinnabariException $exception) {
             $actual = array(
                 'code' => $exception->getCode(),
                 'data' => $exception->getData()
