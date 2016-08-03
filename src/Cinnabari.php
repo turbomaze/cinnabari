@@ -43,58 +43,22 @@ class Cinnabari
     // TODO: trim the query string before Cinnabari
     public function translate($query, $arguments)
     {
-        $tokens = self::getTokens($query);
-        $request = self::getRequest($tokens);
-        return self::getResult($this->schema, $request, $arguments);
-    }
-
-    private static function getTokens($query)
-    {
         try {
             $lexer = new Lexer();
-            return $lexer->tokenize($query);
-        } catch (LexerException $exception) {
-            throw new CinnabariException(
-                CinnabariException::LEXER,
-                $exception->getCode(),
-                $exception->getData(),
-                $exception->getMessage()
-            );
-        }
-    }
+            $parser = new Parser();
+            $compiler = new Compiler($this->schema);
 
-    private static function getRequest($tokens)
-    {
-        $parser = new Parser();
-        return $parser->parse($tokens);
-    }
-
-    private static function getResult(Schema $schema, $request, $arguments)
-    {
-        try {
-            $compiler = new Compiler($schema);
+            $tokens = $lexer->tokenize($query);
+            $request = $parser->parse($tokens);
             return $compiler->compile($request, $arguments);
-        } catch (ArgumentsException $exception) {
-            throw new CinnabariException(
-                CinnabariException::ARGUMENTS,
-                $exception->getCode(),
-                $exception->getData(),
-                $exception->getMessage()
-            );
-        } catch (CompilerException $exception) {
-            throw new CinnabariException(
-                CinnabariException::COMPILER,
-                $exception->getCode(),
-                $exception->getData(),
-                $exception->getMessage()
-            );
         } catch (SchemaException $exception) {
-            throw new CinnabariException(
-                CinnabariException::SCHEMA,
-                $exception->getCode(),
-                $exception->getData(),
-                $exception->getMessage()
-            );
+            throw CinnabariException::schema($exception);
+        } catch (LexerException $exception) {
+            throw CinnabariException::lexer($exception);
+        } catch (CompilerException $exception) {
+            throw CinnabariException::compiler($exception);
+        } catch (ArgumentsException $exception) {
+            throw CinnabariException::arguments($exception);
         }
     }
 }

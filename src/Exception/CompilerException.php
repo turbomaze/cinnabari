@@ -43,6 +43,7 @@ class CompilerException extends AbstractException
         $code = self::NO_INITIAL_PROPERTY;
         $data = array('token' => $token);
         $message = 'API requests must begin with a property.';
+
         return new self($code, $data, $message);
     }
 
@@ -51,6 +52,7 @@ class CompilerException extends AbstractException
         $code = self::NO_INITIAL_PATH;
         $data = array('request' => $request);
         $message = 'API requests must begin with a path.';
+
         return new self($code, $data, $message);
     }
 
@@ -59,16 +61,21 @@ class CompilerException extends AbstractException
         $code = self::BAD_SCHEMA;
         $data = array('accessType' => $accessType, 'arguments' => $arguments);
         $message = null;
+
         if ($accessType === 'property') {
             $property = json_encode($arguments[0]);
-            $message = "Schema failed to return a valid property definition for property {$property}.";
+            $message = "Schema failed to return a valid property definition " .
+                "for property {$property}.";
         } elseif ($accessType === 'list') {
             $list = json_encode($arguments[0]);
-            $message = "Schema failed to return a valid list definition for list {$list}.";
+            $message = "Schema failed to return a valid list definition " .
+                "for list {$list}.";
         } else {
             $accessType = json_encode($arguments[0]);
-            $message = "Schema failed to return a valid definition for {$accessType}.";
+            $message = "Schema failed to return a valid definition " .
+                "for {$accessType}.";
         }
+
         return new self($code, $data, $message);
     }
 
@@ -76,7 +83,9 @@ class CompilerException extends AbstractException
     {
         $code = self::INVALID_METHOD_SEQUENCE;
         $data = array('request' => $request);
-        $message = 'API requests must consist of optional filter/sort/slice methods followed by a map.';
+        $message = 'API requests must consist of optional filter/sort/slice ' .
+            'methods followed by a map.';
+
         return new self($code, $data, $message);
     }
 
@@ -84,7 +93,9 @@ class CompilerException extends AbstractException
     {
         $code = self::NO_FILTER_ARGUMENTS;
         $data = array('token' => $token);
-        $message = 'Filter functions take one expression argument, none provided.';
+        $message = "Filter functions take one argument (an expression), " .
+            "but no arguments were provided.";
+
         return new self($code, $data, $message);
     }
 
@@ -97,6 +108,7 @@ class CompilerException extends AbstractException
             'arguments' => $arguments[0]
         );
         $message = 'Malformed expression supplied to the filter function.';
+
         return new self($code, $data, $message);
     }
 
@@ -104,7 +116,9 @@ class CompilerException extends AbstractException
     {
         $code = self::BAD_MAP_ARGUMENT;
         $data = array('request' => $request);
-        $message = 'Map functions take a property, path, object, or function as an argument.';
+        $message = 'Map functions take a property, path, object, ' .
+            'or function as an argument.';
+
         return new self($code, $data, $message);
     }
 
@@ -113,6 +127,7 @@ class CompilerException extends AbstractException
         $code = self::BAD_MAP_ARGUMENT;
         $data = array('token' => $token);
         $message = 'Sort functions take one argument.';
+
         return new self($code, $data, $message);
     }
 
@@ -122,13 +137,16 @@ class CompilerException extends AbstractException
         $data = array('tableId' => $tableId);
         $tableString = json_encode($tableId);
         $message = "Unknown table id {$tableString}.";
+
         return new self($code, $data, $message);
     }
 
     public static function invalidSelect()
     {
         $code = self::INVALID_SELECT;
-        $message = 'SQL queries must reference at least one table and one column.';
+        $message = 'SQL queries must reference at least one table ' .
+            'and one column.';
+
         return new self($code, null, $message);
     }
 
@@ -140,6 +158,7 @@ class CompilerException extends AbstractException
         );
         $typeString = json_encode($type);
         $message = "Failed to typecast unknown type {$typeString}.";
+
         return new self($code, $data, $message);
     }
 }
