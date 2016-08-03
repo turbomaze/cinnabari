@@ -26,25 +26,18 @@ namespace Datto\Cinnabari\Exception;
 
 class CinnabariException extends AbstractException
 {
-    const ARGUMENTS = 1;
-    const COMPILER = 2;
-    const GRAMMAR = 3;
-    const LEXER = 4;
-    const MYSQL = 5;
-    const OUTPUT = 6;
-    const SCHEMA = 7;
+    const LEXER = 1;
+    const PARSER = 2;
+    const COMPILER = 3;
+    const ARGUMENTS = 4;
+    const SCHEMA = 5;
 
-    private $originalCode;
+    private static $multiplier = 100;
 
-    public function __construct($code, $exception)
+    public function __construct($category, $code, $data, $message = null)
     {
-        $this->originalCode = $exception->getCode();
+        $cinnabariCode = self::$multiplier * $category + $code;
             
-        parent::__construct($code, $exception->getData(), $exception->getMessage());
-    }
-
-    public function getOriginalCode()
-    {
-        return $this->originalCode;
+        parent::__construct($cinnabariCode, $data, $message);
     }
 }
