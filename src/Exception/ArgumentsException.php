@@ -32,24 +32,31 @@ class ArgumentsException extends AbstractException
     public static function inputNotProvided($name, $neededType)
     {
         $code = self::INPUT_NOT_PROVIDED;
+
         $data = array('name' => $name, 'neededType' => $neededType);
+
         $nameString = json_encode($name);
         $message = "Input parameter {$nameString} not provided.";
+
         return new self($code, $data, $message);
     }
 
     public static function wrongInputType($name, $userType, $neededType)
     {
         $code = self::INPUT_NOT_PROVIDED;
+
         $data = array(
             'name' => $name,
             'userType' => $userType,
             'neededType' => $neededType
         );
+
         $nameString = json_encode(':' . $name);
         $userTypeString = json_encode($userType);
         $neededTypeString = json_encode($neededType);
-        $message = "{$userTypeString} type provided as {$nameString}, {$neededTypeString} type expected.";
+        $message = "{$userTypeString} type provided as {$nameString}, " .
+            "{$neededTypeString} type expected.";
+
         return new self($code, $data, $message);
     }
 }

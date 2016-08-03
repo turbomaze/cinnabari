@@ -26,18 +26,51 @@ namespace Datto\Cinnabari\Exception;
 
 class CinnabariException extends AbstractException
 {
-    const LEXER = 1;
-    const PARSER = 2;
-    const COMPILER = 3;
-    const ARGUMENTS = 4;
-    const SCHEMA = 5;
+    private static $schema = 1;
+    private static $lexer = 2;
+    private static $compiler = 4;
+    private static $arguments = 5;
 
     private static $multiplier = 100;
 
-    public function __construct($category, $code, $data, $message = null)
+    public static function schema(SchemaException $exception)
     {
-        $cinnabariCode = self::$multiplier * $category + $code;
-            
-        parent::__construct($cinnabariCode, $data, $message);
+        $code = self::getUniversalCode(self::$schema, $exception->getCode());
+        $data = $exception->getData();
+        $message = $exception->getMessage();
+
+        return new self($code, $data, $message);
+    }
+
+    public static function lexer(LexerException $exception)
+    {
+        $code = self::getUniversalCode(self::$lexer, $exception->getCode());
+        $data = $exception->getData();
+        $message = $exception->getMessage();
+
+        return new self($code, $data, $message);
+    }
+
+    public static function compiler(CompilerException $exception)
+    {
+        $code = self::getUniversalCode(self::$compiler, $exception->getCode());
+        $data = $exception->getData();
+        $message = $exception->getMessage();
+
+        return new self($code, $data, $message);
+    }
+
+    public static function arguments(ArgumentsException $exception)
+    {
+        $code = self::getUniversalCode(self::$arguments, $exception->getCode());
+        $data = $exception->getData();
+        $message = $exception->getMessage();
+
+        return new self($code, $data, $message);
+    }
+
+    private static function getUniversalCode($category, $exception)
+    {
+        return (self::$multiplier * $category) + $exception;
     }
 }

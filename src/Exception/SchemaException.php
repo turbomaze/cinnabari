@@ -39,6 +39,7 @@ class SchemaException extends AbstractException
         $data = array('class' => $class);
         $classString = json_encode($class);
         $message = "Class {$classString} does not exist.";
+
         return new self($code, $data, $message);
     }
 
@@ -49,6 +50,7 @@ class SchemaException extends AbstractException
         $classString = json_encode($class);
         $propertyString = json_encode($property);
         $message = "Property {$propertyString} of class {$classString} does not exist.";
+
         return new self($code, $data, $message);
     }
 
@@ -58,6 +60,7 @@ class SchemaException extends AbstractException
         $data = array('list' => $list);
         $listString = json_encode($list);
         $message = "List {$listString} does not exist.";
+
         return new self($code, $data, $message);
     }
 
@@ -68,6 +71,7 @@ class SchemaException extends AbstractException
         $valueString = json_encode($value);
         $tableString = json_encode($tableId);
         $message = "Value {$valueString} of table {$tableString} does not exist.";
+
         return new self($code, $data, $message);
     }
 
@@ -77,6 +81,7 @@ class SchemaException extends AbstractException
         $data = array('connection' => $connection, 'tableIdentifier' => $tableId);
         $connectionString = json_encode($connection);
         $message = "Connection {$connectionString} does not exist.";
+
         return new self($code, $data, $message);
     }
 }
