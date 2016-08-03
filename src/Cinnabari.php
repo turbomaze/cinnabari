@@ -54,7 +54,12 @@ class Cinnabari
             $lexer = new Lexer();
             return $lexer->tokenize($query);
         } catch (LexerException $exception) {
-            throw new CinnabariException(CinnabariException::LEXER, $exception);
+            throw new CinnabariException(
+                CinnabariException::LEXER,
+                $exception->getCode(),
+                $exception->getData(),
+                $exception->getMessage()
+            );
         }
     }
 
@@ -70,11 +75,26 @@ class Cinnabari
             $compiler = new Compiler($schema);
             return $compiler->compile($request, $arguments);
         } catch (ArgumentsException $exception) {
-            throw new CinnabariException(CinnabariException::ARGUMENTS, $exception);
+            throw new CinnabariException(
+                CinnabariException::ARGUMENTS,
+                $exception->getCode(),
+                $exception->getData(),
+                $exception->getMessage()
+            );
         } catch (CompilerException $exception) {
-            throw new CinnabariException(CinnabariException::COMPILER, $exception);
+            throw new CinnabariException(
+                CinnabariException::COMPILER,
+                $exception->getCode(),
+                $exception->getData(),
+                $exception->getMessage()
+            );
         } catch (SchemaException $exception) {
-            throw new CinnabariException(CinnabariException::SCHEMA, $exception);
+            throw new CinnabariException(
+                CinnabariException::SCHEMA,
+                $exception->getCode(),
+                $exception->getData(),
+                $exception->getMessage()
+            );
         }
     }
 }
