@@ -975,18 +975,27 @@ class Compiler
             case 'minus':
             case 'times':
             case 'divides':
-                if (!$this->getExpression($this->class, $this->table,
-                    $this->request, $expression, $type)
-                ) {
+                if (!$this->getExpression(
+                    $this->class,
+                    $this->table,
+                    $this->request,
+                    $expression,
+                    $type
+                )) {
                     return false;
                 }
 
                 /** @var AbstractExpression $expression */
-                $columnId = $this->mysql->addExpression($this->table,
-                    $expression->getMysql());
+                $columnId = $this->mysql->addExpression(
+                    $this->table,
+                    $expression->getMysql()
+                );
                 $nullable = true; // TODO
-                $this->phpOutput = Output::getValue($columnId, $nullable,
-                    $type);
+                $this->phpOutput = Output::getValue(
+                    $columnId,
+                    $nullable,
+                    $type
+                );
 
                 return true;
 
