@@ -24,7 +24,7 @@
 
 namespace Datto\Cinnabari\Mysql;
 
-use Datto\Cinnabari\Exception\MysqlException;
+use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 class Select
@@ -77,7 +77,7 @@ class Select
     public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $type)
     {
         if (!self::isDefined($this->tables, $tableAId)) {
-            throw MysqlException::badTableId($tableAId);
+            throw CompilerException::badTableId($tableAId);
         }
 
         $tableIdentifierA = self::getIdentifier($tableAId);
@@ -95,7 +95,7 @@ class Select
     public function setOrderBy($tableId, $column, $isAscending)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            throw MysqlException::badTableId($tableId);
+            throw CompilerException::badTableId($tableId);
         }
 
         $table = self::getIdentifier($tableId);
@@ -129,7 +129,7 @@ class Select
     public function addValue($tableId, $column)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            throw MysqlException::badTableId($tableId);
+            throw CompilerException::badTableId($tableId);
         }
 
         $table = self::getIdentifier($tableId);
@@ -150,7 +150,7 @@ class Select
     public function getMysql()
     {
         if (!$this->isValid()) {
-            throw MysqlException::invalidSelect();
+            throw CompilerException::invalidSelect();
         }
 
         $mysql = $this->getColumns() .
@@ -167,7 +167,7 @@ class Select
         $name = array_search($id, $this->tables, true);
 
         if (!is_string($name)) {
-            throw MysqlException::badTableId($id);
+            throw CompilerException::badTableId($id);
         }
 
         if (0 < $id) {

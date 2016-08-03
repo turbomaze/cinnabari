@@ -2,7 +2,7 @@
 
 namespace Datto\Cinnabari\Php;
 
-use Datto\Cinnabari\OutputException;
+use Datto\Cinnabari\CompilerException;
 
 class Output
 {
@@ -114,7 +114,7 @@ class Output
                 return '';
 
             default:
-                throw OutputException::unknownTypecast($type);
+                throw CompilerException::unknownTypecast($type);
         }
     }
 

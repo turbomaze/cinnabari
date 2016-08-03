@@ -34,6 +34,9 @@ class CompilerException extends AbstractException
     const NO_SORT_ARGUMENTS = 6;
     const BAD_MAP_ARGUMENT = 7;
     const BAD_SCHEMA = 8;
+    const BAD_TABLE_ID = 9;
+    const INVALID_SELECT = 10;
+    const UNKNOWN_TYPECAST = 11;
 
     public static function noInitialProperty($token)
     {
@@ -110,6 +113,33 @@ class CompilerException extends AbstractException
         $code = self::BAD_MAP_ARGUMENT;
         $data = array('token' => $token);
         $message = 'Sort functions take one argument.';
+        return new self($code, $data, $message);
+    }
+
+    public static function badTableId($tableId)
+    {
+        $code = self::BAD_TABLE_ID;
+        $data = array('tableId' => $tableId);
+        $tableString = json_encode($tableId);
+        $message = "Unknown table id {$tableString}.";
+        return new self($code, $data, $message);
+    }
+
+    public static function invalidSelect()
+    {
+        $code = self::INVALID_SELECT;
+        $message = 'SQL queries must reference at least one table and one column.';
+        return new self($code, null, $message);
+    }
+
+    public static function unknownTypecast($type)
+    {
+        $code = self::UNKNOWN_TYPECAST;
+        $data = array(
+            'type' => $type,
+        );
+        $typeString = json_encode($type);
+        $message = "Failed to typecast unknown type {$typeString}.";
         return new self($code, $data, $message);
     }
 }

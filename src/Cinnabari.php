@@ -28,8 +28,6 @@ use Datto\Cinnabari\Exception\ArgumentsException;
 use Datto\Cinnabari\Exception\CinnabariException;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Exception\LexerException;
-use Datto\Cinnabari\Exception\MysqlException;
-use Datto\Cinnabari\Exception\OutputException;
 use Datto\Cinnabari\Exception\SchemaException;
 
 class Cinnabari
@@ -75,10 +73,6 @@ class Cinnabari
             throw new CinnabariException(CinnabariException::ARGUMENTS, $exception);
         } catch (CompilerException $exception) {
             throw new CinnabariException(CinnabariException::COMPILER, $exception);
-        } catch (MysqlException $exception) {
-            throw new CinnabariException(CinnabariException::MYSQL, $exception);
-        } catch (OutputException $exception) {
-            throw new CinnabariException(CinnabariException::OUTPUT, $exception);
         } catch (SchemaException $exception) {
             throw new CinnabariException(CinnabariException::SCHEMA, $exception);
         }
