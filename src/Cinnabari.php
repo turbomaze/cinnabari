@@ -30,10 +30,10 @@ class Cinnabari
 {
     const ERROR_SYNTAX = 1;
 
-    /** @var Schema */
+    /** @var array */
     private $schema;
 
-    public function __construct(Schema $schema)
+    public function __construct($schema)
     {
         $this->schema = $schema;
     }
@@ -44,9 +44,11 @@ class Cinnabari
         try {
             $tokens = self::getTokens($query);
             $request = self::getRequest($tokens);
+            $translatedRequest = self::getTranslatedRequest($this->schema, $request);
 
-            return self::getResult($this->schema, $request, $arguments);
+            return self::getResult($translatedRequest, $arguments);
         } catch (AbstractException $exception) {
+            throw $exception;
             return false;
         }
     }
@@ -69,10 +71,16 @@ class Cinnabari
         return $parser->parse($tokens);
     }
 
-    private static function getResult(Schema $schema, $request, $arguments)
+    private static function getTranslatedRequest($schema, $request)
     {
-        $compiler = new Compiler($schema);
-        return $compiler->compile($request, $arguments);
+        $translator = new Translator($schema);
+        return $translator->translate($request);
+    }
+
+    private static function getResult($translatedRequest, $arguments)
+    {
+        $compiler = new Compiler();
+        return $compiler->compile($translatedRequest, $arguments);
     }
 
     private static function errorSyntax($query, $position)

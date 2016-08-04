@@ -83,27 +83,23 @@ class Compiler
     private $phpOutput;
 
     /** @var string */
-    private $class;
+    private $context;
 
-    /** @var int */
-    private $table;
-
-    public function __construct(Schema $schema)
+    public function compile($translatedRequest, $arguments)
     {
-        $this->schema = $schema;
-    }
-
-    public function compile($request, $arguments)
-    {
-        $this->request = $request;
+        $this->request = $translatedRequest;
 
         $this->mysql = new Select();
         $this->arguments = new Arguments($arguments);
         $this->phpOutput = null;
 
-        if (!$this->getArrayProperty()) {
+        if (!$this->enterTable($idAlias, $hasZero)) {
             return null;
         }
+
+        $this->getFunctionSequence();
+
+        $this->phpOutput = Output::getList($idAlias, $hasZero, true, $this->phpOutput);
 
         $mysql = $this->mysql->getMysql();
 
@@ -116,60 +112,20 @@ class Compiler
         return array($mysql, $formatInput, $this->phpOutput);
     }
 
-    private function getArrayProperty()
+    private function enterTable(&$idAlias, &$hasZero)
     {
-        if (!self::scanPath($this->request, $this->request)) {
-            throw new AbstractException(
-                self::ERROR_NO_INITIAL_PATH,
-                array('request' => $this->request),
-                "API requests must begin with a path."
-            );
-        }
+        $firstElement = array_shift($this->request);
+        list($tokenType, $token) = each($firstElement);
 
-        $token = array_shift($this->request);
+        $this->context = $this->mysql->setTable($token['table']);
+        $idAlias = $this->mysql->addValue($this->context, $token['id']);
+        $hasZero = $token['hasZero'];
 
-        if (!self::scanProperty($token, $array)) {
-            throw new AbstractException(
-                self::ERROR_NO_INITIAL_PROPERTY,
-                array('token' => $token),
-                "API requests must begin with a property."
-            );
-        }
+        return true;
+    }
 
-        list($class, $path) = $this->schema->getPropertyDefinition('Database', $array);
-
-        if (!isset($class, $path)) {
-            throw new AbstractException(
-                self::ERROR_BAD_SCHEMA,
-                array(
-                    'accessType' => 'property',
-                    'arguments' => array($array)
-                ),
-                "schema failed to return a proper property definition."
-            );
-        }
-
-        $list = array_pop($path);
-
-        list($table, $id, $hasZero) = $this->schema->getListDefinition($list);
-
-        if (!isset($table, $id, $hasZero)) {
-            throw new AbstractException(
-                self::ERROR_BAD_SCHEMA,
-                array(
-                    'accessType' => 'list',
-                    'arguments' => array($list)
-                ),
-                "schema failed to return a proper list definition."
-            );
-        }
-
-        $this->class = $class;
-        $this->table = $this->mysql->setTable($table);
-
-        $idAlias = $this->mysql->addValue($this->table, $id);
-        $this->connections($this->table, $table, $path);
-
+    private function getFunctionSequence()
+    {
         $this->getOptionalFilterFunction();
         $this->getOptionalSortFunction();
         $this->getOptionalSliceFunction();
@@ -184,15 +140,12 @@ class Compiler
             );
         }
 
-        $this->phpOutput = Output::getList($idAlias, $hasZero, true, $this->phpOutput);
         return true;
     }
 
     private function getOptionalFilterFunction()
     {
-        $token = current($this->request);
-
-        if (!self::scanFunction($token, $name, $arguments)) {
+        if (!self::scanFunction(reset($this->request), $name, $arguments)) {
             return false;
         }
 
@@ -209,12 +162,12 @@ class Compiler
             );
         }
 
-        if (!$this->getExpression($this->class, $this->table, $arguments[0], $where, $type)) {
+        // TODO: throw exception for bad filters
+        if (!$this->getBooleanExpression($arguments[0], $where)) {
             throw new AbstractException(
                 self::ERROR_BAD_FILTER_EXPRESSION,
                 array(
-                    'class' => $this->class,
-                    'table' => $this->table,
+                    'context' => $this->context,
                     'arguments' => $arguments[0]
                 ),
                 "malformed expression supplied to the filter function."
@@ -224,67 +177,42 @@ class Compiler
         $this->mysql->setWhere($where);
 
         array_shift($this->request);
+
         return true;
     }
 
-    private function getExpression($class, $tableId, $token, &$expression, &$type)
+    private function getExpression($arrayToken, &$expression, &$type)
     {
-        return $this->getBooleanExpression($class, $tableId, $token, $expression)
-            || $this->getNumericExpression($class, $tableId, $token, $expression, $type)
-            || $this->getStringExpression($class, $tableId, $token, $expression);
+        return $this->getBooleanExpression($arrayToken, $expression)
+            || $this->getNumericExpression($arrayToken, $expression, $type)
+            || $this->getStringExpression($arrayToken, $expression);
     }
 
-    private function getBooleanExpression($class, $tableId, $token, &$output)
+    private function getBooleanExpression($arrayToken, &$output)
     {
-        list($type, $name) = $token;
+        $firstElement = reset($arrayToken);
+        list($tokenType, $token) = each($firstElement);
 
-        switch ($type) {
-            case Parser::TYPE_PATH:
-                $tokens = array_slice($token, 1);
-                return $this->getBooleanPath($class, $tableId, $tokens, $output);
+        switch ($tokenType) {
+            case Translator::TYPE_JOIN:
+                $this->handleJoin($token, $output);
+                array_shift($arrayToken);
+                return $this->getBooleanExpression($arrayToken, $output);
 
-            case Parser::TYPE_PARAMETER:
-                return $this->getBooleanParameter($name, $output);
+            case Translator::TYPE_PARAMETER:
+                return $this->getBooleanParameter($token, $output);
 
-            case Parser::TYPE_PROPERTY:
-                return $this->getBooleanProperty($class, $tableId, $name, $output);
+            case Translator::TYPE_VALUE:
+                return $this->getBooleanProperty($token, $output);
 
-            case Parser::TYPE_FUNCTION:
-                $arguments = array_slice($token, 2);
-                return $this->getBooleanFunction($class, $tableId, $name, $arguments, $output);
+            case Translator::TYPE_FUNCTION:
+                $name = $token['function'];
+                $arguments = $token['arguments'];
+                return $this->getBooleanFunction($name, $arguments, $output);
 
             default:
                 return false;
         }
-    }
-
-    private function getBooleanPath($class, $tableId, $tokens, &$output)
-    {
-        $token = reset($tokens);
-
-        if (!self::scanProperty($token, $property)) {
-            return false;
-        }
-
-        array_shift($tokens);
-
-        list($class, $path) = $this->schema->getPropertyDefinition($class, $property);
-
-        if (!isset($class, $path)) {
-            return false;
-        }
-
-        $tableIdentifier = $this->mysql->getTable($tableId);
-        $this->connections($tableId, $tableIdentifier, $path);
-
-        if (count($tokens) === 1) {
-            $request = array_shift($tokens);
-        } else {
-            array_unshift($tokens, Parser::TYPE_PATH);
-            $request = $tokens;
-        }
-
-        return $this->getBooleanExpression($class, $tableId, $request, $output);
     }
 
     private function getBooleanParameter($name, &$output)
@@ -317,35 +245,35 @@ class Compiler
         return true;
     }
 
-    private function getBooleanProperty($class, $tableId, $name, &$output)
+    private function getBooleanProperty($propertyToken, &$output)
     {
-        return $this->getProperty($class, $tableId, $name, Output::TYPE_BOOLEAN, $output);
+        return $this->getProperty($propertyToken, Output::TYPE_BOOLEAN, $output);
     }
 
-    private function getBooleanFunction($class, $tableId, $name, $arguments, &$output)
+    private function getBooleanFunction($name, $arguments, &$output)
     {
         $countArguments = count($arguments);
 
         if ($countArguments === 1) {
             $argument = current($arguments);
-            return $this->getBooleanUnaryFunction($class, $tableId, $name, $argument, $output);
+            return $this->getBooleanUnaryFunction($name, $argument, $output);
         }
 
         if ($countArguments === 2) {
             list($argumentA, $argumentB) = $arguments;
-            return $this->getBooleanBinaryFunction($class, $tableId, $name, $argumentA, $argumentB, $output);
+            return $this->getBooleanBinaryFunction($name, $argumentA, $argumentB, $output);
         }
 
         return false;
     }
 
-    private function getBooleanUnaryFunction($class, $tableId, $name, $argument, &$expression)
+    private function getBooleanUnaryFunction($name, $argument, &$expression)
     {
         if ($name !== 'not') {
             return false;
         }
 
-        if (!$this->getBooleanExpression($class, $tableId, $argument, $childExpression)) {
+        if (!$this->getBooleanExpression($argument, $childExpression)) {
             return false;
         }
 
@@ -353,53 +281,53 @@ class Compiler
         return true;
     }
 
-    private function getBooleanBinaryFunction($class, $tableId, $name, $argumentA, $argumentB, &$expression)
+    private function getBooleanBinaryFunction($name, $argumentA, $argumentB, &$expression)
     {
         switch ($name) {
             case 'equal':
-                return $this->getEqualFunction($class, $tableId, $argumentA, $argumentB, $expression);
+                return $this->getEqualFunction($argumentA, $argumentB, $expression);
 
             case 'and':
-                return $this->getAndFunction($class, $tableId, $argumentA, $argumentB, $expression);
+                return $this->getAndFunction($argumentA, $argumentB, $expression);
 
             case 'or':
-                return $this->getOrFunction($class, $tableId, $argumentA, $argumentB, $expression);
+                return $this->getOrFunction($argumentA, $argumentB, $expression);
 
             case 'notEqual':
-                return $this->getNotEqualFunction($class, $tableId, $argumentA, $argumentB, $expression);
+                return $this->getNotEqualFunction($argumentA, $argumentB, $expression);
 
             case 'less':
-                return $this->getLessFunction($class, $tableId, $argumentA, $argumentB, $expression);
+                return $this->getLessFunction($argumentA, $argumentB, $expression);
 
             case 'lessEqual':
-                return $this->getLessEqualFunction($class, $tableId, $argumentA, $argumentB, $expression);
+                return $this->getLessEqualFunction($argumentA, $argumentB, $expression);
 
             case 'greater':
-                return $this->getGreaterFunction($class, $tableId, $argumentA, $argumentB, $expression);
+                return $this->getGreaterFunction($argumentA, $argumentB, $expression);
 
             case 'greaterEqual':
-                return $this->getGreaterEqualFunction($class, $tableId, $argumentA, $argumentB, $expression);
+                return $this->getGreaterEqualFunction($argumentA, $argumentB, $expression);
 
             case 'match':
-                return $this->getMatchFunction($class, $tableId, $argumentA, $argumentB, $expression);
+                return $this->getMatchFunction($argumentA, $argumentB, $expression);
 
             default:
                 return false;
         }
     }
 
-    private function getEqualFunction($class, $tableId, $argumentA, $argumentB, &$expression)
+    private function getEqualFunction($argumentA, $argumentB, &$expression)
     {
         if (
             (
-                $this->getBooleanExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getBooleanExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getBooleanExpression($argumentA, $expressionA) &&
+                $this->getBooleanExpression($argumentB, $expressionB)
             ) || (
-                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) &&
-                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
+                $this->getNumericExpression($argumentA, $expressionA, $typeA) &&
+                $this->getNumericExpression($argumentB, $expressionB, $typeB)
             ) || (
-                $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getStringExpression($argumentA, $expressionA) &&
+                $this->getStringExpression($argumentB, $expressionB)
             )
         ) {
             $expression = new OperatorEqual($expressionA, $expressionB);
@@ -409,11 +337,11 @@ class Compiler
         return false;
     }
 
-    private function getAndFunction($class, $tableId, $argumentA, $argumentB, &$expression)
+    private function getAndFunction($argumentA, $argumentB, &$expression)
     {
         if (
-            !$this->getBooleanExpression($class, $tableId, $argumentA, $outputA) ||
-            !$this->getBooleanExpression($class, $tableId, $argumentB, $outputB)
+            !$this->getBooleanExpression($argumentA, $outputA) ||
+            !$this->getBooleanExpression($argumentB, $outputB)
         ) {
             return false;
         }
@@ -422,11 +350,11 @@ class Compiler
         return true;
     }
 
-    private function getOrFunction($class, $tableId, $argumentA, $argumentB, &$expression)
+    private function getOrFunction($argumentA, $argumentB, &$expression)
     {
         if (
-            !$this->getBooleanExpression($class, $tableId, $argumentA, $outputA) ||
-            !$this->getBooleanExpression($class, $tableId, $argumentB, $outputB)
+            !$this->getBooleanExpression($argumentA, $outputA) ||
+            !$this->getBooleanExpression($argumentB, $outputB)
         ) {
             return false;
         }
@@ -435,9 +363,9 @@ class Compiler
         return true;
     }
 
-    private function getNotEqualFunction($class, $tableId, $argumentA, $argumentB, &$expression)
+    private function getNotEqualFunction($argumentA, $argumentB, &$expression)
     {
-        if (!$this->getEqualFunction($class, $tableId, $argumentA, $argumentB, $equalExpression)) {
+        if (!$this->getEqualFunction($argumentA, $argumentB, $equalExpression)) {
             return false;
         }
 
@@ -445,15 +373,15 @@ class Compiler
         return true;
     }
 
-    private function getLessFunction($class, $tableId, $argumentA, $argumentB, &$expression)
+    private function getLessFunction($argumentA, $argumentB, &$expression)
     {
         if (
             (
-                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) &&
-                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
+                $this->getNumericExpression($argumentA, $expressionA, $typeA) &&
+                $this->getNumericExpression($argumentB, $expressionB, $typeB)
             ) || (
-                $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getStringExpression($argumentA, $expressionA) &&
+                $this->getStringExpression($argumentB, $expressionB)
             )
         ) {
             $expression = new OperatorLess($expressionA, $expressionB);
@@ -463,15 +391,15 @@ class Compiler
         return false;
     }
 
-    private function getLessEqualFunction($class, $tableId, $argumentA, $argumentB, &$expression)
+    private function getLessEqualFunction($argumentA, $argumentB, &$expression)
     {
         if (
             (
-                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) &&
-                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
+                $this->getNumericExpression($argumentA, $expressionA, $typeA) &&
+                $this->getNumericExpression($argumentB, $expressionB, $typeB)
             ) || (
-                $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getStringExpression($argumentA, $expressionA) &&
+                $this->getStringExpression($argumentB, $expressionB)
             )
         ) {
             $expression = new OperatorLessEqual($expressionA, $expressionB);
@@ -481,15 +409,15 @@ class Compiler
         return false;
     }
 
-    private function getGreaterFunction($class, $tableId, $argumentA, $argumentB, &$expression)
+    private function getGreaterFunction($argumentA, $argumentB, &$expression)
     {
         if (
             (
-                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) &&
-                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
+                $this->getNumericExpression($argumentA, $expressionA, $typeA) &&
+                $this->getNumericExpression($argumentB, $expressionB, $typeB)
             ) || (
-                $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getStringExpression($argumentA, $expressionA) &&
+                $this->getStringExpression($argumentB, $expressionB)
             )
         ) {
             $expression = new OperatorGreater($expressionA, $expressionB);
@@ -499,15 +427,15 @@ class Compiler
         return false;
     }
 
-    private function getGreaterEqualFunction($class, $tableId, $argumentA, $argumentB, &$expression)
+    private function getGreaterEqualFunction($argumentA, $argumentB, &$expression)
     {
         if (
             (
-                $this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) &&
-                $this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
+                $this->getNumericExpression($argumentA, $expressionA, $typeA) &&
+                $this->getNumericExpression($argumentB, $expressionB, $typeB)
             ) || (
-                $this->getStringExpression($class, $tableId, $argumentA, $expressionA) &&
-                $this->getStringExpression($class, $tableId, $argumentB, $expressionB)
+                $this->getStringExpression($argumentA, $expressionA) &&
+                $this->getStringExpression($argumentB, $expressionB)
             )
         ) {
             $expression = new OperatorGreaterEqual($expressionA, $expressionB);
@@ -517,89 +445,72 @@ class Compiler
         return false;
     }
 
-    private function getMatchFunction($class, $tableId, $property, $pattern, &$expression)
+    private function getMatchFunction($property, $pattern, &$expression)
     {
         if (!isset($property) || count($property) < 2) {
             return false;
         }
-        
-        if ($property[0] === Parser::TYPE_PATH) {
-            $tokens = array_slice($property, 1);
-            if (!$this->getStringPath($class, $tableId, $tokens, $argumentExpression, Parser::TYPE_PROPERTY)) {
-                return false;
-            }
-        } else {
-            if (!$this->getStringProperty($class, $tableId, $property[1], $argumentExpression)) {
-                return false;
-            }
+
+        $state = $this->context;
+
+        $property = $this->followJoins($property);
+        $firstElementProperty = reset($property);
+        list($tokenTypeA, $propertyToken) = each($firstElementProperty);
+        if ($tokenTypeA !== Translator::TYPE_VALUE) {
+            $this->context = $state;
+            return false;
         }
 
-        if (($pattern[0] !== Parser::TYPE_PARAMETER) || !$this->getStringParameter($pattern[1], $patternExpression)) {
+        $firstElementPattern = reset($pattern);
+        list($tokenTypeB, $name) = each($firstElementPattern);
+        if ($tokenTypeB !== Translator::TYPE_PARAMETER) {
+            $this->context = $state;
+            return false;
+        }
+
+        if (
+            !$this->getStringProperty($propertyToken, $argumentExpression) ||
+            !$this->getStringParameter($name, $patternExpression)
+        ) {
+            $this->context = $state;
             return false;
         }
 
         $expression = new OperatorRegexpBinary($argumentExpression, $patternExpression);
+        $this->context = $state;
         return true;
     }
 
-    private function getNumericExpression($class, $tableId, $token, &$output, &$type)
+    private function getNumericExpression($arrayToken, &$output, &$type)
     {
-        $type = $token[0];
+        $firstElement = reset($arrayToken);
+        list($tokenType, $token) = each($firstElement);
 
-        switch ($type) {
-            case Parser::TYPE_PATH:
-                $tokens = array_slice($token, 1);
-                return $this->getNumericPath($class, $tableId, $tokens, $output, $type);
+        switch ($tokenType) {
+            case Translator::TYPE_JOIN:
+                $this->handleJoin($token, $output);
+                array_shift($arrayToken);
+                return $this->getNumericExpression($arrayToken, $output, $type);
 
-            case Parser::TYPE_PARAMETER:
-                return $this->getNumericParameter($token[1], $output, $type);
+            case Translator::TYPE_PARAMETER:
+                return $this->getNumericParameter($token, $output, $type);
 
-            case Parser::TYPE_PROPERTY:
-                return $this->getNumericProperty($class, $tableId, $token[1], $output, $type);
+            case Translator::TYPE_VALUE:
+                return $this->getNumericProperty($token, $output, $type);
 
-            case Parser::TYPE_FUNCTION:
-                if (!self::scanFunction($token, $name, $arguments)) {
-                    return false;
-                }
+            case Translator::TYPE_FUNCTION:
+                $name = $token['function'];
+                $arguments = $token['arguments'];
 
                 if (count($arguments) < 2) {
                     return false;
                 }
 
-                return $this->getNumericBinaryFunction($class, $tableId, $name, $arguments[0], $arguments[1], $output, $type);
+                return $this->getNumericBinaryFunction($name, $arguments[0], $arguments[1], $output, $type);
 
             default:
                 return false;
         }
-    }
-
-    private function getNumericPath($class, $tableId, $tokens, &$output, &$type)
-    {
-        $token = reset($tokens);
-
-        if (!self::scanProperty($token, $property)) {
-            return false;
-        }
-
-        array_shift($tokens);
-
-        list($class, $path) = $this->schema->getPropertyDefinition($class, $property);
-
-        if (!isset($class, $path)) {
-            return false;
-        }
-
-        $tableIdentifier = $this->mysql->getTable($tableId);
-        $this->connections($tableId, $tableIdentifier, $path);
-
-        if (count($tokens) === 1) {
-            $request = array_shift($tokens);
-        } else {
-            array_unshift($tokens, Parser::TYPE_PATH);
-            $request = $tokens;
-        }
-
-        return $this->getNumericExpression($class, $tableId, $request, $output, $type);
     }
 
     private function getNumericParameter($name, &$output, &$type)
@@ -615,12 +526,12 @@ class Compiler
         }
     }
 
-    private function getNumericProperty($class, $tableId, $name, &$output, &$type)
+    private function getNumericProperty($propertyToken, &$output, &$type)
     {
-        if ($this->getProperty($class, $tableId, $name, Output::TYPE_INTEGER, $output)) {
+        if ($this->getProperty($propertyToken, Output::TYPE_INTEGER, $output)) {
             $type = Output::TYPE_INTEGER;
             return true;
-        } elseif ($this->getProperty($class, $tableId, $name, Output::TYPE_FLOAT, $output)) {
+        } elseif ($this->getProperty($propertyToken, Output::TYPE_FLOAT, $output)) {
             $type = Output::TYPE_FLOAT;
             return true;
         } else {
@@ -628,11 +539,11 @@ class Compiler
         }
     }
 
-    private function getNumericBinaryFunction($class, $tableId, $name, $argumentA, $argumentB, &$expression, &$type)
+    private function getNumericBinaryFunction($name, $argumentA, $argumentB, &$expression, &$type)
     {
         if (
-            !$this->getNumericExpression($class, $tableId, $argumentA, $expressionA, $typeA) ||
-            !$this->getNumericExpression($class, $tableId, $argumentB, $expressionB, $typeB)
+            !$this->getNumericExpression($argumentA, $expressionA, $typeA) ||
+            !$this->getNumericExpression($argumentB, $expressionB, $typeB)
         ) {
             return false;
         }
@@ -674,7 +585,7 @@ class Compiler
         }
     }
 
-    private function getStringPropertyExpression($class, $tableId, $token, &$output)
+    private function getStringPropertyExpression($token, &$output)
     {
         if (count($token) < 2) {
             return false;
@@ -683,72 +594,33 @@ class Compiler
         $type = $token[0];
 
         switch ($type) {
-            case Parser::TYPE_PATH:
-                $tokens = array_slice($token, 1);
-                return $this->getStringPath($class, $tableId, $tokens, $output, Parser::TYPE_PROPERTY);
-
             case Parser::TYPE_PROPERTY:
-                return $this->getStringProperty($class, $tableId, $token[1], $output);
+                return $this->getStringProperty($token[1], $output);
 
             default:
                 return false;
         }
     }
 
-    private function getStringExpression($class, $tableId, $token, &$output)
+    private function getStringExpression($arrayToken, &$output)
     {
-        if (count($token) < 2) {
-            return false;
-        }
+        $firstElement = reset($arrayToken);
+        list($tokenType, $token) = each($firstElement);
 
-        $type = $token[0];
+        switch ($tokenType) {
+            case Translator::TYPE_JOIN:
+                $this->handleJoin($token, $output);
+                array_shift($arrayToken);
+                return $this->getStringExpression($arrayToken, $output);
 
-        switch ($type) {
-            case Parser::TYPE_PATH:
-                $tokens = array_slice($token, 1);
-                return $this->getStringPath($class, $tableId, $tokens, $output);
+            case Translator::TYPE_PARAMETER:
+                return $this->getStringParameter($token, $output);
 
-            case Parser::TYPE_PARAMETER:
-                return $this->getStringParameter($token[1], $output);
-
-            case Parser::TYPE_PROPERTY:
-                return $this->getStringProperty($class, $tableId, $token[1], $output);
+            case Translator::TYPE_VALUE:
+                return $this->getStringProperty($token, $output);
 
             default:
                 return false;
-        }
-    }
-
-    private function getStringPath($class, $tableId, $tokens, &$output, $type = null)
-    {
-        $token = reset($tokens);
-
-        if (!self::scanProperty($token, $property)) {
-            return false;
-        }
-
-        array_shift($tokens);
-
-        list($class, $path) = $this->schema->getPropertyDefinition($class, $property);
-
-        if (!isset($class, $path)) {
-            return false;
-        }
-
-        $tableIdentifier = $this->mysql->getTable($tableId);
-        $this->connections($tableId, $tableIdentifier, $path);
-
-        if (count($tokens) === 1) {
-            $request = array_shift($tokens);
-        } else {
-            array_unshift($tokens, Parser::TYPE_PATH);
-            $request = $tokens;
-        }
-
-        if ($type === Parser::TYPE_PROPERTY) {
-            return $this->getStringPropertyExpression($class, $tableId, $request, $output);
-        } else {
-            return $this->getStringExpression($class, $tableId, $request, $output);
         }
     }
 
@@ -757,35 +629,21 @@ class Compiler
         return $this->getParameter($name, 'string', $output);
     }
 
-    private function getStringProperty($class, $tableId, $name, &$output)
+    private function getStringProperty($propertyToken, &$output)
     {
-        return $this->getProperty($class, $tableId, $name, Output::TYPE_STRING, $output);
+        return $this->getProperty($propertyToken, Output::TYPE_STRING, $output);
     }
 
-    private function getProperty($class, $tableId, $name, $neededType, &$output)
+    private function getProperty($propertyToken, $neededType, &$output)
     {
-        $tableIdentifier = $this->mysql->getTable($tableId);
-
-        list($actualType, $path) = $this->schema->getPropertyDefinition($class, $name);
-
-        if (!isset($actualType, $path)) {
-            return false;
-        }
+        $actualType = $propertyToken['type'];
+        $column = $propertyToken['expression'];
 
         if ($neededType !== $actualType) {
             return false;
         }
 
-        $value = array_pop($path);
-
-        list($column, ) = $this->schema->getValueDefinition($tableIdentifier, $value);
-
-        if (!isset($column)) {
-            return false;
-        }
-
-        $this->connections($tableId, $tableIdentifier, $path);
-
+        $tableId = $this->context;
         $tableAliasIdentifier = "`{$tableId}`";
         $columnExpression = Select::getAbsoluteExpression($tableAliasIdentifier, $column);
         $output = new Column($columnExpression);
@@ -793,45 +651,28 @@ class Compiler
         return true;
     }
 
-    private function readExpressionAndGetTail(&$tailProperty)
-    {
-        $token = $this->request;
-
-        $type = $token[0];
-
-        switch ($type) {
-            case Parser::TYPE_PATH:
-                return $this->readPathAndGetTail($tailProperty);
-
-            case Parser::TYPE_PROPERTY:
-                return $this->readPropertyAndGetColumn($tailProperty);
-
-            default:
-                return false;
-        }
-    }
-
     private function readExpression()
     {
-        $token = $this->request;
+        $firstElement = reset($this->request);
+        list($tokenType, $token) = each($firstElement);
 
-        if (!isset($token) || count($token) < 1) {
+        if (!isset($token)) {
             return false;
         }
 
-        $type = $token[0];
+        switch ($tokenType) {
+            case Translator::TYPE_JOIN:
+                $this->handleJoin($token);
+                array_shift($this->request);
+                return $this->readExpression();
 
-        switch ($type) {
-            case Parser::TYPE_PATH:
-                return $this->readPath();
-
-            case Parser::TYPE_PROPERTY:
+            case Translator::TYPE_VALUE:
                 return $this->readProperty();
 
-            case Parser::TYPE_OBJECT:
+            case Translator::TYPE_OBJECT:
                 return $this->readObject();
 
-            case Parser::TYPE_FUNCTION:
+            case Translator::TYPE_FUNCTION:
                 return $this->readFunction(); // any function
 
             default:
@@ -839,116 +680,42 @@ class Compiler
         }
     }
 
-    private function readPathAndGetTail(&$tailProperty)
+    private function handleJoin($token)
     {
-        if (!self::scanPath($this->request, $tokens)) {
-            return false;
-        }
-
-        $token = reset($tokens);
-
-        if (!self::scanProperty($token, $property)) {
-            return false;
-        }
-
-        array_shift($tokens);
-
-        list($this->class, $path) = $this->schema->getPropertyDefinition($this->class, $property);
-
-        $tableIdentifier = $this->mysql->getTable($this->table);
-        $this->connections($this->table, $tableIdentifier, $path);
-        // TODO
-
-        if (count($tokens) === 1) {
-            $this->request = array_shift($tokens);
-        } else {
-            array_unshift($tokens, Parser::TYPE_PATH);
-            $this->request = $tokens;
-        }
-
-        return $this->readExpressionAndGetTail($tailProperty);
+        $this->context = $this->mysql->addJoin(
+            $this->context,
+            $token['tableB'],
+            $token['expression'],
+            $token['hasZero'],
+            $token['hasMany']
+        );
     }
 
-    private function readPath()
+    private function followJoins($arrayToken)
     {
-        if (!self::scanPath($this->request, $tokens)) {
-            return false;
+        // consume all of the joins
+        while ($this->scanJoin(reset($arrayToken), $joinToken)) {
+            $this->handleJoin($joinToken);
+            array_shift($arrayToken);
         }
-
-        $token = reset($tokens);
-
-        if (!self::scanProperty($token, $property)) {
-            return false;
-        }
-
-        array_shift($tokens);
-
-        list($this->class, $path) = $this->schema->getPropertyDefinition($this->class, $property);
-
-        if (!isset($this->class, $path)) {
-            return false;
-        }
-
-        $tableIdentifier = $this->mysql->getTable($this->table);
-        $this->connections($this->table, $tableIdentifier, $path);
-        // TODO
-
-        if (count($tokens) === 1) {
-            $this->request = array_shift($tokens);
-        } else {
-            array_unshift($tokens, Parser::TYPE_PATH);
-            $this->request = $tokens;
-        }
-
-        return $this->readExpression();
-    }
-
-    private function readPropertyAndGetColumn(&$tailProperty)
-    {
-        if (!self::scanProperty($this->request, $property)) {
-            return false;
-        }
-
-        list(, $path) = $this->schema->getPropertyDefinition($this->class, $property);
-
-        $value = array_pop($path);
-
-        // just get the table id; NOTE: this method does not add the property to the output!
-        $tableIdentifier = $this->mysql->getTable($this->table);
-        $this->connections($this->table, $tableIdentifier, $path);
-
-        list($column,) = $this->schema->getValueDefinition($tableIdentifier, $value);
-
-        $tailProperty = $column;
-
-        return true;
+        return $arrayToken;
     }
 
     private function readProperty()
     {
-        if (!self::scanProperty($this->request, $property)) {
-            return false;
-        }
+        $firstElement = reset($this->request);
+        list($tokenType, $token) = each($firstElement);
 
-        list($type, $path) = $this->schema->getPropertyDefinition($this->class, $property);
+        $actualType = $token['type'];
+        $column = $token['expression'];
+        $hasZero = $token['hasZero'];
 
-        if (!isset($type, $path)) {
-            return false;
-        }
+        $tableId = $this->context;
+        $tableAliasIdentifier = "`{$tableId}`";
+        $columnExpression = Select::getAbsoluteExpression($tableAliasIdentifier, $column);
 
-        $value = array_pop($path);
-
-        $tableIdentifier = $this->mysql->getTable($this->table);
-        $this->connections($this->table, $tableIdentifier, $path);
-
-        list($column, $isColumnNullable) = $this->schema->getValueDefinition($tableIdentifier, $value);
-
-        if (!isset($column, $isColumnNullable)) {
-            return false;
-        }
-
-        $columnId = $this->mysql->addValue($this->table, $column);
-        $this->phpOutput = Output::getValue($columnId, $isColumnNullable, $type);
+        $columnId = $this->mysql->addValue($tableId, $column);
+        $this->phpOutput = Output::getValue($columnId, $hasZero, $actualType);
 
         return true;
     }
@@ -961,18 +728,14 @@ class Compiler
 
         $properties = array();
 
-        $class = $this->class;
-        $table = $this->table;
-
+        $initialContext = $this->context;
         foreach ($object as $label => $this->request) {
+            $this->context = $initialContext;
             if (!$this->readExpression()) {
                 return false;
             }
 
             $properties[$label] = $this->phpOutput;
-
-            $this->class = $class;
-            $this->table = $table;
         }
 
         $this->phpOutput = Output::getObject($properties);
@@ -1011,7 +774,7 @@ class Compiler
 
     private function readFunction()
     {
-        if (!self::scanFunction($this->request, $name, $arguments)) {
+        if (!self::scanFunction(reset($this->request), $name, $arguments)) {
             return false;
         }
 
@@ -1023,18 +786,25 @@ class Compiler
             case 'minus':
             case 'times':
             case 'divides':
-                if (!$this->getExpression($this->class, $this->table,
-                    $this->request, $expression, $type)
-                ) {
+                if (!$this->getExpression(
+                    $this->request,
+                    $expression,
+                    $type
+                )) {
                     return false;
                 }
 
                 /** @var AbstractExpression $expression */
-                $columnId = $this->mysql->addExpression($this->table,
-                    $expression->getMysql());
+                $columnId = $this->mysql->addExpression(
+                    $this->context,
+                    $expression->getMysql()
+                );
                 $nullable = true; // TODO
-                $this->phpOutput = Output::getValue($columnId, $nullable,
-                    $type);
+                $this->phpOutput = Output::getValue(
+                    $columnId,
+                    $nullable,
+                    $type
+                );
 
                 return true;
 
@@ -1043,40 +813,9 @@ class Compiler
         }
     }
 
-    private function connections(&$contextId, &$tableAIdentifier, $connections)
-    {
-        foreach ($connections as $key => $connection) {
-            $definition = $this->schema->getConnectionDefinition($tableAIdentifier, $connection);
-
-            if (!isset($definition) || count($definition) < 5) {
-                return false;
-            }
-
-            list($tableBIdentifier, $expression, $id, $allowsZeroMatches, $allowsMultipleMatches) = $definition;
-
-            if (!$allowsZeroMatches && !$allowsMultipleMatches) {
-                $joinType = Select::JOIN_INNER;
-            } else {
-                $joinType = Select::JOIN_LEFT;
-
-                if ($this->phpOutput !== null) {
-                    $idAlias = $this->mysql->addValue($this->table, $id);
-                    $this->phpOutput = Output::getList($idAlias, $allowsZeroMatches, $allowsMultipleMatches, $this->phpOutput);
-                }
-            }
-
-            $contextId = $this->mysql->addJoin($contextId, $tableBIdentifier, $expression, $joinType);
-            $tableAIdentifier = $tableBIdentifier;
-        }
-
-        return true;
-    }
-
     private function getOptionalSortFunction()
     {
-        $token = reset($this->request);
-
-        if (!self::scanFunction($token, $name, $arguments)) {
+        if (!self::scanFunction(reset($this->request), $name, $arguments)) {
             return false;
         }
 
@@ -1084,6 +823,7 @@ class Compiler
             return false;
         }
 
+        // at this point, we're sure they want to sort
         if (!isset($arguments) || count($arguments) !== 1) {
             // TODO: add an explanation of the missing argument, or link to the documentation
             throw new AbstractException(
@@ -1093,14 +833,20 @@ class Compiler
             );
         }
 
-        $state = array($this->request, $this->class, $this->table);
+        $state = array($this->request, $this->context);
 
-        // TODO: verify that the "$tailProperty" is valid before it is used
+        // consume all of the joins
         $this->request = $arguments[0];
-        $this->readExpressionAndGetTail($tailProperty);
-        $this->mysql->setOrderBy($this->table, $tailProperty, true);
+        $this->request = $this->followJoins($this->request);
 
-        list($this->request, $this->class, $this->table) = $state;
+        if (!$this->scanProperty(reset($this->request), $table, $name, $type, $hasZero)) {
+            return false;
+        }
+
+        $this->mysql->setOrderBy($this->context, $name, true);
+
+        list($this->request, $this->context) = $state;
+
         array_shift($this->request);
 
         return true;
@@ -1108,9 +854,7 @@ class Compiler
 
     private function getOptionalSliceFunction()
     {
-        $token = current($this->request);
-
-        if (!self::scanFunction($token, $name, $arguments)) {
+        if (!self::scanFunction(reset($this->request), $name, $arguments)) {
             return false;
         }
 
@@ -1118,11 +862,19 @@ class Compiler
             return false;
         }
 
-        if (count($arguments) !== 2) {
-            return false;
+        // at this point, we're sure they want to slice
+        if (!isset($arguments) || count($arguments) !== 2) {
+            throw new AbstractException(
+                self::ERROR_NO_SORT_ARGUMENTS, // TODO: slice exception
+                array('token' => reset($this->request)),
+                "slice functions take two argument"
+            );
         }
 
-        if (!self::scanParameter($arguments[0], $nameA) || !self::scanParameter($arguments[1], $nameB)) {
+        if (
+            !$this->scanParameter($arguments[0], $nameA) ||
+            !$this->scanParameter($arguments[1], $nameB)
+        ) {
             return false;
         }
 
@@ -1130,89 +882,80 @@ class Compiler
             return false;
         }
 
-        $this->mysql->setLimit($this->table, $start, $end);
+        $this->mysql->setLimit($this->context, $start, $end);
 
         array_shift($this->request);
+
         return true;
     }
 
-    private static function scanParameter($token, &$name)
+    private static function scanParameter($input, &$name)
     {
-        if (!self::isParameterToken($token)) {
+        // scan the next token of the supplied arrayToken
+        $input = reset($input);
+
+        list($tokenType, $token) = each($input);
+
+        if ($tokenType !== Translator::TYPE_PARAMETER) {
             return false;
         }
 
-        $name = $token[1];
+        $name = $token;
         return true;
     }
 
-    private static function scanProperty($token, &$name)
+    private static function scanProperty($input, &$table, &$name, &$type, &$hasZero)
     {
-        if (!self::isPropertyToken($token)) {
+        list($tokenType, $token) = each($input);
+
+        if ($tokenType !== Translator::TYPE_VALUE) {
             return false;
         }
 
-        $name = $token[1];
+        $table = $token['table'];
+        $name = $token['expression'];
+        $type = $token['type'];
+        $hasZero = $token['hasZero'];
         return true;
     }
 
     private static function scanFunction($input, &$name, &$arguments)
     {
-        if (!self::isFunctionToken($input)) {
+        list($tokenType, $token) = each($input);
+
+        if ($tokenType !== Translator::TYPE_FUNCTION) {
             return false;
         }
 
-        $name = $input[1];
-        $arguments = array_slice($input, 2);
+        $name = $token['function'];
+        $arguments = $token['arguments'];
         return true;
     }
 
     private static function scanObject($input, &$object)
     {
-        if (!self::isObjectToken($input)) {
+        // scan the next token of the supplied arrayToken
+        $input = reset($input);
+
+        list($tokenType, $token) = each($input);
+
+        if ($tokenType !== Translator::TYPE_OBJECT) {
             return false;
         }
 
-        if (count($input) < 2) {
-            return false;
-        }
-
-        $object = $input[1];
+        $object = $token;
         return true;
     }
 
-    private static function scanPath($token, &$tokens)
+    private static function scanJoin($input, &$object)
     {
-        if (!self::isPathToken($token)) {
+        list($tokenType, $token) = each($input);
+
+        if ($tokenType !== Translator::TYPE_JOIN) {
             return false;
         }
 
-        $tokens = array_slice($token, 1);
+        $object = $token;
         return true;
-    }
-
-    private static function isParameterToken($token)
-    {
-        return is_array($token) && ($token[0] === Parser::TYPE_PARAMETER);
-    }
-
-    private static function isPropertyToken($token)
-    {
-        return is_array($token) && (count($token) > 0) && ($token[0] === Parser::TYPE_PROPERTY);
-    }
-
-    private static function isFunctionToken($token)
-    {
-        return is_array($token) && (count($token) > 0) && ($token[0] === Parser::TYPE_FUNCTION);
-    }
-
-    private static function isObjectToken($token)
-    {
-        return is_array($token) && (count($token) > 0) && ($token[0] === Parser::TYPE_OBJECT);
-    }
-
-    private static function isPathToken($token)
-    {
-        return is_array($token) && ($token[0] === Parser::TYPE_PATH);
     }
 }

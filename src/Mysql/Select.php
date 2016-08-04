@@ -24,7 +24,7 @@
 
 namespace Datto\Cinnabari\Mysql;
 
-use Datto\Cinnabari\AbstractException;
+use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 class Select
@@ -76,26 +76,6 @@ class Select
         }
 
         return self::insert($this->tables, $name);
-    }
-
-    public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $type)
-    {
-        if (!self::isDefined($this->tables, $tableAId)) {
-            $tableString = json_encode($tableAId);
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $tableAId
-                ),
-                "unknown table id {$tableString}."
-            );
-        }
-
-        $tableIdentifierA = self::getIdentifier($tableAId);
-
-        $key = json_encode(array($tableIdentifierA, $tableBIdentifier, $mysqlExpression, $type));
-
-        return self::insert($this->tables, $key);
     }
 
     public function setWhere(AbstractExpression $expression)
@@ -191,8 +171,29 @@ class Select
         return rtrim($mysql, "\n");
     }
 
+    public function findTable($name)
+    {
+        if (array_key_exists($name, $this->tables)) {
+            return $this->tables[$name];
+        } else {
+            return false;
+        }
+    }
+
+    public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $hasZero, $hasMany)
+    {
+        if (!self::isDefined($this->tables, $tableAId)) {
+            return null;
+        }
+        $joinType = (!$hasZero && !$hasMany) ? self::JOIN_INNER : self::JOIN_LEFT;
+        $tableAIdentifier = self::getIdentifier($tableAId);
+        $key = json_encode(array($tableAIdentifier, $tableBIdentifier, $mysqlExpression, $joinType));
+        return self::insert($this->tables, $key);
+    }
+
     public function getTable($id)
     {
+        echo json_encode($this->tables) . "\n\n";
         $name = array_search($id, $this->tables, true);
 
         if (!is_string($name)) {
