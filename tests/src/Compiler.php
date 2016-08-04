@@ -2,11 +2,12 @@
 
 namespace Datto\Cinnabari\Tests;
 
-use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Compiler;
-use Datto\Cinnabari\Parser;
-use Datto\Cinnabari\Lexer;
+use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Format\Arguments;
+use Datto\Cinnabari\Lexer;
+use Datto\Cinnabari\Parser;
+use Datto\Cinnabari\Translator;
 use PHPUnit_Framework_TestCase;
 
 /*
@@ -800,12 +801,45 @@ EOS;
             'a' => 'foo'
         );
 
+        $parameterPath = array(
+            0 => array(
+                6 => array(
+                    'tableA' => '`People`',
+                    'tableB' => '`Names`',
+                    'expression' => '`0`.`Name` <=> `1`.`Id`',
+                    'id' => '`Id`',
+                    'hasZero' => false,
+                    'hasMany' => false
+                )
+            ),
+            1 => array(
+                1 => 'a'
+            )
+        );
+
+        $matchFunction = array(
+            3 => array(
+                'function' => 'match',
+                'arguments' => array(
+                    0 => $parameterPath,
+                    1 => array(
+                        0 => array(
+                            1 => 'regex'
+                        )
+                    )
+                )
+            )
+        );
+
         $this->verifyException(
             $scenario,
             $method,
             $arguments,
-            Arguments::ERROR_WRONG_INPUT_TYPE,
-            array('name' => 'a', 'userType' => 'string', 'neededType' => 'integer')
+            Compiler::ERROR_BAD_FILTER_EXPRESSION,
+            array(
+                'context' => 0,
+                'arguments' => array($matchFunction)
+            )
         );
     }
     
@@ -822,18 +856,44 @@ EOS;
             'a' => 'foo'
         );
 
-        $pathInformation = array(
-            5,
-            array(2, 'name'),
-            array(1, 'a'),
-            array(2, 'first')
+        $parameterPropertyPath = array(
+           0 => array(
+               6 => array(
+                   'tableA' => '`People`',
+                   'tableB' => '`Names`',
+                   'expression' => '`0`.`Name` <=> `1`.`Id`',
+                   'id' => '`Id`',
+                   'hasZero' => false,
+                   'hasMany' => false
+               )
+           ),
+           1 => array(
+               1 => 'a'
+           ),
+           2 => array(
+               7 => array(
+                   'table' => '`Names`',
+                   'expression' => '`First`',
+                   'type' => 4,
+                   'hasZero' => false
+               )
+           )
+        );
+
+        $matchArguments = array(
+            0 => $parameterPropertyPath,
+            1 => Array (
+                0 => Array (
+                    1 => 'regex'
+                )
+            )
         );
 
         $matchFunction = array(
-            3,
-            'match',
-            $pathInformation,
-            array(1, 'regex')
+            3 => array(
+                'function' => 'match',
+                'arguments' => $matchArguments
+            )
         );
 
         $this->verifyException(
@@ -842,9 +902,8 @@ EOS;
             $arguments,
             Compiler::ERROR_BAD_FILTER_EXPRESSION,
             array(
-                'class' => 'Person',
-                'table' => 0,
-                'arguments' => $matchFunction
+                'context' => 0,
+                'arguments' => array($matchFunction)
             )
         );
     }
@@ -1027,12 +1086,13 @@ EOS;
 
         $lexer = new Lexer();
         $parser = new Parser();
-        $schema = new Schema($scenario);
-        $compiler = new Compiler($schema);
+        $translator = new Translator($scenario);
+        $compiler = new Compiler();
 
         $tokens = $lexer->tokenize($method);
         $request = $parser->parse($tokens);
-        return $compiler->compile($request, $arguments);
+        $translatedRequest = $translator->translate($request);
+        return $compiler->compile($translatedRequest, $arguments);
     }
 
     private static function standardize($artifact)
