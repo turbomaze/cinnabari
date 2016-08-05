@@ -1,9 +1,34 @@
 <?php
 
-namespace Datto\Cinnabari;
+/**
+ * Copyright (C) 2016 Datto, Inc.
+ *
+ * This file is part of Cinnabari.
+ *
+ * Cinnabari is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License, version 3,
+ * as published by the Free Software Foundation.
+ *
+ * Cinnabari is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with Cinnabari. If not, see <http://www.gnu.org/licenses/>.
+ *
+ * @author Spencer Mortensen <smortensen@datto.com>
+ * @author Anthony Liu <aliu@datto.com>
+ * @license http://www.gnu.org/licenses/lgpl-3.0.html LGPL-3.0
+ * @copyright 2016 Datto, Inc.
+ */
+
+namespace Datto\Cinnabari\Compiler;
 
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
+use Datto\Cinnabari\Mysql\AbstractMysql;
+use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\OperatorAnd;
 use Datto\Cinnabari\Mysql\Expression\OperatorDivides;
 use Datto\Cinnabari\Mysql\Expression\OperatorEqual;
@@ -19,6 +44,7 @@ use Datto\Cinnabari\Mysql\Expression\OperatorRegexpBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Php\Output;
+use Datto\Cinnabari\Translator;
 
 /**
  * Class AbstractCompiler
@@ -35,7 +61,7 @@ abstract class AbstractCompiler implements CompilerInterface
     /** @var int */
     protected $context;
     
-    /** @var Mysql */
+    /** @var AbstractMysql */
     protected $mysql;
 
     /** @var array */
@@ -45,6 +71,13 @@ abstract class AbstractCompiler implements CompilerInterface
     {
         $this->rollbackPoint = array();
     }
+
+	/**
+	 * @param array $token
+	 * @param string $neededType
+	 * @param AbstractExpression|null $output
+	 */
+    abstract protected function getProperty($token, $neededType, &$output);
 
     protected function getOptionalFilterFunction()
     {

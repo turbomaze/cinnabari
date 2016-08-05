@@ -59,8 +59,8 @@ class Select extends AbstractMysql
 
     public function addExpression($tableId, $expression)
     {
-        if (!self::isDefined($this->tables, $tableAId)) {
-            throw CompilerException::badTableId($tableAId);
+        if (!self::isDefined($this->tables, $tableId)) {
+            throw CompilerException::badTableId($tableId);
         }
 
         return self::insert($this->columns, $expression);
@@ -88,12 +88,12 @@ class Select extends AbstractMysql
         $table = $this->getIdentifier($tableId);
         $name = self::getAbsoluteExpression($table, $column);
 
-        $mysql = "ORDER BY {$name} ";
+        $mysql = "ORDER BY {$name}";
 
         if ($isAscending) {
-            $mysql .= "ASC";
+            $mysql .= " ASC";
         } else {
-            $mysql .= "DESC";
+            $mysql .= " DESC";
         }
 
         $this->orderBy = $mysql;

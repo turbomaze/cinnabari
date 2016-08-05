@@ -26,18 +26,28 @@ namespace Datto\Cinnabari\Exception;
 
 class CompilerException extends AbstractException
 {
-    const NO_INITIAL_PROPERTY = 1;
-    const NO_INITIAL_PATH = 2;
-    const INVALID_METHOD_SEQUENCE = 3;
-    const NO_FILTER_ARGUMENTS = 4;
-    const BAD_FILTER_EXPRESSION = 5;
-    const NO_SORT_ARGUMENTS = 6;
-    const BAD_SLICE_ARGUMENTS = 7;
-    const BAD_MAP_ARGUMENT = 8;
-    const BAD_SCHEMA = 9;
-    const BAD_TABLE_ID = 10;
-    const INVALID_SELECT = 11;
-    const UNKNOWN_TYPECAST = 12;
+	const UNKNOWN_REQUEST_TYPE = 1;
+    const NO_INITIAL_PROPERTY = 2;
+    const NO_INITIAL_PATH = 3;
+    const INVALID_METHOD_SEQUENCE = 4;
+    const NO_FILTER_ARGUMENTS = 5;
+    const BAD_FILTER_EXPRESSION = 6;
+    const NO_SORT_ARGUMENTS = 7;
+    const BAD_SLICE_ARGUMENTS = 8;
+    const BAD_MAP_ARGUMENT = 9;
+    const BAD_SCHEMA = 10;
+    const BAD_TABLE_ID = 11;
+    const INVALID_SELECT = 12;
+    const UNKNOWN_TYPECAST = 13;
+
+	public static function unknownRequestType($request)
+	{
+		$code = self::UNKNOWN_REQUEST_TYPE;
+		$data = array('request' => $request);
+		$message = 'Only get and delete queries are supported at the moment.';
+
+		return new self($code, $data, $message);
+	}
 
     public static function noInitialProperty($token)
     {

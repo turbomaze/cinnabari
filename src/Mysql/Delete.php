@@ -65,12 +65,12 @@ class Delete extends AbstractMysql
         $table = $this->getTable($tableId);
         $name = self::getAbsoluteExpression($table, $column);
 
-        $mysql = "ORDER BY {$name} ";
+        $mysql = "ORDER BY {$name}";
 
         if ($isAscending) {
-            $mysql .= "ASC";
+            $mysql .= " ASC";
         } else {
-            $mysql .= "DESC";
+            $mysql .= " DESC";
         }
 
         $this->orderBy = $mysql;
@@ -82,17 +82,13 @@ class Delete extends AbstractMysql
             return null;
         }
 
-        $count = $length->getMysql();
-
-        $mysql = "{$count}";
-
-        $this->limit = $mysql;
+        $this->limit = $length->getMysql();
     }
 
     protected function getTables()
     {
         reset($this->tables);
-        list($table, $id) = each($this->tables);
+        list($table, ) = each($this->tables);
 
         $mysql = "\tFROM " . $table . "\n";
 

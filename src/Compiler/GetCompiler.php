@@ -23,7 +23,7 @@
  * @copyright 2016 Datto, Inc.
  */
 
-namespace Datto\Cinnabari;
+namespace Datto\Cinnabari\Compiler;
 
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
@@ -32,6 +32,7 @@ use Datto\Cinnabari\Mysql\Expression\Column;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Mysql\Select;
 use Datto\Cinnabari\Php\Output;
+use Datto\Cinnabari\Translator;
 
 /**
  * Class GetCompiler
@@ -81,7 +82,7 @@ class GetCompiler extends AbstractCompiler
     protected function enterTable(&$idAlias, &$hasZero)
     {
         $firstElement = array_shift($this->request);
-        list($tokenType, $token) = each($firstElement);
+        list(, $token) = each($firstElement);
 
         $this->context = $this->mysql->setTable($token['table']);
         $idAlias = $this->mysql->addValue($this->context, $token['id']);
@@ -154,7 +155,7 @@ class GetCompiler extends AbstractCompiler
     protected function readProperty()
     {
         $firstElement = reset($this->request);
-        list($tokenType, $token) = each($firstElement);
+        list(, $token) = each($firstElement);
 
         $actualType = $token['type'];
         $column = $token['expression'];
@@ -243,10 +244,11 @@ class GetCompiler extends AbstractCompiler
                     $this->context,
                     $expression->getMysql()
                 );
-                $nullable = true; // TODO
+
+                $isNullable = true; // TODO
                 $this->phpOutput = Output::getValue(
                     $columnId,
-                    $nullable,
+                    $isNullable,
                     $type
                 );
 

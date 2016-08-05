@@ -3,13 +3,7 @@
 namespace Datto\Cinnabari\Tests;
 
 use Datto\Cinnabari\Cinnabari;
-use Datto\Cinnabari\Exception\AbstractException;
-use Datto\Cinnabari\Exception\ArgumentsException;
 use Datto\Cinnabari\Exception\CinnabariException;
-use Datto\Cinnabari\Exception\CompilerException;
-use Datto\Cinnabari\Exception\LexerException;
-use Datto\Cinnabari\Exception\SchemaException;
-use Datto\Cinnabari\Format\Arguments;
 use PHPUnit_Framework_TestCase;
 
 /*
@@ -838,7 +832,7 @@ EOS;
             $method,
             $arguments,
             // the universal code corresponding to this exception
-            405,
+            406,
             array(
                 'context' => 0,
                 'arguments' => $matchFunction
@@ -903,7 +897,7 @@ EOS;
             $scenario,
             $method,
             $arguments,
-            405,
+            406,
             array(
                 'context' => 0,
                 'arguments' => $matchFunction

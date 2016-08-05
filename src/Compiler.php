@@ -24,19 +24,19 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\CompilerInterface;
-use Datto\Cinnabari\DeleteCompiler;
 use Datto\Cinnabari\Exception\CompilerException;
-use Datto\Cinnabari\GetCompiler;
-use Datto\Cinnabari\SemanticAnalyzer;
+use Datto\Cinnabari\Compiler\GetCompiler;
+use Datto\Cinnabari\Compiler\DeleteCompiler;
 
 /**
  * Class Compiler
  * @package Datto\Cinnabari
  */
-
-class Compiler implements CompilerInterface
+class Compiler
 {
+    const TYPE_GET = 0;
+    const TYPE_DELETE = 1;
+
     private $getCompiler;
     private $deleteCompiler;
 
@@ -48,23 +48,31 @@ class Compiler implements CompilerInterface
     
     public function compile($translatedRequest, $arguments)
     {
-        $queryType = SemanticAnalyzer::getQueryType($translatedRequest);
+        $queryType = self::getQueryType($translatedRequest);
 
         switch($queryType) {
-            case SemanticAnalyzer::TYPE_GET:
+            case self::TYPE_GET:
                 return $this->getCompiler->compile($translatedRequest, $arguments);
 
-            case SemanticAnalyzer::TYPE_DELETE:
+            case self::TYPE_DELETE:
                 return $this->deleteCompiler->compile($translatedRequest, $arguments);
     
             default:
-                throw new AbstractException(
-                    self::ERROR_UNSUPPORTED_QUERY_TYPE,
-                    array('request' => $translatedRequest),
-                    "Only get and delete queries are supported at the moment."
-                );
+                throw CompilerException::unknownRequestType($translatedRequest);
+        }
+    }
+
+    public static function getQueryType($translatedRequest)
+    {
+        $lastRequest =  end($translatedRequest);
+        list($lastTokenType, $lastToken) = each($lastRequest);
+
+        if ($lastTokenType === Translator::TYPE_FUNCTION) {
+            if ($lastToken['function'] === 'delete') {
+                return self::TYPE_DELETE;
+            }
         }
 
-        return false;
+        return self::TYPE_GET;
     }
 }

@@ -23,7 +23,7 @@
  * @copyright 2016 Datto, Inc.
  */
 
-namespace Datto\Cinnabari;
+namespace Datto\Cinnabari\Compiler;
 
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
@@ -69,7 +69,7 @@ class DeleteCompiler extends AbstractCompiler
     protected function enterTable(&$hasZero)
     {
         $firstElement = array_shift($this->request);
-        list($tokenType, $token) = each($firstElement);
+        list(, $token) = each($firstElement);
 
         $this->context = $this->mysql->setTable($token['table']);
         $hasZero = $token['hasZero'];
