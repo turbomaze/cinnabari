@@ -882,8 +882,8 @@ EOS;
 
         $matchArguments = array(
             0 => $parameterPropertyPath,
-            1 => Array (
-                0 => Array (
+            1 => array(
+                0 => array(
                     1 => 'regex'
                 )
             )
