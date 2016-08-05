@@ -25,7 +25,7 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\Column;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
@@ -86,11 +86,7 @@ class DeleteCompiler extends AbstractCompiler
         $this->request = reset($this->request);
 
         if (!$this->readDelete()) {
-            throw new AbstractException(
-                Compiler::ERROR_NO_DELETE_FUNCTION,
-                array('request' => $this->request),
-                "API requests must contain a delete function after the optional filter/sort functions."
-            );
+            throw CompilerException::invalidMethodSequence($this->request);
         }
 
         return true;
@@ -135,11 +131,7 @@ class DeleteCompiler extends AbstractCompiler
 
         // at this point, we're sure they want to slice
         if (!isset($arguments) || count($arguments) !== 2) {
-            throw new AbstractException(
-                Compiler::ERROR_NO_SORT_ARGUMENTS, // TODO: slice exception
-                array('token' => reset($this->request)),
-                "slice functions take two argument"
-            );
+            throw CompilerException::badSliceArguments($this->request);
         }
 
         if (

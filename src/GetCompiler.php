@@ -25,7 +25,7 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\Column;
@@ -99,11 +99,7 @@ class GetCompiler extends AbstractCompiler
         $this->request = reset($this->request);
 
         if (!$this->readMap()) {
-            throw new AbstractException(
-                Compiler::ERROR_NO_MAP_FUNCTION,
-                array('request' => $this->request),
-                "API requests must contain a map function after the optional filter/sort functions."
-            );
+            throw CompilerException::invalidMethodSequence($this->request);
         }
 
         return true;
@@ -214,11 +210,7 @@ class GetCompiler extends AbstractCompiler
         $this->request = reset($arguments);
 
         if (!$this->readExpression()) {
-            throw new AbstractException(
-                Compiler::ERROR_BAD_MAP_ARGUMENT,
-                array('request' => $this->request),
-                'map functions take a property, path, object, or function as an argument.'
-            );
+            throw CompilerException::badMapArgument($this->request);
         }
 
         return true;
@@ -277,11 +269,7 @@ class GetCompiler extends AbstractCompiler
 
         // at this point, we're sure they want to slice
         if (!isset($arguments) || count($arguments) !== 2) {
-            throw new AbstractException(
-                Compiler::ERROR_NO_SORT_ARGUMENTS, // TODO: slice exception
-                array('token' => reset($this->request)),
-                "slice functions take two argument"
-            );
+            throw CompilerException::badSliceArguments($this->request);
         }
 
         if (

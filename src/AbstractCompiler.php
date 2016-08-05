@@ -2,7 +2,7 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\OperatorAnd;
 use Datto\Cinnabari\Mysql\Expression\OperatorDivides;
@@ -58,22 +58,14 @@ abstract class AbstractCompiler implements CompilerInterface
 
         // at this point, we're sure they want to filter
         if (!isset($arguments) || count($arguments) === 0) {
-            throw new AbstractException(
-                Compiler::ERROR_NO_FILTER_ARGUMENTS,
-                array('request' => $this->request),
-                "filter functions take one expression argument, none provided."
-            );
+            throw CompilerException::noFilterArguments($this->request);
         }
 
         // TODO: throw exception for bad filters
         if (!$this->getBooleanExpression($arguments[0], $where)) {
-            throw new AbstractException(
-                Compiler::ERROR_BAD_FILTER_EXPRESSION,
-                array(
-                    'context' => $this->context,
-                    'arguments' => $arguments[0]
-                ),
-                "malformed expression supplied to the filter function."
+            throw CompilerException::badFilterExpression(
+                $this->context,
+                $arguments[0]
             );
         }
 
@@ -97,11 +89,7 @@ abstract class AbstractCompiler implements CompilerInterface
         // at this point, we're sure they want to sort
         if (!isset($arguments) || count($arguments) !== 1) {
             // TODO: add an explanation of the missing argument, or link to the documentation
-            throw new AbstractException(
-                Compiler::ERROR_NO_SORT_ARGUMENTS,
-                array('request' => $this->request),
-                "sort functions take one argument"
-            );
+            throw CompilerException::noSortArguments($this->request);
         }
 
         $state = array($this->request, $this->context);

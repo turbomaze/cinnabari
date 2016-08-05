@@ -24,15 +24,14 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\ArgumentsException;
+use Datto\Cinnabari\Exception\CinnabariException;
+use Datto\Cinnabari\Exception\CompilerException;
+use Datto\Cinnabari\Exception\LexerException;
+use Datto\Cinnabari\Exception\SchemaException;
 
 class Cinnabari
 {
-    const ERROR_SYNTAX = 1;
-
-    /** @var array */
-    private $schema;
-
     public function __construct($schema)
     {
         $this->schema = $schema;
@@ -42,121 +41,23 @@ class Cinnabari
     public function translate($query, $arguments)
     {
         try {
-            $tokens = self::getTokens($query);
-            $request = self::getRequest($tokens);
-            $translatedRequest = self::getTranslatedRequest($this->schema, $request);
-
-            return self::getResult($translatedRequest, $arguments);
-        } catch (AbstractException $exception) {
-            throw $exception;
-            return false;
-        }
-    }
-
-    private static function getTokens($query)
-    {
-        try {
             $lexer = new Lexer();
-            return $lexer->tokenize($query);
-        } catch (AbstractException $exception) {
-            $position = $exception->getData();
-            self::errorSyntax($query, $position);
-            return null;
+            $parser = new Parser();
+            $translator = new Translator($this->schema);
+            $compiler = new Compiler($this->schema);
+
+            $tokens = $lexer->tokenize($query);
+            $request = $parser->parse($tokens);
+            $translatedRequest = $translator->translate($request);
+            return $compiler->compile($translatedRequest, $arguments);
+        } catch (SchemaException $exception) {
+            throw CinnabariException::schema($exception);
+        } catch (LexerException $exception) {
+            throw CinnabariException::lexer($exception);
+        } catch (CompilerException $exception) {
+            throw CinnabariException::compiler($exception);
+        } catch (ArgumentsException $exception) {
+            throw CinnabariException::arguments($exception);
         }
-    }
-
-    private static function getRequest($tokens)
-    {
-        $parser = new Parser();
-        return $parser->parse($tokens);
-    }
-
-    private static function getTranslatedRequest($schema, $request)
-    {
-        $translator = new Translator($schema);
-        return $translator->translate($request);
-    }
-
-    private static function getResult($translatedRequest, $arguments)
-    {
-        $compiler = new Compiler();
-        return $compiler->compile($translatedRequest, $arguments);
-    }
-
-    private static function errorSyntax($query, $position)
-    {
-        if ($position === null) {
-            $queryType = self::getType($query);
-            $queryName = var_export($query, true);
-            $indefiniteArticle = self::getIndefiniteArticle($queryType);
-
-            $message = "Syntax error: expected string input, but received {$indefiniteArticle} {$queryType} value instead ({$queryName})";
-        } elseif (strlen($query) === 0) {
-            $message = "Syntax error: expected a query string, but received an empty string instead";
-        } else {
-            $queryCursorName = self::underline($query, $position);
-
-            $message = "Syntax error at position {$position}: {$queryCursorName}";
-        }
-
-        throw new AbstractException(self::ERROR_SYNTAX, $position, $message);
-    }
-
-    private static function getType($value)
-    {
-        $type = gettype($value);
-
-        if ($type === 'NULL') {
-            return 'null';
-        }
-
-        if ($type === 'double') {
-            return 'float';
-        }
-
-        return $type;
-    }
-
-    private static function getIndefiniteArticle($word)
-    {
-        $firstLetter = substr($word, 0, 1);
-
-        if (
-            ($firstLetter === 'a') ||
-            ($firstLetter === 'e') ||
-            ($firstLetter === 'i') ||
-            ($firstLetter === 'o') ||
-            ($firstLetter === 'u')
-        ) {
-            return 'an';
-        }
-
-        return 'a';
-    }
-
-    private static function underline($text, $beg = null, $end = null)
-    {
-        $underlineCharacter = pack("CC", 0xcc, 0xb2);
-
-        $textEnd = strlen($text) - 1;
-
-        $beg = is_null($beg) ? 0 : max($beg, 0);
-        $end = is_null($end) ? $textEnd : min($end, $textEnd);
-
-        $input = json_encode($text);
-        $output = '';
-
-        ++$beg;
-        ++$end;
-
-        for ($i = 0, $length = strlen($input); $i < $length; ++$i) {
-            if (($beg <= $i) && ($i <= $end)) {
-                $output .= $underlineCharacter;
-            }
-
-            $output .= $input[$i];
-        }
-
-        return $output;
     }
 }

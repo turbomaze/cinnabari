@@ -24,7 +24,7 @@
 
 namespace Datto\Cinnabari\Mysql;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 class Select extends AbstractMysql
@@ -59,8 +59,8 @@ class Select extends AbstractMysql
 
     public function addExpression($tableId, $expression)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
+        if (!self::isDefined($this->tables, $tableAId)) {
+            throw CompilerException::badTableId($tableAId);
         }
 
         return self::insert($this->columns, $expression);
@@ -82,14 +82,7 @@ class Select extends AbstractMysql
     public function setOrderBy($tableId, $column, $isAscending)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            $tableString = json_encode($tableId);
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $tableId
-                ),
-                "unknown table id {$tableString}."
-            );
+            throw CompilerException::badTableId($tableId);
         }
 
         $table = $this->getIdentifier($tableId);
@@ -109,14 +102,7 @@ class Select extends AbstractMysql
     public function addValue($tableId, $column)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            $tableString = json_decode($tableId);
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $tableId
-                ),
-                "unknown table id {$tableString}."
-            );
+            throw CompilerException::badTableId($tableId);
         }
 
         $table = self::getIdentifier($tableId);

@@ -2,12 +2,14 @@
 
 namespace Datto\Cinnabari\Tests;
 
-use Datto\Cinnabari\Compiler;
+use Datto\Cinnabari\Cinnabari;
 use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\ArgumentsException;
+use Datto\Cinnabari\Exception\CinnabariException;
+use Datto\Cinnabari\Exception\CompilerException;
+use Datto\Cinnabari\Exception\LexerException;
+use Datto\Cinnabari\Exception\SchemaException;
 use Datto\Cinnabari\Format\Arguments;
-use Datto\Cinnabari\Lexer;
-use Datto\Cinnabari\Parser;
-use Datto\Cinnabari\Translator;
 use PHPUnit_Framework_TestCase;
 
 /*
@@ -835,10 +837,11 @@ EOS;
             $scenario,
             $method,
             $arguments,
-            Compiler::ERROR_BAD_FILTER_EXPRESSION,
+            // the universal code corresponding to this exception
+            405,
             array(
                 'context' => 0,
-                'arguments' => array($matchFunction)
+                'arguments' => $matchFunction
             )
         );
     }
@@ -900,10 +903,10 @@ EOS;
             $scenario,
             $method,
             $arguments,
-            Compiler::ERROR_BAD_FILTER_EXPRESSION,
+            405,
             array(
                 'context' => 0,
-                'arguments' => array($matchFunction)
+                'arguments' => $matchFunction
             )
         );
     }
@@ -1070,7 +1073,7 @@ EOS;
         try {
             self::translate($scenarioJson, $method, $arguments);
             $actual = null;
-        } catch (AbstractException $exception) {
+        } catch (CinnabariException $exception) {
             $actual = array(
                 'code' => $exception->getCode(),
                 'data' => $exception->getData()
@@ -1084,15 +1087,8 @@ EOS;
     {
         $scenario = json_decode($scenarioJson, true);
 
-        $lexer = new Lexer();
-        $parser = new Parser();
-        $translator = new Translator($scenario);
-        $compiler = new Compiler();
-
-        $tokens = $lexer->tokenize($method);
-        $request = $parser->parse($tokens);
-        $translatedRequest = $translator->translate($request);
-        return $compiler->compile($translatedRequest, $arguments);
+        $cinnabari = new Cinnabari($scenario);
+        return $cinnabari->translate($method, $arguments);
     }
 
     private static function standardize($artifact)

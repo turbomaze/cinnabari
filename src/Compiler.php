@@ -26,7 +26,7 @@ namespace Datto\Cinnabari;
 
 use Datto\Cinnabari\CompilerInterface;
 use Datto\Cinnabari\DeleteCompiler;
-use Datto\Cinnabari\Exception\AbstractException;;
+use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\GetCompiler;
 use Datto\Cinnabari\SemanticAnalyzer;
 
@@ -37,18 +37,6 @@ use Datto\Cinnabari\SemanticAnalyzer;
 
 class Compiler implements CompilerInterface
 {
-    // compiler errors
-    const ERROR_NO_INITIAL_PROPERTY = 501;
-    const ERROR_NO_INITIAL_PATH = 502;
-    const ERROR_NO_MAP_FUNCTION = 503;
-    const ERROR_NO_DELETE_FUNCTION = 504;
-    const ERROR_NO_FILTER_ARGUMENTS = 505;
-    const ERROR_BAD_FILTER_EXPRESSION = 506;
-    const ERROR_NO_SORT_ARGUMENTS = 507;
-    const ERROR_BAD_MAP_ARGUMENT = 508;
-    const ERROR_BAD_SCHEMA = 509;
-    const ERROR_UNSUPPORTED_QUERY_TYPE = 510;
-
     private $getCompiler;
     private $deleteCompiler;
 
