@@ -949,7 +949,7 @@ EOS;
         $mysql = <<<'EOS'
 DELETE
     FROM `People`
-    WHERE `People`.`Age` < :0
+    WHERE (`People`.`Age` < :0)
 EOS;
 
         $phpInput = <<<'EOS'
@@ -1030,7 +1030,7 @@ EOS;
         $mysql = <<<'EOS'
 DELETE
     FROM `People`
-    WHERE :0 <= `People`.`Age`
+    WHERE (:0 <= `People`.`Age`)
     ORDER BY `People`.`Age` ASC
     LIMIT :1
 EOS;

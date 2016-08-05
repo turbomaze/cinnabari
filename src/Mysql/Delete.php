@@ -18,6 +18,7 @@
  * along with Cinnabari. If not, see <http://www.gnu.org/licenses/>.
  *
  * @author Spencer Mortensen <smortensen@datto.com>
+ * @author Anthony Liu <aliu@datto.com>
  * @license http://www.gnu.org/licenses/lgpl-3.0.html LGPL-3.0
  * @copyright 2016 Datto, Inc.
  */
@@ -27,7 +28,7 @@ namespace Datto\Cinnabari\Mysql;
 use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
-class Select
+class Delete
 {
     // mysql errors
     const ERROR_BAD_TABLE_ID = 201;
@@ -38,9 +39,6 @@ class Select
 
     /** @var string[] */
     private $tables;
-
-    /** @var string[] */
-    private $columns;
 
     /** @var AbstractExpression */
     private $where;
@@ -100,7 +98,7 @@ class Select
             );
         }
 
-        $table = self::getIdentifier($tableId);
+        $table = $this->getTable($tableId);
         $name = self::getAbsoluteExpression($table, $column);
 
         $mysql = "ORDER BY {$name} ";
@@ -114,37 +112,17 @@ class Select
         $this->orderBy = $mysql;
     }
 
-    public function setLimit($tableId, AbstractExpression $start, AbstractExpression $length)
+    public function setLimit($tableId, AbstractExpression $length)
     {
         if (!self::isDefined($this->tables, $tableId)) {
             return null;
         }
 
-        $offset = $start->getMysql();
         $count = $length->getMysql();
 
-        $mysql = "{$offset}, {$count}";
+        $mysql = "{$count}";
 
         $this->limit = $mysql;
-    }
-
-    public function addValue($tableId, $column)
-    {
-        if (!self::isDefined($this->tables, $tableId)) {
-            $tableString = json_decode($tableId);
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $tableId
-                ),
-                "unknown table id {$tableString}."
-            );
-        }
-
-        $table = self::getIdentifier($tableId);
-        $name = self::getAbsoluteExpression($table, $column);
-
-        return self::insert($this->columns, $name);
     }
 
     public function addExpression($tableId, $expression)
@@ -162,11 +140,13 @@ class Select
             throw new AbstractException(
                 self::ERROR_INVALID_MYSQL,
                 array(),
-                "SQL queries must reference at least one table and column."
+                "SQL delete queries must reference at least one table."
             );
         }
 
-        $mysql = $this->getColumns() .
+        list(, $id) = each($this->tables);
+
+        $mysql = "DELETE\n" .
             $this->getTables() .
             $this->getWhereClause() .
             $this->getOrderByClause() .
@@ -197,7 +177,6 @@ class Select
 
     public function getTable($id)
     {
-        echo json_encode($this->tables) . "\n\n";
         $name = array_search($id, $this->tables, true);
 
         if (!is_string($name)) {
@@ -247,30 +226,15 @@ class Select
 
     private function isValid()
     {
-        return (0 < count($this->tables)) && (0 < count($this->columns));
-    }
-
-    private function getColumns()
-    {
-        return "SELECT\n\t" . implode(",\n\t", $this->getColumnNames()) . "\n";
-    }
-
-    private function getColumnNames()
-    {
-        $columns = array();
-
-        foreach ($this->columns as $name => $id) {
-            $columns[] = self::getAliasedName($name, $id);
-        }
-
-        return $columns;
+        return (0 < count($this->tables));
     }
 
     private function getTables()
     {
+        reset($this->tables);
         list($table, $id) = each($this->tables);
 
-        $mysql = "\tFROM " . self::getAliasedName($table, $id) . "\n";
+        $mysql = "\tFROM " . $table . "\n";
 
         $tables = array_slice($this->tables, 1);
 
@@ -326,7 +290,7 @@ class Select
     private static function getAliasedName($name, $id)
     {
         $alias = self::getIdentifier($id);
-        return "{$name} AS {$alias}";
+        return "{$name} {$alias}";
     }
 
     public function setRollbackPoint()
