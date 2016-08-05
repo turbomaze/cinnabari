@@ -28,61 +28,25 @@ namespace Datto\Cinnabari\Mysql;
 use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
-class Delete
+class Delete extends AbstractMysql
 {
-    // mysql errors
-    const ERROR_BAD_TABLE_ID = 201;
-    const ERROR_INVALID_MYSQL = 202;
-
-    const JOIN_INNER = 1;
-    const JOIN_LEFT = 2;
-
-    /** @var string[] */
-    private $tables;
-
-    /** @var AbstractExpression */
-    private $where;
-
-    /** @var string */
-    private $orderBy;
-
-    /** @var string */
-    private $limit;
-
-    /** @var array */
-    private $rollbackPoint;
-
-    public function __construct()
+    public function getMysql()
     {
-        $this->tables = array();
-        $this->columns = array();
-        $this->where = null;
-        $this->orderBy = null;
-        $this->limit = null;
-        $this->rollbackPoint = array();
-    }
-
-    /**
-     * @param string $name
-     * Mysql table identifier (e.g. "`people`")
-     *
-     * @return int
-     * Numeric table identifier (e.g. 0)
-     */
-    public function setTable($name)
-    {
-        $countTables = count($this->tables);
-
-        if (0 < $countTables) {
-            return null;
+        if (!$this->isValid()) {
+            throw new AbstractException(
+                self::ERROR_INVALID_MYSQL,
+                array(),
+                "SQL delete queries must reference at least one table."
+            );
         }
 
-        return self::insert($this->tables, $name);
-    }
+        $mysql = "DELETE\n" .
+            $this->getTables() .
+            $this->getWhereClause() .
+            $this->getOrderByClause() .
+            $this->getLimitClause();
 
-    public function setWhere(AbstractExpression $expression)
-    {
-        $this->where = $expression;
+        return rtrim($mysql, "\n");
     }
 
     public function setOrderBy($tableId, $column, $isAscending)
@@ -125,111 +89,7 @@ class Delete
         $this->limit = $mysql;
     }
 
-    public function addExpression($tableId, $expression)
-    {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
-        return self::insert($this->columns, $expression);
-    }
-
-    public function getMysql()
-    {
-        if (!$this->isValid()) {
-            throw new AbstractException(
-                self::ERROR_INVALID_MYSQL,
-                array(),
-                "SQL delete queries must reference at least one table."
-            );
-        }
-
-        list(, $id) = each($this->tables);
-
-        $mysql = "DELETE\n" .
-            $this->getTables() .
-            $this->getWhereClause() .
-            $this->getOrderByClause() .
-            $this->getLimitClause();
-
-        return rtrim($mysql, "\n");
-    }
-
-    public function findTable($name)
-    {
-        if (array_key_exists($name, $this->tables)) {
-            return $this->tables[$name];
-        } else {
-            return false;
-        }
-    }
-
-    public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $hasZero, $hasMany)
-    {
-        if (!self::isDefined($this->tables, $tableAId)) {
-            return null;
-        }
-        $joinType = (!$hasZero && !$hasMany) ? self::JOIN_INNER : self::JOIN_LEFT;
-        $tableAIdentifier = self::getIdentifier($tableAId);
-        $key = json_encode(array($tableAIdentifier, $tableBIdentifier, $mysqlExpression, $joinType));
-        return self::insert($this->tables, $key);
-    }
-
-    public function getTable($id)
-    {
-        $name = array_search($id, $this->tables, true);
-
-        if (!is_string($name)) {
-            $idString = json_decode($id);
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $id,
-                    'name' => $name
-                ),
-                "unknown table id {$idString}."
-            );
-        }
-
-        if (0 < $id) {
-            list(, $name) = json_decode($name);
-        }
-
-        return $name;
-    }
-
-    public static function getAbsoluteExpression($context, $expression)
-    {
-        return preg_replace('~`.*?`~', "{$context}.\$0", $expression);
-    }
-
-    private static function insert(&$array, $key)
-    {
-        $id = &$array[$key];
-
-        if (!isset($id)) {
-            $id = count($array) - 1;
-        }
-
-        return $id;
-    }
-
-    private static function isDefined($array, $id)
-    {
-        return is_int($id) && (-1 < $id) && ($id < count($array));
-    }
-
-    private static function getIdentifier($name)
-    {
-        return "`{$name}`";
-    }
-
-    private function isValid()
-    {
-        return (0 < count($this->tables));
-    }
-
-    private function getTables()
+    protected function getTables()
     {
         reset($this->tables);
         list($table, $id) = each($this->tables);
@@ -259,53 +119,8 @@ class Delete
         return $mysql;
     }
 
-    private function getWhereClause()
+    protected function isValid()
     {
-        if ($this->where === null) {
-            return null;
-        }
-
-        $where = $this->where->getMysql();
-        return "\tWHERE {$where}\n";
-    }
-
-    private function getOrderByClause()
-    {
-        if ($this->orderBy === null) {
-            return null;
-        }
-
-        return "\t{$this->orderBy}\n";
-    }
-
-    private function getLimitClause()
-    {
-        if ($this->limit === null) {
-            return null;
-        }
-
-        return "\tLIMIT {$this->limit}\n";
-    }
-
-    private static function getAliasedName($name, $id)
-    {
-        $alias = self::getIdentifier($id);
-        return "{$name} {$alias}";
-    }
-
-    public function setRollbackPoint()
-    {
-        $this->rollbackPoint[] = array(count($this->tables));
-    }
-
-    public function clearRollbackPoint()
-    {
-        array_pop($this->rollbackPoint);
-    }
-
-    public function rollback()
-    {
-        $rollbackState = array_pop($this->rollbackPoint);
-        $this->tables = array_slice($this->tables, 0, $rollbackState[0]);
+        return (0 < count($this->tables));
     }
 }

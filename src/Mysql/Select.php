@@ -27,133 +27,15 @@ namespace Datto\Cinnabari\Mysql;
 use Datto\Cinnabari\Exception\AbstractException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
-class Select
+class Select extends AbstractMysql
 {
-    // mysql errors
-    const ERROR_BAD_TABLE_ID = 201;
-    const ERROR_INVALID_MYSQL = 202;
-
-    const JOIN_INNER = 1;
-    const JOIN_LEFT = 2;
-
     /** @var string[] */
-    private $tables;
-
-    /** @var string[] */
-    private $columns;
-
-    /** @var AbstractExpression */
-    private $where;
-
-    /** @var string */
-    private $orderBy;
-
-    /** @var string */
-    private $limit;
-
-    /** @var array */
-    private $rollbackPoint;
+    protected $columns;
 
     public function __construct()
     {
-        $this->tables = array();
+        parent::__construct();
         $this->columns = array();
-        $this->where = null;
-        $this->orderBy = null;
-        $this->limit = null;
-        $this->rollbackPoint = array();
-    }
-
-    /**
-     * @param string $name
-     * Mysql table identifier (e.g. "`people`")
-     *
-     * @return int
-     * Numeric table identifier (e.g. 0)
-     */
-    public function setTable($name)
-    {
-        $countTables = count($this->tables);
-
-        if (0 < $countTables) {
-            return null;
-        }
-
-        return self::insert($this->tables, $name);
-    }
-
-    public function setWhere(AbstractExpression $expression)
-    {
-        $this->where = $expression;
-    }
-
-    public function setOrderBy($tableId, $column, $isAscending)
-    {
-        if (!self::isDefined($this->tables, $tableId)) {
-            $tableString = json_encode($tableId);
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $tableId
-                ),
-                "unknown table id {$tableString}."
-            );
-        }
-
-        $table = self::getIdentifier($tableId);
-        $name = self::getAbsoluteExpression($table, $column);
-
-        $mysql = "ORDER BY {$name} ";
-
-        if ($isAscending) {
-            $mysql .= "ASC";
-        } else {
-            $mysql .= "DESC";
-        }
-
-        $this->orderBy = $mysql;
-    }
-
-    public function setLimit($tableId, AbstractExpression $start, AbstractExpression $length)
-    {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
-        $offset = $start->getMysql();
-        $count = $length->getMysql();
-
-        $mysql = "{$offset}, {$count}";
-
-        $this->limit = $mysql;
-    }
-
-    public function addValue($tableId, $column)
-    {
-        if (!self::isDefined($this->tables, $tableId)) {
-            $tableString = json_decode($tableId);
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $tableId
-                ),
-                "unknown table id {$tableString}."
-            );
-        }
-
-        $table = self::getIdentifier($tableId);
-        $name = self::getAbsoluteExpression($table, $column);
-
-        return self::insert($this->columns, $name);
-    }
-
-    public function addExpression($tableId, $expression)
-    {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
-        return self::insert($this->columns, $expression);
     }
 
     public function getMysql()
@@ -175,87 +57,80 @@ class Select
         return rtrim($mysql, "\n");
     }
 
-    public function findTable($name)
+    public function addExpression($tableId, $expression)
     {
-        if (array_key_exists($name, $this->tables)) {
-            return $this->tables[$name];
-        } else {
-            return false;
-        }
-    }
-
-    public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $hasZero, $hasMany)
-    {
-        if (!self::isDefined($this->tables, $tableAId)) {
+        if (!self::isDefined($this->tables, $tableId)) {
             return null;
         }
-        $joinType = (!$hasZero && !$hasMany) ? self::JOIN_INNER : self::JOIN_LEFT;
-        $tableAIdentifier = self::getIdentifier($tableAId);
-        $key = json_encode(array($tableAIdentifier, $tableBIdentifier, $mysqlExpression, $joinType));
-        return self::insert($this->tables, $key);
+
+        return self::insert($this->columns, $expression);
     }
 
-    public function getTable($id)
+    public function setLimit($tableId, AbstractExpression $start, AbstractExpression $length)
     {
-        echo json_encode($this->tables) . "\n\n";
-        $name = array_search($id, $this->tables, true);
+        if (!self::isDefined($this->tables, $tableId)) {
+            return null;
+        }
 
-        if (!is_string($name)) {
-            $idString = json_decode($id);
+        $offset = $start->getMysql();
+        $count = $length->getMysql();
+        $mysql = "{$offset}, {$count}";
+
+        $this->limit = $mysql;
+    }
+
+    public function setOrderBy($tableId, $column, $isAscending)
+    {
+        if (!self::isDefined($this->tables, $tableId)) {
+            $tableString = json_encode($tableId);
             throw new AbstractException(
                 self::ERROR_BAD_TABLE_ID,
                 array(
-                    'tableId' => $id,
-                    'name' => $name
+                    'tableId' => $tableId
                 ),
-                "unknown table id {$idString}."
+                "unknown table id {$tableString}."
             );
         }
 
-        if (0 < $id) {
-            list(, $name) = json_decode($name);
+        $table = $this->getIdentifier($tableId);
+        $name = self::getAbsoluteExpression($table, $column);
+
+        $mysql = "ORDER BY {$name} ";
+
+        if ($isAscending) {
+            $mysql .= "ASC";
+        } else {
+            $mysql .= "DESC";
         }
 
-        return $name;
+        $this->orderBy = $mysql;
     }
 
-    public static function getAbsoluteExpression($context, $expression)
+    public function addValue($tableId, $column)
     {
-        return preg_replace('~`.*?`~', "{$context}.\$0", $expression);
-    }
-
-    private static function insert(&$array, $key)
-    {
-        $id = &$array[$key];
-
-        if (!isset($id)) {
-            $id = count($array) - 1;
+        if (!self::isDefined($this->tables, $tableId)) {
+            $tableString = json_decode($tableId);
+            throw new AbstractException(
+                self::ERROR_BAD_TABLE_ID,
+                array(
+                    'tableId' => $tableId
+                ),
+                "unknown table id {$tableString}."
+            );
         }
 
-        return $id;
+        $table = self::getIdentifier($tableId);
+        $name = self::getAbsoluteExpression($table, $column);
+
+        return self::insert($this->columns, $name);
     }
 
-    private static function isDefined($array, $id)
-    {
-        return is_int($id) && (-1 < $id) && ($id < count($array));
-    }
-
-    private static function getIdentifier($name)
-    {
-        return "`{$name}`";
-    }
-
-    private function isValid()
-    {
-        return (0 < count($this->tables)) && (0 < count($this->columns));
-    }
-
-    private function getColumns()
+    protected function getColumns()
     {
         return "SELECT\n\t" . implode(",\n\t", $this->getColumnNames()) . "\n";
     }
 
-    private function getColumnNames()
+    protected function getColumnNames()
     {
         $columns = array();
 
@@ -266,7 +141,7 @@ class Select
         return $columns;
     }
 
-    private function getTables()
+    protected function getTables()
     {
         list($table, $id) = each($this->tables);
 
@@ -295,53 +170,14 @@ class Select
         return $mysql;
     }
 
-    private function getWhereClause()
+    protected function isValid()
     {
-        if ($this->where === null) {
-            return null;
-        }
-
-        $where = $this->where->getMysql();
-        return "\tWHERE {$where}\n";
+        return (0 < count($this->tables)) && (0 < count($this->columns));
     }
 
-    private function getOrderByClause()
-    {
-        if ($this->orderBy === null) {
-            return null;
-        }
-
-        return "\t{$this->orderBy}\n";
-    }
-
-    private function getLimitClause()
-    {
-        if ($this->limit === null) {
-            return null;
-        }
-
-        return "\tLIMIT {$this->limit}\n";
-    }
-
-    private static function getAliasedName($name, $id)
+    protected static function getAliasedName($name, $id)
     {
         $alias = self::getIdentifier($id);
         return "{$name} AS {$alias}";
-    }
-
-    public function setRollbackPoint()
-    {
-        $this->rollbackPoint[] = array(count($this->tables));
-    }
-
-    public function clearRollbackPoint()
-    {
-        array_pop($this->rollbackPoint);
-    }
-
-    public function rollback()
-    {
-        $rollbackState = array_pop($this->rollbackPoint);
-        $this->tables = array_slice($this->tables, 0, $rollbackState[0]);
     }
 }
