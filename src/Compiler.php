@@ -50,7 +50,7 @@ class Compiler
     {
         $queryType = self::getQueryType($translatedRequest);
 
-        switch($queryType) {
+        switch ($queryType) {
             case self::TYPE_GET:
                 return $this->getCompiler->compile($translatedRequest, $arguments);
 

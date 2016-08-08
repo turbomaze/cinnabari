@@ -25,7 +25,7 @@
 
 namespace Datto\Cinnabari\Mysql;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 class Delete extends AbstractMysql
@@ -33,11 +33,7 @@ class Delete extends AbstractMysql
     public function getMysql()
     {
         if (!$this->isValid()) {
-            throw new AbstractException(
-                self::ERROR_INVALID_MYSQL,
-                array(),
-                "SQL delete queries must reference at least one table."
-            );
+            throw CompilerException::invalidDelete();
         }
 
         $mysql = "DELETE\n" .
@@ -52,14 +48,7 @@ class Delete extends AbstractMysql
     public function setOrderBy($tableId, $column, $isAscending)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            $tableString = json_encode($tableId);
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $tableId
-                ),
-                "unknown table id {$tableString}."
-            );
+            throw CompilerException::badTableId($tableId);
         }
 
         $table = $this->getTable($tableId);

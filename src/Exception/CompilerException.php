@@ -26,7 +26,7 @@ namespace Datto\Cinnabari\Exception;
 
 class CompilerException extends AbstractException
 {
-	const UNKNOWN_REQUEST_TYPE = 1;
+    const UNKNOWN_REQUEST_TYPE = 1;
     const NO_INITIAL_PROPERTY = 2;
     const NO_INITIAL_PATH = 3;
     const INVALID_METHOD_SEQUENCE = 4;
@@ -38,16 +38,17 @@ class CompilerException extends AbstractException
     const BAD_SCHEMA = 10;
     const BAD_TABLE_ID = 11;
     const INVALID_SELECT = 12;
-    const UNKNOWN_TYPECAST = 13;
+    const INVALID_DELETE = 13;
+    const UNKNOWN_TYPECAST = 14;
 
-	public static function unknownRequestType($request)
-	{
-		$code = self::UNKNOWN_REQUEST_TYPE;
-		$data = array('request' => $request);
-		$message = 'Only get and delete queries are supported at the moment.';
+    public static function unknownRequestType($request)
+    {
+        $code = self::UNKNOWN_REQUEST_TYPE;
+        $data = array('request' => $request);
+        $message = 'Only get and delete queries are supported at the moment.';
 
-		return new self($code, $data, $message);
-	}
+        return new self($code, $data, $message);
+    }
 
     public static function noInitialProperty($token)
     {
@@ -163,12 +164,20 @@ class CompilerException extends AbstractException
     public static function invalidSelect()
     {
         $code = self::INVALID_SELECT;
-        $message = 'SQL queries must reference at least one table ' .
+        $message = 'SQL select queries must reference at least one table ' .
             'and one column.';
 
         return new self($code, null, $message);
     }
 
+    public static function invalidDelete()
+    {
+        $code = self::INVALID_DELETE;
+        $message = 'SQL delete queries must reference at least one table.';
+
+        return new self($code, null, $message);
+    }
+    
     public static function unknownTypecast($type)
     {
         $code = self::UNKNOWN_TYPECAST;

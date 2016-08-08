@@ -41,11 +41,7 @@ class Select extends AbstractMysql
     public function getMysql()
     {
         if (!$this->isValid()) {
-            throw new AbstractException(
-                self::ERROR_INVALID_MYSQL,
-                array(),
-                "SQL queries must reference at least one table and column."
-            );
+            throw CompilerException::invalidSelect();
         }
 
         $mysql = $this->getColumns() .

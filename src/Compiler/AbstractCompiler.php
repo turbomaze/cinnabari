@@ -72,11 +72,11 @@ abstract class AbstractCompiler implements CompilerInterface
         $this->rollbackPoint = array();
     }
 
-	/**
-	 * @param array $token
-	 * @param string $neededType
-	 * @param AbstractExpression|null $output
-	 */
+    /**
+     * @param array $token
+     * @param string $neededType
+     * @param AbstractExpression|null $output
+     */
     abstract protected function getProperty($token, $neededType, &$output);
 
     protected function getOptionalFilterFunction()
@@ -90,7 +90,7 @@ abstract class AbstractCompiler implements CompilerInterface
         }
 
         // at this point, we're sure they want to filter
-        if (!isset($arguments) || count($arguments) === 0) {
+        if (!isset($arguments) || (count($arguments) === 0)) {
             throw CompilerException::noFilterArguments($this->request);
         }
 
@@ -486,15 +486,15 @@ abstract class AbstractCompiler implements CompilerInterface
             return false;
         }
 
-        $aIsAnInteger = $typeA === Output::TYPE_INTEGER;
-        $bIsAnInteger = $typeB === Output::TYPE_INTEGER;
-        $aIsAFloat = $typeA === Output::TYPE_FLOAT;
-        $bIsAFloat = $typeB === Output::TYPE_FLOAT;
+        $aIsAnInteger = ($typeA === Output::TYPE_INTEGER);
+        $bIsAnInteger = ($typeB === Output::TYPE_INTEGER);
+        $aIsAFloat = ($typeA === Output::TYPE_FLOAT);
+        $bIsAFloat = ($typeB === Output::TYPE_FLOAT);
 
-        if ($name === 'plus' || $name === 'minus' || $name === 'times' || $name === 'divides') {
+        if (($name === 'plus') || ($name === 'minus') || ($name === 'times') || ($name === 'divides')) {
             if ($aIsAnInteger && $bIsAnInteger) {
                 $type = Output::TYPE_INTEGER;
-            } elseif ($aIsAnInteger && $bIsAFloat || $aIsAFloat && $bIsAnInteger || $aIsAFloat && $bIsAFloat) {
+            } elseif (($aIsAnInteger && $bIsAFloat) || ($aIsAFloat && $bIsAnInteger) || ($aIsAFloat && $bIsAFloat)) {
                 $type = Output::TYPE_FLOAT;
             } else {
                 return false;
@@ -702,4 +702,3 @@ abstract class AbstractCompiler implements CompilerInterface
         $this->mysql->rollback();
     }
 }
-

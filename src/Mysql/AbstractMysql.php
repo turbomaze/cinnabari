@@ -25,7 +25,7 @@
 
 namespace Datto\Cinnabari\Mysql;
 
-use Datto\Cinnabari\Exception\AbstractException;
+use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 abstract class AbstractMysql
@@ -61,11 +61,11 @@ abstract class AbstractMysql
         $this->rollbackPoint = array();
     }
 
-	/**
-	 * @param integer $context
-	 * @param string $name
-	 * @param bool $isAscending
-	 */
+    /**
+     * @param integer $context
+     * @param string $name
+     * @param bool $isAscending
+     */
     abstract public function setOrderBy($context, $name, $isAscending);
 
     /**
@@ -118,15 +118,7 @@ abstract class AbstractMysql
         $name = array_search($id, $this->tables, true);
 
         if (!is_string($name)) {
-            $idString = json_decode($id);
-            throw new AbstractException(
-                self::ERROR_BAD_TABLE_ID,
-                array(
-                    'tableId' => $id,
-                    'name' => $name
-                ),
-                "unknown table id {$idString}."
-            );
+            throw CompilerException::badTableId($id);
         }
 
         if (0 < $id) {

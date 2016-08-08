@@ -11,8 +11,10 @@ When joining from an origin table to a destination table:
  * Assume there is exactly one matching row in the destination table
  * If there is NO foreign key:
       Add the possibility of no matching rows in the destination table
- * If there is either (a) NO uniqueness constraint on the destination table, or (b) BOTH the origin and destination columns are nullable:
-      Add the possibility of many matching rows
+ * If there is either:
+     (a) NO uniqueness constraint on the destination table, or
+     (b) BOTH the origin and destination columns are nullable:
+ * Then add the possibility of many matching rows
 */
 
 class CompilerTest extends PHPUnit_Framework_TestCase
