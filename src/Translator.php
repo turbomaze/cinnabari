@@ -43,6 +43,9 @@ class Translator
     /** @var array */
     private $schema;
 
+    /** @var string */
+    private $context;
+
     public function __construct($schema)
     {
         $this->schema = $schema;
@@ -73,9 +76,17 @@ class Translator
                     break;
 
                 case Parser::TYPE_FUNCTION:
-                    $function = $token[1];
-                    $arguments = array_slice($token, 2);
-                    $this->getFunction($class, $table, $function, $arguments, $output);
+                    $this->scanFunction($token, $function, $arguments);
+                    switch ($function) {
+                        case 'get':
+                        case 'filter':
+                            $this->getListFunction($class, $table, $function, $arguments, $output);
+                            break;
+
+                        default: 
+                            $this->getFunction($class, $table, $function, $arguments, $output);
+                            break;
+                    }
                     break;
 
                 default: // Parser::TYPE_OBJECT:
@@ -171,6 +182,40 @@ class Translator
         );
     }
 
+    private function getListFunction(&$class, &$table, $function, $arguments, &$output)
+    {
+        // list functions cannot have array tokens as their first argument
+        $firstArgument = array_shift($arguments);
+        $firstArgument = reset($firstArgument); // TODO: exception?
+        $firstArgumentType = $firstArgument[0];
+
+        if ($firstArgumentType === Parser::TYPE_PROPERTY) {
+            $property = $firstArgument[1];
+            $this->getProperty($class, $table, $property, $output);
+            $this->getFunction($class, $table, $function, $arguments, $output);
+            return $property;
+        } else {
+            $this->scanFunction($firstArgument, $childFunction, $childArguments);
+
+            $property = $this->getListFunction(
+                $class,
+                $table,
+                $childFunction,
+                $childArguments,
+                $output
+            );
+
+            $translatedArguments = $this->translateArray($class, $table, $arguments);
+
+            $output[] = array(
+                self::TYPE_FUNCTION => array(
+                    'function' => $function,
+                    'arguments' => $translatedArguments
+                )
+            );
+        }
+    }
+
     private function getObject(&$class, &$table, $object, &$output)
     {
         $output[] = array(
@@ -234,5 +279,11 @@ class Translator
         }
 
         return $definition;
+    }
+
+    private static function scanFunction($token, &$function, &$arguments)
+    {
+        $function = $token[1];
+        $arguments = array_slice($token, 2);
     }
 }

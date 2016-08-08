@@ -34,7 +34,7 @@ class CompilerException extends AbstractException
     const BAD_FILTER_EXPRESSION = 6;
     const NO_SORT_ARGUMENTS = 7;
     const BAD_SLICE_ARGUMENTS = 8;
-    const BAD_MAP_ARGUMENT = 9;
+    const BAD_GET_ARGUMENT = 9;
     const BAD_SCHEMA = 10;
     const BAD_TABLE_ID = 11;
     const INVALID_SELECT = 12;
@@ -96,7 +96,7 @@ class CompilerException extends AbstractException
         $code = self::INVALID_METHOD_SEQUENCE;
         $data = array('request' => $request);
         $message = 'API requests must consist of optional filter/sort/slice ' .
-            'methods followed by a map or delete.';
+            'methods followed by a get or delete.';
 
         return new self($code, $data, $message);
     }
@@ -123,11 +123,11 @@ class CompilerException extends AbstractException
         return new self($code, $data, $message);
     }
 
-    public static function badMapArgument($request)
+    public static function badGetArgument($request)
     {
-        $code = self::BAD_MAP_ARGUMENT;
+        $code = self::BAD_GET_ARGUMENT;
         $data = array('request' => $request);
-        $message = 'Map functions take a property, path, object, ' .
+        $message = 'Get functions take a property, path, object, ' .
             'or function as an argument.';
 
         return new self($code, $data, $message);

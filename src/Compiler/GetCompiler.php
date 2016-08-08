@@ -37,12 +37,6 @@ use Datto\Cinnabari\Translator;
 /**
  * Class GetCompiler
  * @package Datto\Cinnabari
- *
- * EBNF:
- *
- * request = list, [ filter-function ], map-function
- * map-argument = path | property | object | map
- * object-value = path | property | object | map
  */
 class GetCompiler extends AbstractCompiler
 {
@@ -99,7 +93,7 @@ class GetCompiler extends AbstractCompiler
 
         $this->request = reset($this->request);
 
-        if (!$this->readMap()) {
+        if (!$this->readGet()) {
             throw CompilerException::invalidMethodSequence($this->request);
         }
 
@@ -191,27 +185,27 @@ class GetCompiler extends AbstractCompiler
         return true;
     }
 
-    protected function getMap($arguments)
+    protected function getGet($arguments)
     {
         $this->request = reset($arguments);
         return $this->readExpression();
     }
 
-    protected function readMap()
+    protected function readGet()
     {
         if (!self::scanFunction($this->request, $name, $arguments)) {
             return false;
         }
 
-        if ($name !== 'map') {
+        if ($name !== 'get') {
             return false;
         }
 
-        // at this point they definitely intend to use a map function
+        // at this point they definitely intend to use a get function
         $this->request = reset($arguments);
 
         if (!$this->readExpression()) {
-            throw CompilerException::badMapArgument($this->request);
+            throw CompilerException::badGetArgument($this->request);
         }
 
         return true;
@@ -224,8 +218,8 @@ class GetCompiler extends AbstractCompiler
         }
 
         switch ($name) {
-            case 'map':
-                return $this->getMap($arguments);
+            case 'get':
+                return $this->getGet($arguments);
 
             case 'plus':
             case 'minus':
