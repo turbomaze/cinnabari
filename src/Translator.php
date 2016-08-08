@@ -79,7 +79,7 @@ class Translator
                     $this->scanFunction($token, $function, $arguments);
                     switch ($function) {
                         case 'get':
-                        case 'filter':
+                        case 'delete':
                             $this->getListFunction($class, $table, $function, $arguments, $output);
                             break;
 
