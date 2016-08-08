@@ -28,7 +28,7 @@ use Datto\Cinnabari\Exception\ArgumentsException;
 use Datto\Cinnabari\Exception\CinnabariException;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Exception\LexerException;
-use Datto\Cinnabari\Exception\SchemaException;
+use Datto\Cinnabari\Exception\TranslatorException;
 
 class Cinnabari
 {
@@ -50,10 +50,10 @@ class Cinnabari
             $request = $parser->parse($tokens);
             $translatedRequest = $translator->translate($request);
             return $compiler->compile($translatedRequest, $arguments);
-        } catch (SchemaException $exception) {
-            throw CinnabariException::schema($exception);
         } catch (LexerException $exception) {
             throw CinnabariException::lexer($exception);
+        } catch (TranslatorException $exception) {
+            throw CinnabariException::translator($exception);
         } catch (CompilerException $exception) {
             throw CinnabariException::compiler($exception);
         } catch (ArgumentsException $exception) {

@@ -24,6 +24,8 @@
 
 namespace Datto\Cinnabari;
 
+use Datto\Cinnabari\Exception\TranslatorException;
+
 class Translator
 {
     const TYPE_PARAMETER = 1;
@@ -192,7 +194,7 @@ class Translator
         $definition = &$this->schema['classes'][$class][$property];
 
         if ($definition === null) {
-            throw self::exceptionUnknownProperty($class, $property);
+            throw TranslatorException::unknownProperty($class, $property);
         }
 
         $type = reset($definition);
@@ -206,7 +208,7 @@ class Translator
         $definition = &$this->schema['lists'][$list];
 
         if ($definition === null) {
-            throw self::exceptionUnknownList($list);
+            throw TranslatorException::unknownList($list);
         }
 
         return $definition;
@@ -217,7 +219,7 @@ class Translator
         $definition = &$this->schema['connections'][$table][$connection];
 
         if ($definition === null) {
-            throw self::exceptionUnknownConnection($table, $connection);
+            throw TranslatorException::unknownConnection($table, $connection);
         }
 
         return $definition;
@@ -228,75 +230,9 @@ class Translator
         $definition = &$this->schema['values'][$table][$value];
 
         if ($definition === null) {
-            throw self::exceptionUnknownValue($table, $value);
+            throw TranslatorException::unknownValue($table, $value);
         }
 
         return $definition;
-    }
-
-    private static function exceptionUnknownProperty($class, $property)
-    {
-        $code = self::EXCEPTION_UNKNOWN_PROPERTY;
-
-        $data = array(
-            'class' => $class,
-            'property' => $property
-        );
-
-        $className = json_encode($class);
-        $propertyName = json_encode($property);
-
-        $message = "Unknown property {$propertyName} in class {$className}";
-
-        return new Exception($code, $data, $message);
-    }
-
-    private static function exceptionUnknownList($list)
-    {
-        $code = self::EXCEPTION_UNKNOWN_LIST;
-
-        $data = array(
-            'list' => $list
-        );
-
-        $listName = json_encode($list);
-
-        $message = "Unknown list {$listName}";
-
-        return new Exception($code, $data, $message);
-    }
-
-    private static function exceptionUnknownConnection($table, $connection)
-    {
-        $code = self::EXCEPTION_UNKNOWN_CONNECTION;
-
-        $data = array(
-            'table' => $table,
-            'connection' => $connection
-        );
-
-        $connectionName = json_encode($connection);
-        $tableName = json_encode($table);
-
-        $message = "Unknown connection {$connectionName} in table {$tableName}";
-
-        return new Exception($code, $data, $message);
-    }
-
-    private static function exceptionUnknownValue($table, $value)
-    {
-        $code = self::EXCEPTION_UNKNOWN_VALUE;
-
-        $data = array(
-            'table' => $table,
-            'value' => $value
-        );
-
-        $tableName = json_encode($table);
-        $valueName = json_encode($value);
-
-        $message = "Unknown value {$valueName} in table {$tableName}";
-
-        return new Exception($code, $data, $message);
     }
 }

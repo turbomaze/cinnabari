@@ -834,7 +834,7 @@ EOS;
             $method,
             $arguments,
             // the universal code corresponding to this exception
-            406,
+            306,
             array(
                 'context' => 0,
                 'arguments' => $matchFunction
@@ -899,7 +899,7 @@ EOS;
             $scenario,
             $method,
             $arguments,
-            406,
+            306,
             array(
                 'context' => 0,
                 'arguments' => $matchFunction
