@@ -283,7 +283,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testGetBasicObject()
@@ -331,7 +332,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testGetAdvancedObject()
@@ -373,7 +375,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testGetFilter()
@@ -412,7 +415,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testGetAdvancedFilter()
@@ -485,7 +489,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function getSort()
@@ -520,7 +525,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testGetAdvancedSort()
@@ -557,7 +563,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testGetSlice()
@@ -599,7 +606,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testGet()
@@ -635,7 +643,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testGetGet()
@@ -687,7 +696,8 @@ foreach ($output as &$x0) {
 }
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testGetGetGet()
@@ -755,7 +765,8 @@ foreach ($output as &$x1) {
 }
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testGetFilterMatch()
@@ -796,7 +807,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testDelete()
@@ -824,7 +836,8 @@ EOS;
 $output = null;
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testDeleteFilter()
@@ -857,7 +870,8 @@ EOS;
 $output = null;
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     /**
@@ -907,7 +921,8 @@ EOS;
 $output = null;
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testDeleteSliceSortFilter()
@@ -938,6 +953,97 @@ EOS;
 $output = array(
     $input['age'],
     $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testInsert()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+insert(
+    people,
+    {
+        "name": :name,
+        "email": :email,
+        "age": :age,
+        "height": :height,
+        "isMarried": :isMarried
+    }
+)
+EOS;
+
+        $arguments = array(
+            'isMarried' => false,
+            'age' => 28,
+            'height' => 5.3,
+            'name' => 'Eva',
+            'email' => 'eva@example.com'
+        );
+
+        $mysql = <<<'EOS'
+INSERT
+    INTO `People`
+    SET
+        `Name` = :0,
+        `Email` = :1,
+        `Age` = :2,
+        `Height` = :3,
+        `Married` = :4
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['isMarried'],
+    $input['age'],
+    $input['height'],
+    $input['name'],
+    $input['email']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testSet()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+set(
+    people,
+    {
+        "name", :name
+    }
+)
+EOS;
+
+        $arguments = array(
+            'name' => 'Nemo'
+        );
+
+        $mysql = <<<'EOS'
+UPDATE
+    `People` AS `0`
+    SET
+        `0`.`Name` = :0
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['name']
 );
 EOS;
 
