@@ -36,6 +36,7 @@ use Datto\Cinnabari\Parser;
  */
 class Compiler
 {
+    const TYPE_UNKNOWN = -1;
     const TYPE_GET = 0;
     const TYPE_DELETE = 1;
     const TYPE_SET = 2;
@@ -71,7 +72,7 @@ class Compiler
                 return $this->setCompiler->compile($translatedRequest, $arguments);
     
             default:
-                throw CompilerException::unknownRequestType($translatedRequest);
+                throw CompilerException::unknownRequestType($request);
         }
     }
 
@@ -80,13 +81,15 @@ class Compiler
         list($tokenType, $functionName, ) = reset($request);
 
         if ($tokenType === Parser::TYPE_FUNCTION) {
-            if ($functionName === 'delete') {
+            if ($functionName === 'get') {
+                return self::TYPE_GET;
+            } else if ($functionName === 'delete') {
                 return self::TYPE_DELETE;
             } else if ($functionName === 'set') {
                 return self::TYPE_SET;
             }
         }
 
-        return self::TYPE_GET;
+        return self::TYPE_UNKNOWN;
     }
 }

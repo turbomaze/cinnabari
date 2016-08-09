@@ -1025,7 +1025,7 @@ EOS;
 set(
     people,
     {
-        "name", :name
+        "name": :name
     }
 )
 EOS;

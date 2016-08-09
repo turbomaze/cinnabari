@@ -47,7 +47,7 @@ class CompilerException extends AbstractException
     {
         $code = self::UNKNOWN_REQUEST_TYPE;
         $data = array('request' => $request);
-        $message = 'Only get and delete queries are supported at the moment.';
+        $message = 'Only get, delete, and set queries are supported at the moment.';
 
         return new self($code, $data, $message);
     }

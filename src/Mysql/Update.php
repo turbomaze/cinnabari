@@ -112,7 +112,7 @@ class Update extends AbstractMysql
             $pairs[] = $column . ' = ' . $this->values[$column];
         }
 
-        return "\tSET " . implode(", ", $pairs) . "\n";
+        return "\tSET\n\t\t" . implode(",\n\t\t", $pairs) . "\n";
     }
 
     protected function getTables()
