@@ -28,7 +28,7 @@ namespace Datto\Cinnabari\Mysql;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
-class Update extends AbstractMysql
+class Insert extends AbstractMysql
 {
     /** @var string[] */
     protected $columns;
@@ -46,50 +46,14 @@ class Update extends AbstractMysql
     public function getMysql()
     {
         if (!$this->isValid()) {
-            throw CompilerException::invalidUpdate();
+            throw CompilerException::invalidInsert();
         }
 
-        $mysql = "UPDATE\n" .
+        $mysql = "INSERT\n" .
             $this->getTables() .
-            $this->getColumnValuePairs() .
-            $this->getWhereClause() .
-            $this->getOrderByClause() .
-            $this->getLimitClause();
+            $this->getColumnValuePairs();
 
         return rtrim($mysql, "\n");
-    }
-
-    public function setLimit($tableId, AbstractExpression $start, AbstractExpression $length)
-    {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
-        $offset = $start->getMysql();
-        $count = $length->getMysql();
-        $mysql = "{$offset}, {$count}";
-
-        $this->limit = $mysql;
-    }
-
-    public function setOrderBy($tableId, $column, $isAscending)
-    {
-        if (!self::isDefined($this->tables, $tableId)) {
-            throw CompilerException::badTableId($tableId);
-        }
-
-        $table = $this->getIdentifier($tableId);
-        $name = self::getAbsoluteExpression($table, $column);
-
-        $mysql = "ORDER BY {$name}";
-
-        if ($isAscending) {
-            $mysql .= " ASC";
-        } else {
-            $mysql .= " DESC";
-        }
-
-        $this->orderBy = $mysql;
     }
 
     public function addPropertyValuePair($tableId, $column, $expression)
@@ -98,8 +62,7 @@ class Update extends AbstractMysql
             throw CompilerException::badTableId($tableId);
         }
 
-        $table = self::getIdentifier($tableId);
-        $name = self::getAbsoluteExpression($table, $column->getMysql());
+        $name = self::getColumnNameFromExpression($column->getMysql());
 
         $this->values[$name] = $expression->getMysql();
         return self::insert($this->columns, $name);
@@ -120,27 +83,7 @@ class Update extends AbstractMysql
     {
         list($table, $id) = each($this->tables);
 
-        $mysql = "\t" . self::getAliasedName($table, $id) . "\n";
-
-        $tables = array_slice($this->tables, 1);
-
-        foreach ($tables as $joinJson => $id) {
-            list($tableAIdentifier, $tableBIdentifier, $expression, $type) = json_decode($joinJson, true);
-
-            $joinIdentifier = self::getIdentifier($id);
-
-            $from = array('`0`', '`1`');
-            $to = array($tableAIdentifier, $joinIdentifier);
-            $expression = str_replace($from, $to, $expression);
-
-            if ($type === self::JOIN_INNER) {
-                $mysqlJoin = 'INNER JOIN';
-            } else {
-                $mysqlJoin = 'LEFT JOIN';
-            }
-
-            $mysql .= "\t{$mysqlJoin} {$tableBIdentifier} AS {$joinIdentifier} ON {$expression}\n";
-        }
+        $mysql = "\tINTO " . $table . "\n";
 
         return $mysql;
     }
@@ -150,10 +93,13 @@ class Update extends AbstractMysql
         return (0 < count($this->tables)) && (0 < count($this->columns)) && (count($this->columns) === count($this->values));
     }
 
-    protected static function getAliasedName($name, $id)
+    private static function getColumnNameFromExpression($expression)
     {
-        $alias = self::getIdentifier($id);
-        return "{$name} AS {$alias}";
+        preg_match("/`[a-z0-9_$]+`/i", $expression, $matches);
+        if (count($matches) === 0) {
+            return $expression;
+        } else {
+            return $matches[0];
+        }
     }
 }
-

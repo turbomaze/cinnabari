@@ -41,7 +41,8 @@ class CompilerException extends AbstractException
     const INVALID_SELECT = 13;
     const INVALID_DELETE = 14;
     const INVALID_UPDATE = 15;
-    const UNKNOWN_TYPECAST = 16;
+    const INVALID_INSERT = 16;
+    const UNKNOWN_TYPECAST = 17;
 
     public static function unknownRequestType($request)
     {
@@ -193,6 +194,14 @@ class CompilerException extends AbstractException
     {
         $code = self::INVALID_UPDATE;
         $message = 'SQL update queries must reference at least one table and one column, and there must be one value associated with each column.';
+
+        return new self($code, null, $message);
+    }
+
+    public static function invalidInsert()
+    {
+        $code = self::INVALID_INSERT;
+        $message = 'SQL insert queries must reference exactly one table and at least one column.';
 
         return new self($code, null, $message);
     }

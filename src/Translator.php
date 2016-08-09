@@ -85,6 +85,7 @@ class Translator
                         case 'get':
                         case 'delete':
                         case 'set':
+                        case 'insert':
                             $this->getListFunction(
                                 $translateObjectKeys,
                                 $class,

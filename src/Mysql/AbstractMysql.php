@@ -62,13 +62,6 @@ abstract class AbstractMysql
     }
 
     /**
-     * @param integer $context
-     * @param string $name
-     * @param bool $isAscending
-     */
-    abstract public function setOrderBy($context, $name, $isAscending);
-
-    /**
      * @param string $name
      * Mysql table identifier (e.g. "`people`")
      *

@@ -1002,11 +1002,11 @@ EOS;
 
         $phpInput = <<<'EOS'
 $output = array(
-    $input['isMarried'],
+    $input['name'],
+    $input['email'],
     $input['age'],
     $input['height'],
-    $input['name'],
-    $input['email']
+    $input['isMarried']
 );
 EOS;
 

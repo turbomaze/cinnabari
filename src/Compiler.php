@@ -27,6 +27,7 @@ namespace Datto\Cinnabari;
 use Datto\Cinnabari\Compiler\DeleteCompiler;
 use Datto\Cinnabari\Compiler\GetCompiler;
 use Datto\Cinnabari\Compiler\SetCompiler;
+use Datto\Cinnabari\Compiler\InsertCompiler;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Parser;
 
@@ -40,6 +41,7 @@ class Compiler
     const TYPE_GET = 0;
     const TYPE_DELETE = 1;
     const TYPE_SET = 2;
+    const TYPE_INSERT = 3;
 
     private $getCompiler;
     private $deleteCompiler;
@@ -51,6 +53,7 @@ class Compiler
         $this->getCompiler = new GetCompiler();
         $this->deleteCompiler = new DeleteCompiler();
         $this->setCompiler = new SetCompiler();
+        $this->insertCompiler = new InsertCompiler();
         $this->translator = new Translator($schema);
     }
     
@@ -70,6 +73,10 @@ class Compiler
             case self::TYPE_SET:
                 $translatedRequest = $this->translator->translateIncludingObjects($request);
                 return $this->setCompiler->compile($translatedRequest, $arguments);
+
+            case self::TYPE_INSERT:
+                $translatedRequest = $this->translator->translateIncludingObjects($request);
+                return $this->insertCompiler->compile($translatedRequest, $arguments);
     
             default:
                 throw CompilerException::unknownRequestType($request);
@@ -87,6 +94,8 @@ class Compiler
                 return self::TYPE_DELETE;
             } else if ($functionName === 'set') {
                 return self::TYPE_SET;
+            } else if ($functionName === 'insert') {
+                return self::TYPE_INSERT;
             }
         }
 
