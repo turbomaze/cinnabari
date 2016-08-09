@@ -193,7 +193,8 @@ class CompilerException extends AbstractException
     public static function invalidUpdate()
     {
         $code = self::INVALID_UPDATE;
-        $message = 'SQL update queries must reference at least one table and one column, and there must be one value associated with each column.';
+        $message = 'SQL update queries must reference at least one table and one column,' .
+            ' and there must be one value associated with each column.';
 
         return new self($code, null, $message);
     }

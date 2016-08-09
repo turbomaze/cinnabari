@@ -27,6 +27,7 @@ namespace Datto\Cinnabari\Mysql;
 
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
+use Datto\Cinnabari\Mysql\Expression\Column;
 
 class Insert extends AbstractMysql
 {
@@ -56,7 +57,7 @@ class Insert extends AbstractMysql
         return rtrim($mysql, "\n");
     }
 
-    public function addPropertyValuePair($tableId, $column, $expression)
+    public function addPropertyValuePair($tableId, Column $column, AbstractExpression $expression)
     {
         if (!self::isDefined($this->tables, $tableId)) {
             throw CompilerException::badTableId($tableId);
@@ -81,7 +82,7 @@ class Insert extends AbstractMysql
 
     protected function getTables()
     {
-        list($table, $id) = each($this->tables);
+        list($table, ) = each($this->tables);
 
         $mysql = "\tINTO " . $table . "\n";
 
@@ -90,7 +91,9 @@ class Insert extends AbstractMysql
 
     protected function isValid()
     {
-        return (0 < count($this->tables)) && (0 < count($this->columns)) && (count($this->columns) === count($this->values));
+        return (0 < count($this->tables)) &&
+            (0 < count($this->columns)) &&
+            (count($this->columns) === count($this->values));
     }
 
     private static function getColumnNameFromExpression($expression)

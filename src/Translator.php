@@ -18,6 +18,7 @@
  * along with Cinnabari. If not, see <http://www.gnu.org/licenses/>.
  *
  * @author Spencer Mortensen <smortensen@datto.com>
+ * @author Anthony Liu <aliu@datto.com>
  * @license http://www.gnu.org/licenses/lgpl-3.0.html LGPL-3.0
  * @copyright 2016 Datto, Inc.
  */
@@ -25,7 +26,6 @@
 namespace Datto\Cinnabari;
 
 use Datto\Cinnabari\Exception\TranslatorException;
-use Datto\Cinnabari\Parser;
 
 class Translator
 {
@@ -96,7 +96,7 @@ class Translator
                             );
                             break;
 
-                        default: 
+                        default:
                             $this->getFunction(
                                 $translateObjectKeys,
                                 $class,
@@ -237,6 +237,8 @@ class Translator
                     )
                 )
             );
+            
+            return $property;
         }
     }
 

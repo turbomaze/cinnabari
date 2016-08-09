@@ -253,6 +253,41 @@ class GetCompiler extends AbstractCompiler
         }
     }
 
+    protected function getOptionalSortFunction()
+    {
+        if (!self::scanFunction(reset($this->request), $name, $arguments)) {
+            return false;
+        }
+
+        if ($name !== 'sort') {
+            return false;
+        }
+
+        // at this point, we're sure they want to sort
+        if (!isset($arguments) || count($arguments) !== 1) {
+            // TODO: add an explanation of the missing argument, or link to the documentation
+            throw CompilerException::noSortArguments($this->request);
+        }
+
+        $state = array($this->request, $this->context);
+
+        // consume all of the joins
+        $this->request = $arguments[0];
+        $this->request = $this->followJoins($this->request);
+
+        if (!$this->scanProperty(reset($this->request), $table, $name, $type, $hasZero)) {
+            return false;
+        }
+
+        $this->mysql->setOrderBy($this->context, $name, true);
+
+        list($this->request, $this->context) = $state;
+
+        array_shift($this->request);
+
+        return true;
+    }
+
     protected function getOptionalSliceFunction()
     {
         if (!self::scanFunction(reset($this->request), $name, $arguments)) {

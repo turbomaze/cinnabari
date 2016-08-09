@@ -27,6 +27,7 @@ namespace Datto\Cinnabari\Mysql;
 
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
+use Datto\Cinnabari\Mysql\Expression\Column;
 
 class Update extends AbstractMysql
 {
@@ -92,7 +93,7 @@ class Update extends AbstractMysql
         $this->orderBy = $mysql;
     }
 
-    public function addPropertyValuePair($tableId, $column, $expression)
+    public function addPropertyValuePair($tableId, Column $column, AbstractExpression $expression)
     {
         if (!self::isDefined($this->tables, $tableId)) {
             throw CompilerException::badTableId($tableId);
@@ -147,7 +148,9 @@ class Update extends AbstractMysql
 
     protected function isValid()
     {
-        return (0 < count($this->tables)) && (0 < count($this->columns)) && (count($this->columns) === count($this->values));
+        return (0 < count($this->tables)) &&
+            (0 < count($this->columns)) &&
+            (count($this->columns) === count($this->values));
     }
 
     protected static function getAliasedName($name, $id)
@@ -156,4 +159,3 @@ class Update extends AbstractMysql
         return "{$name} AS {$alias}";
     }
 }
-

@@ -27,7 +27,6 @@ namespace Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Exception\ArgumentsException;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
-use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\Column;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Mysql\Insert;
@@ -191,4 +190,3 @@ class InsertCompiler extends AbstractCompiler
         return true;
     }
 }
-

@@ -29,7 +29,6 @@ use Datto\Cinnabari\Compiler\GetCompiler;
 use Datto\Cinnabari\Compiler\SetCompiler;
 use Datto\Cinnabari\Compiler\InsertCompiler;
 use Datto\Cinnabari\Exception\CompilerException;
-use Datto\Cinnabari\Parser;
 
 /**
  * Class Compiler
@@ -88,14 +87,18 @@ class Compiler
         list($tokenType, $functionName, ) = reset($request);
 
         if ($tokenType === Parser::TYPE_FUNCTION) {
-            if ($functionName === 'get') {
-                return self::TYPE_GET;
-            } else if ($functionName === 'delete') {
-                return self::TYPE_DELETE;
-            } else if ($functionName === 'set') {
-                return self::TYPE_SET;
-            } else if ($functionName === 'insert') {
-                return self::TYPE_INSERT;
+            switch ($functionName) {
+                case 'get':
+                    return self::TYPE_GET;
+                    
+                case 'delete':
+                    return self::TYPE_DELETE;
+                    
+                case 'set':
+                    return self::TYPE_SET;
+
+                case 'insert':
+                    return self::TYPE_INSERT;
             }
         }
 
