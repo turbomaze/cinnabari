@@ -58,12 +58,6 @@ class Arguments
         return $id;
     }
 
-    /**
-     * TODO: this function currently inserts *two* expressions (the minuend is
-     * implicitly inserted along with the subtraction expression as a whole).
-     * To insert two independent expressions, we should use two independent
-     * function calls (e.g. useArgument(...); $useSubtractiveArgument(...);)
-     */
     public function useSubtractiveArgument($nameA, $nameB, $neededTypeA, $neededTypeB)
     {
         if (!array_key_exists($nameA, $this->input) || !array_key_exists($nameB, $this->input)) {
@@ -83,12 +77,10 @@ class Arguments
         }
 
         $inputA = self::getInputPhp($nameA);
-        $idA = $this->insertParameter($inputA);
-
         $inputB = self::getInputPhp($nameB);
         $idB = $this->insertParameter("{$inputB} - {$inputA}");
 
-        return array($idA, $idB);
+        return $idB;
     }
 
     public function getPhp()

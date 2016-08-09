@@ -26,25 +26,25 @@ namespace Datto\Cinnabari\Exception;
 
 class CinnabariException extends AbstractException
 {
-    private static $schema = 1;
-    private static $lexer = 2;
-    private static $compiler = 4;
-    private static $arguments = 5;
+    private static $lexer = 1;
+    private static $translator = 2;
+    private static $compiler = 3;
+    private static $arguments = 4;
 
     private static $multiplier = 100;
-
-    public static function schema(SchemaException $exception)
+    
+    public static function lexer(LexerException $exception)
     {
-        $code = self::getUniversalCode(self::$schema, $exception->getCode());
+        $code = self::getUniversalCode(self::$lexer, $exception->getCode());
         $data = $exception->getData();
         $message = $exception->getMessage();
 
         return new self($code, $data, $message);
     }
 
-    public static function lexer(LexerException $exception)
+    public static function translator(TranslatorException $exception)
     {
-        $code = self::getUniversalCode(self::$lexer, $exception->getCode());
+        $code = self::getUniversalCode(self::$translator, $exception->getCode());
         $data = $exception->getData();
         $message = $exception->getMessage();
 

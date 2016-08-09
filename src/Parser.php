@@ -31,7 +31,6 @@ class Parser
     const TYPE_PROPERTY = 2;
     const TYPE_FUNCTION = 3;
     const TYPE_OBJECT = 4;
-    const TYPE_PATH = 5;
 
     // Operator Arity
     const UNARY = 1;
@@ -140,7 +139,7 @@ class Parser
     private static function getExpression($tokens)
     {
         $tokens = self::sortTokens($tokens);
-        return self::getTokenStream($tokens);
+        return self::getExpressionFromSortedTokens($tokens);
     }
 
     private static function sortTokens($input)
@@ -198,7 +197,7 @@ class Parser
         return @self::$operators[$lexeme];
     }
 
-    private static function getTokenStream(&$tokens)
+    private static function getExpressionFromSortedTokens(&$tokens)
     {
         $token = array_pop($tokens);
 
@@ -227,12 +226,12 @@ class Parser
 
     private static function getParameterExpression($name)
     {
-        return array(self::TYPE_PARAMETER, $name);
+        return array(array(self::TYPE_PARAMETER, $name));
     }
 
     private static function getPropertyExpression($name)
     {
-        return array(self::TYPE_PROPERTY, $name);
+        return array(array(self::TYPE_PROPERTY, $name));
     }
 
     private static function getFunctionExpression($input)
@@ -248,7 +247,7 @@ class Parser
         $value = $arguments;
         array_unshift($value, self::TYPE_FUNCTION, $name);
 
-        return $value;
+        return array($value);
     }
 
     private static function getObjectExpression($input)
@@ -259,7 +258,7 @@ class Parser
             $output[$property] = self::getExpression($tokens);
         }
 
-        return array(self::TYPE_OBJECT, $output);
+        return array(array(self::TYPE_OBJECT, $output));
     }
 
     private static function getOperatorExpression($lexeme, &$tokens)
@@ -269,36 +268,18 @@ class Parser
 
         // Binary operator
         if ($operator['arity'] === self::BINARY) {
-            $childB = self::getTokenStream($tokens);
-            $childA = self::getTokenStream($tokens);
+            $childB = self::getExpressionFromSortedTokens($tokens);
+            $childA = self::getExpressionFromSortedTokens($tokens);
 
             if ($name === 'dot') {
-                return self::getPathExpression($childA, $childB);
+                return array_merge($childA, $childB);
             }
 
-            return array(self::TYPE_FUNCTION, $name, $childA, $childB);
+            return array(array(self::TYPE_FUNCTION, $name, $childA, $childB));
         }
 
         // Unary operator
-        $child = self::getTokenStream($tokens);
-        return array(self::TYPE_FUNCTION, $name, $child);
-    }
-
-    private static function getPathExpression($childA, $childB)
-    {
-        if ($childA[0] === self::TYPE_PATH) {
-            $children = array_slice($childA, 1);
-        } else {
-            $children = array($childA);
-        }
-
-        if ($childB[0] === self::TYPE_PATH) {
-            $children = array_merge($children, array_slice($childB, 1));
-        } else {
-            $children[] = $childB;
-        }
-
-        array_unshift($children, self::TYPE_PATH);
-        return $children;
+        $child = self::getExpressionFromSortedTokens($tokens);
+        return array(array(self::TYPE_FUNCTION, $name, $child));
     }
 }

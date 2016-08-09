@@ -2,14 +2,8 @@
 
 namespace Datto\Cinnabari\Tests;
 
-use Datto\Cinnabari\Compiler;
-use Datto\Cinnabari\Exception\ArgumentsException;
+use Datto\Cinnabari\Cinnabari;
 use Datto\Cinnabari\Exception\CinnabariException;
-use Datto\Cinnabari\Exception\CompilerException;
-use Datto\Cinnabari\Format\Arguments;
-use Datto\Cinnabari\Lexer;
-use Datto\Cinnabari\Parser;
-use Datto\Cinnabari\Schema;
 use PHPUnit_Framework_TestCase;
 
 /*
@@ -17,8 +11,10 @@ When joining from an origin table to a destination table:
  * Assume there is exactly one matching row in the destination table
  * If there is NO foreign key:
       Add the possibility of no matching rows in the destination table
- * If there is either (a) NO uniqueness constraint on the destination table, or (b) BOTH the origin and destination columns are nullable:
-      Add the possibility of many matching rows
+ * If there is either:
+     (a) NO uniqueness constraint on the destination table, or
+     (b) BOTH the origin and destination columns are nullable:
+ * Then add the possibility of many matching rows
 */
 
 class CompilerTest extends PHPUnit_Framework_TestCase
@@ -803,12 +799,46 @@ EOS;
             'a' => 'foo'
         );
 
+        $parameterPath = array(
+            0 => array(
+                6 => array(
+                    'tableA' => '`People`',
+                    'tableB' => '`Names`',
+                    'expression' => '`0`.`Name` <=> `1`.`Id`',
+                    'id' => '`Id`',
+                    'hasZero' => false,
+                    'hasMany' => false
+                )
+            ),
+            1 => array(
+                1 => 'a'
+            )
+        );
+
+        $matchFunction = array(
+            3 => array(
+                'function' => 'match',
+                'arguments' => array(
+                    0 => $parameterPath,
+                    1 => array(
+                        0 => array(
+                            1 => 'regex'
+                        )
+                    )
+                )
+            )
+        );
+
         $this->verifyException(
             $scenario,
             $method,
             $arguments,
-            ArgumentsException::WRONG_INPUT_TYPE,
-            array('name' => 'a', 'userType' => 'string', 'neededType' => 'integer')
+            // the universal code corresponding to this exception
+            306,
+            array(
+                'context' => 0,
+                'arguments' => $matchFunction
+            )
         );
     }
     
@@ -825,28 +855,53 @@ EOS;
             'a' => 'foo'
         );
 
-        $pathInformation = array(
-            5,
-            array(2, 'name'),
-            array(1, 'a'),
-            array(2, 'first')
+        $parameterPropertyPath = array(
+           0 => array(
+               6 => array(
+                   'tableA' => '`People`',
+                   'tableB' => '`Names`',
+                   'expression' => '`0`.`Name` <=> `1`.`Id`',
+                   'id' => '`Id`',
+                   'hasZero' => false,
+                   'hasMany' => false
+               )
+           ),
+           1 => array(
+               1 => 'a'
+           ),
+           2 => array(
+               7 => array(
+                   'table' => '`Names`',
+                   'expression' => '`First`',
+                   'type' => 4,
+                   'hasZero' => false
+               )
+           )
+        );
+
+        $matchArguments = array(
+            0 => $parameterPropertyPath,
+            1 => array(
+                0 => array(
+                    1 => 'regex'
+                )
+            )
         );
 
         $matchFunction = array(
-            3,
-            'match',
-            $pathInformation,
-            array(1, 'regex')
+            3 => array(
+                'function' => 'match',
+                'arguments' => $matchArguments
+            )
         );
 
         $this->verifyException(
             $scenario,
             $method,
             $arguments,
-            CompilerException::BAD_FILTER_EXPRESSION,
+            306,
             array(
-                'class' => 'Person',
-                'table' => 0,
+                'context' => 0,
                 'arguments' => $matchFunction
             )
         );
@@ -893,7 +948,7 @@ EOS;
         $mysql = <<<'EOS'
 DELETE
     FROM `People`
-    WHERE `People`.`Age` < :0
+    WHERE (`People`.`Age` < :0)
 EOS;
 
         $phpInput = <<<'EOS'
@@ -974,7 +1029,7 @@ EOS;
         $mysql = <<<'EOS'
 DELETE
     FROM `People`
-    WHERE :0 <= `People`.`Age`
+    WHERE (:0 <= `People`.`Age`)
     ORDER BY `People`.`Age` ASC
     LIMIT :1
 EOS;
@@ -1028,14 +1083,8 @@ EOS;
     {
         $scenario = json_decode($scenarioJson, true);
 
-        $lexer = new Lexer();
-        $parser = new Parser();
-        $schema = new Schema($scenario);
-        $compiler = new Compiler($schema);
-
-        $tokens = $lexer->tokenize($method);
-        $request = $parser->parse($tokens);
-        return $compiler->compile($request, $arguments);
+        $cinnabari = new Cinnabari($scenario);
+        return $cinnabari->translate($method, $arguments);
     }
 
     private static function standardize($artifact)

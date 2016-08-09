@@ -26,17 +26,29 @@ namespace Datto\Cinnabari\Exception;
 
 class CompilerException extends AbstractException
 {
-    const NO_INITIAL_PROPERTY = 1;
-    const NO_INITIAL_PATH = 2;
-    const INVALID_METHOD_SEQUENCE = 3;
-    const NO_FILTER_ARGUMENTS = 4;
-    const BAD_FILTER_EXPRESSION = 5;
-    const NO_SORT_ARGUMENTS = 6;
-    const BAD_MAP_ARGUMENT = 7;
-    const BAD_SCHEMA = 8;
-    const BAD_TABLE_ID = 9;
-    const INVALID_SELECT = 10;
-    const UNKNOWN_TYPECAST = 11;
+    const UNKNOWN_REQUEST_TYPE = 1;
+    const NO_INITIAL_PROPERTY = 2;
+    const NO_INITIAL_PATH = 3;
+    const INVALID_METHOD_SEQUENCE = 4;
+    const NO_FILTER_ARGUMENTS = 5;
+    const BAD_FILTER_EXPRESSION = 6;
+    const NO_SORT_ARGUMENTS = 7;
+    const BAD_SLICE_ARGUMENTS = 8;
+    const BAD_MAP_ARGUMENT = 9;
+    const BAD_SCHEMA = 10;
+    const BAD_TABLE_ID = 11;
+    const INVALID_SELECT = 12;
+    const INVALID_DELETE = 13;
+    const UNKNOWN_TYPECAST = 14;
+
+    public static function unknownRequestType($request)
+    {
+        $code = self::UNKNOWN_REQUEST_TYPE;
+        $data = array('request' => $request);
+        $message = 'Only get and delete queries are supported at the moment.';
+
+        return new self($code, $data, $message);
+    }
 
     public static function noInitialProperty($token)
     {
@@ -84,7 +96,7 @@ class CompilerException extends AbstractException
         $code = self::INVALID_METHOD_SEQUENCE;
         $data = array('request' => $request);
         $message = 'API requests must consist of optional filter/sort/slice ' .
-            'methods followed by a map.';
+            'methods followed by a map or delete.';
 
         return new self($code, $data, $message);
     }
@@ -99,12 +111,11 @@ class CompilerException extends AbstractException
         return new self($code, $data, $message);
     }
 
-    public static function badFilterExpression($class, $table, $arguments)
+    public static function badFilterExpression($context, $arguments)
     {
         $code = self::BAD_FILTER_EXPRESSION;
         $data = array(
-            'class' => $class,
-            'table' => $table,
+            'context' => $context,
             'arguments' => $arguments[0]
         );
         $message = 'Malformed expression supplied to the filter function.';
@@ -124,9 +135,18 @@ class CompilerException extends AbstractException
 
     public static function noSortArguments($token)
     {
-        $code = self::BAD_MAP_ARGUMENT;
+        $code = self::NO_SORT_ARGUMENTS;
         $data = array('token' => $token);
         $message = 'Sort functions take one argument.';
+
+        return new self($code, $data, $message);
+    }
+
+    public static function badSliceArguments($token)
+    {
+        $code = self::BAD_SLICE_ARGUMENTS;
+        $data = array('token' => $token);
+        $message = 'Slice functions take two integer arguments.';
 
         return new self($code, $data, $message);
     }
@@ -144,12 +164,20 @@ class CompilerException extends AbstractException
     public static function invalidSelect()
     {
         $code = self::INVALID_SELECT;
-        $message = 'SQL queries must reference at least one table ' .
+        $message = 'SQL select queries must reference at least one table ' .
             'and one column.';
 
         return new self($code, null, $message);
     }
 
+    public static function invalidDelete()
+    {
+        $code = self::INVALID_DELETE;
+        $message = 'SQL delete queries must reference at least one table.';
+
+        return new self($code, null, $message);
+    }
+    
     public static function unknownTypecast($type)
     {
         $code = self::UNKNOWN_TYPECAST;

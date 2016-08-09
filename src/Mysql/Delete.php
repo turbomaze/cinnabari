@@ -18,6 +18,7 @@
  * along with Cinnabari. If not, see <http://www.gnu.org/licenses/>.
  *
  * @author Spencer Mortensen <smortensen@datto.com>
+ * @author Anthony Liu <aliu@datto.com>
  * @license http://www.gnu.org/licenses/lgpl-3.0.html LGPL-3.0
  * @copyright 2016 Datto, Inc.
  */
@@ -27,24 +28,15 @@ namespace Datto\Cinnabari\Mysql;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
-class Select extends AbstractMysql
+class Delete extends AbstractMysql
 {
-    /** @var string[] */
-    protected $columns;
-
-    public function __construct()
-    {
-        parent::__construct();
-        $this->columns = array();
-    }
-
     public function getMysql()
     {
         if (!$this->isValid()) {
-            throw CompilerException::invalidSelect();
+            throw CompilerException::invalidDelete();
         }
 
-        $mysql = $this->getColumns() .
+        $mysql = "DELETE\n" .
             $this->getTables() .
             $this->getWhereClause() .
             $this->getOrderByClause() .
@@ -53,35 +45,13 @@ class Select extends AbstractMysql
         return rtrim($mysql, "\n");
     }
 
-    public function addExpression($tableId, $expression)
-    {
-        if (!self::isDefined($this->tables, $tableId)) {
-            throw CompilerException::badTableId($tableId);
-        }
-
-        return self::insert($this->columns, $expression);
-    }
-
-    public function setLimit($tableId, AbstractExpression $start, AbstractExpression $length)
-    {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
-        $offset = $start->getMysql();
-        $count = $length->getMysql();
-        $mysql = "{$offset}, {$count}";
-
-        $this->limit = $mysql;
-    }
-
     public function setOrderBy($tableId, $column, $isAscending)
     {
         if (!self::isDefined($this->tables, $tableId)) {
             throw CompilerException::badTableId($tableId);
         }
 
-        $table = $this->getIdentifier($tableId);
+        $table = $this->getTable($tableId);
         $name = self::getAbsoluteExpression($table, $column);
 
         $mysql = "ORDER BY {$name}";
@@ -95,39 +65,21 @@ class Select extends AbstractMysql
         $this->orderBy = $mysql;
     }
 
-    public function addValue($tableId, $column)
+    public function setLimit($tableId, AbstractExpression $length)
     {
         if (!self::isDefined($this->tables, $tableId)) {
-            throw CompilerException::badTableId($tableId);
+            return null;
         }
 
-        $table = self::getIdentifier($tableId);
-        $name = self::getAbsoluteExpression($table, $column);
-
-        return self::insert($this->columns, $name);
-    }
-
-    protected function getColumns()
-    {
-        return "SELECT\n\t" . implode(",\n\t", $this->getColumnNames()) . "\n";
-    }
-
-    protected function getColumnNames()
-    {
-        $columns = array();
-
-        foreach ($this->columns as $name => $id) {
-            $columns[] = self::getAliasedName($name, $id);
-        }
-
-        return $columns;
+        $this->limit = $length->getMysql();
     }
 
     protected function getTables()
     {
-        list($table, $id) = each($this->tables);
+        reset($this->tables);
+        list($table, ) = each($this->tables);
 
-        $mysql = "\tFROM " . self::getAliasedName($table, $id) . "\n";
+        $mysql = "\tFROM " . $table . "\n";
 
         $tables = array_slice($this->tables, 1);
 
@@ -154,12 +106,6 @@ class Select extends AbstractMysql
 
     protected function isValid()
     {
-        return (0 < count($this->tables)) && (0 < count($this->columns));
-    }
-
-    protected static function getAliasedName($name, $id)
-    {
-        $alias = self::getIdentifier($id);
-        return "{$name} AS {$alias}";
+        return (0 < count($this->tables));
     }
 }

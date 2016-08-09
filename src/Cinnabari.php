@@ -28,14 +28,11 @@ use Datto\Cinnabari\Exception\ArgumentsException;
 use Datto\Cinnabari\Exception\CinnabariException;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Exception\LexerException;
-use Datto\Cinnabari\Exception\SchemaException;
+use Datto\Cinnabari\Exception\TranslatorException;
 
 class Cinnabari
 {
-    /** @var Schema */
-    private $schema;
-
-    public function __construct(Schema $schema)
+    public function __construct($schema)
     {
         $this->schema = $schema;
     }
@@ -46,15 +43,17 @@ class Cinnabari
         try {
             $lexer = new Lexer();
             $parser = new Parser();
+            $translator = new Translator($this->schema);
             $compiler = new Compiler($this->schema);
 
             $tokens = $lexer->tokenize($query);
             $request = $parser->parse($tokens);
-            return $compiler->compile($request, $arguments);
-        } catch (SchemaException $exception) {
-            throw CinnabariException::schema($exception);
+            $translatedRequest = $translator->translate($request);
+            return $compiler->compile($translatedRequest, $arguments);
         } catch (LexerException $exception) {
             throw CinnabariException::lexer($exception);
+        } catch (TranslatorException $exception) {
+            throw CinnabariException::translator($exception);
         } catch (CompilerException $exception) {
             throw CinnabariException::compiler($exception);
         } catch (ArgumentsException $exception) {
