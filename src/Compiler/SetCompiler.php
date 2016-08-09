@@ -216,7 +216,10 @@ class SetCompiler extends AbstractCompiler
         try {
             $id = $this->arguments->useArgument($name, $type);
         } catch (ArgumentsException $exception) {
-            // suppress for now
+            // suppress type exceptions for now
+            if ($exception->getCode() !== ArgumentsException::WRONG_INPUT_TYPE) {
+                throw $exception;
+            }
         }
 
         if ($id === null) {
