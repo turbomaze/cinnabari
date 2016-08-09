@@ -24,19 +24,16 @@
 
 namespace Datto\Cinnabari\Compiler;
 
-use Datto\Cinnabari\Exception\ArgumentsException;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\Column;
-use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Mysql\Insert;
-use Datto\Cinnabari\Translator;
 
 /**
  * Class InsertCompiler
  * @package Datto\Cinnabari
  */
-class InsertCompiler extends AbstractCompiler
+class InsertCompiler extends AbstractValuedCompiler
 {
     /** @var Insert */
     protected $mysql;
@@ -48,7 +45,7 @@ class InsertCompiler extends AbstractCompiler
         $this->mysql = new Insert();
         $this->arguments = new Arguments($arguments);
 
-        if (!$this->enterTable($hasZero)) {
+        if (!$this->enterTable()) {
             return null;
         }
 
@@ -67,19 +64,12 @@ class InsertCompiler extends AbstractCompiler
         return array($mysql, $formatInput, $phpOutput);
     }
 
-    protected function enterTable(&$hasZero)
-    {
-        $firstElement = array_shift($this->request);
-        list(, $token) = each($firstElement);
-
-        $this->context = $this->mysql->setTable($token['table']);
-        $hasZero = $token['hasZero'];
-
-        return true;
-    }
-
     protected function getFunctionSequence()
     {
+        if (!isset($this->request) || (count($this->request) !== 1)) {
+            throw CompilerException::badInsertArgument($this->request);
+        }
+
         $this->request = reset($this->request);
 
         if (!$this->readInsert()) {
@@ -99,45 +89,22 @@ class InsertCompiler extends AbstractCompiler
             return false;
         }
 
+        if (!isset($arguments) || (count($arguments) !== 1)) {
+            throw CompilerException::badInsertArgument($this->request);
+        }
+
         $this->request = reset($arguments); // should have just one argument
+
+        if (!isset($this->request) || (count($this->request) !== 1)) {
+            throw CompilerException::badInsertArgument($this->request);
+        }
+
         $this->request = reset($this->request); // ...which should not be an array
 
         if (!$this->readList()) {
-            throw CompilerException::badSetArgument($this->request);
+            throw CompilerException::badInsertArgument($this->request);
         }
 
-        return true;
-    }
-
-    protected function readList()
-    {
-        if (!$this->scanList($this->request, $list)) {
-            return false;
-        }
-
-        $initialContext = $this->context;
-        foreach ($list as $index => $pair) {
-            $this->context = $initialContext;
-            $property = $pair['property'];
-            $this->getColumnFromPropertyPath($property, $column);
-
-            $this->context = $initialContext;
-            $value = $pair['value'];
-            $this->getExpression($value, $expression, $type);
-
-            $this->mysql->addPropertyValuePair($this->context, $column, $expression);
-        }
-
-        return true;
-    }
-
-    // TODO: type checking
-    protected function getColumnFromPropertyPath($arrayToken, &$output)
-    {
-        $arrayToken = $this->followJoins($arrayToken);
-        $propertyToken = reset($arrayToken);
-        list(, $property) = each($propertyToken);
-        $output = new Column($property['expression']);
         return true;
     }
 
@@ -155,38 +122,6 @@ class InsertCompiler extends AbstractCompiler
         $columnExpression = Insert::getAbsoluteExpression($tableAliasIdentifier, $column);
         $output = new Column($columnExpression);
 
-        return true;
-    }
-
-    protected function getParameter($name, $type, &$output)
-    {
-        $id = null;
-        try {
-            $id = $this->arguments->useArgument($name, $type);
-        } catch (ArgumentsException $exception) {
-            // suppress type exceptions for now
-            if ($exception->getCode() !== ArgumentsException::WRONG_INPUT_TYPE) {
-                throw $exception;
-            }
-        }
-
-        if ($id === null) {
-            return false;
-        }
-
-        $output = new Parameter($id);
-        return true;
-    }
-
-    protected function scanList($input, &$object)
-    {
-        list($tokenType, $token) = each($input);
-
-        if ($tokenType !== Translator::TYPE_LIST) {
-            return false;
-        }
-
-        $object = $token;
         return true;
     }
 }

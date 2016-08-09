@@ -29,21 +29,8 @@ use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\Column;
 
-class Insert extends AbstractMysql
+class Insert extends AbstractValuedMysql
 {
-    /** @var string[] */
-    protected $columns;
-
-    /** @var string[] */
-    protected $values;
-
-    public function __construct()
-    {
-        parent::__construct();
-        $this->columns = array();
-        $this->values = array();
-    }
-
     public function getMysql()
     {
         if (!$this->isValid()) {
@@ -59,10 +46,6 @@ class Insert extends AbstractMysql
 
     public function addPropertyValuePair($tableId, Column $column, AbstractExpression $expression)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            throw CompilerException::badTableId($tableId);
-        }
-
         $name = self::getColumnNameFromExpression($column->getMysql());
 
         $this->values[$name] = $expression->getMysql();
@@ -87,22 +70,5 @@ class Insert extends AbstractMysql
         $mysql = "\tINTO " . $table . "\n";
 
         return $mysql;
-    }
-
-    protected function isValid()
-    {
-        return (0 < count($this->tables)) &&
-            (0 < count($this->columns)) &&
-            (count($this->columns) === count($this->values));
-    }
-
-    private static function getColumnNameFromExpression($expression)
-    {
-        preg_match("/`[a-z0-9_$]+`/i", $expression, $matches);
-        if (count($matches) === 0) {
-            return $expression;
-        } else {
-            return $matches[0];
-        }
     }
 }

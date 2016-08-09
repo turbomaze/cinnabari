@@ -204,9 +204,18 @@ class Translator
 
     private function getListFunction($translateObjectKeys, &$class, &$table, $function, $arguments, &$output)
     {
-        // list functions cannot have array tokens as their first argument
         $firstArgument = array_shift($arguments);
-        $firstArgument = reset($firstArgument); // TODO: exception?
+
+        if (!isset($firstArgument) || (count($firstArgument) < 1)) {
+            throw TranslatorException::unknownContext($function, $arguments);
+        }
+
+        $firstArgument = reset($firstArgument);
+
+        if (!isset($firstArgument) || (count($firstArgument) < 2)) {
+            throw TranslatorException::unknownContext($function, $arguments);
+        }
+
         $firstArgumentType = $firstArgument[0];
 
         if ($firstArgumentType === Parser::TYPE_PROPERTY) {

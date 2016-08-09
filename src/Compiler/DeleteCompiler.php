@@ -47,7 +47,7 @@ class DeleteCompiler extends AbstractCompiler
         $this->mysql = new Delete();
         $this->arguments = new Arguments($arguments);
 
-        if (!$this->enterTable($hasZero)) {
+        if (!$this->enterTable()) {
             return null;
         }
 
@@ -66,13 +66,12 @@ class DeleteCompiler extends AbstractCompiler
         return array($mysql, $formatInput, $phpOutput);
     }
 
-    protected function enterTable(&$hasZero)
+    private function enterTable()
     {
         $firstElement = array_shift($this->request);
         list(, $token) = each($firstElement);
 
         $this->context = $this->mysql->setTable($token['table']);
-        $hasZero = $token['hasZero'];
 
         return true;
     }
@@ -130,7 +129,7 @@ class DeleteCompiler extends AbstractCompiler
         }
 
         // at this point, we're sure they want to sort
-        if (!isset($arguments) || count($arguments) !== 1) {
+        if (!isset($arguments) || (count($arguments) !== 1)) {
             // TODO: add an explanation of the missing argument, or link to the documentation
             throw CompilerException::noSortArguments($this->request);
         }
@@ -165,7 +164,7 @@ class DeleteCompiler extends AbstractCompiler
         }
 
         // at this point, we're sure they want to slice
-        if (!isset($arguments) || count($arguments) !== 2) {
+        if (!isset($arguments) || (count($arguments) !== 2)) {
             throw CompilerException::badSliceArguments($this->request);
         }
 
@@ -180,7 +179,7 @@ class DeleteCompiler extends AbstractCompiler
             return false;
         }
 
-        $this->mysql->setLimit($this->context, $length);
+        $this->mysql->setLimit($length);
 
         array_shift($this->request);
 

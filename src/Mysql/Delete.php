@@ -47,10 +47,6 @@ class Delete extends AbstractMysql
 
     public function setOrderBy($tableId, $column, $isAscending)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            throw CompilerException::badTableId($tableId);
-        }
-
         $table = $this->getTable($tableId);
         $name = self::getAbsoluteExpression($table, $column);
 
@@ -65,12 +61,8 @@ class Delete extends AbstractMysql
         $this->orderBy = $mysql;
     }
 
-    public function setLimit($tableId, AbstractExpression $length)
+    public function setLimit(AbstractExpression $length)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
         $this->limit = $length->getMysql();
     }
 

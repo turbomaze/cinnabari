@@ -36,13 +36,14 @@ class CompilerException extends AbstractException
     const BAD_SLICE_ARGUMENTS = 8;
     const BAD_GET_ARGUMENT = 9;
     const BAD_SET_ARGUMENT = 10;
-    const BAD_SCHEMA = 11;
-    const BAD_TABLE_ID = 12;
-    const INVALID_SELECT = 13;
-    const INVALID_DELETE = 14;
-    const INVALID_UPDATE = 15;
-    const INVALID_INSERT = 16;
-    const UNKNOWN_TYPECAST = 17;
+    const BAD_INSERT_ARGUMENT = 11;
+    const BAD_SCHEMA = 12;
+    const BAD_TABLE_ID = 13;
+    const INVALID_SELECT = 14;
+    const INVALID_DELETE = 15;
+    const INVALID_UPDATE = 16;
+    const INVALID_INSERT = 17;
+    const UNKNOWN_TYPECAST = 18;
 
     public static function unknownRequestType($request)
     {
@@ -141,6 +142,15 @@ class CompilerException extends AbstractException
         $code = self::BAD_SET_ARGUMENT;
         $data = array('request' => $request);
         $message = 'Set functions take objects with API properties as keys as an argument.';
+
+        return new self($code, $data, $message);
+    }
+
+    public static function badInsertArgument($request)
+    {
+        $code = self::BAD_INSERT_ARGUMENT;
+        $data = array('request' => $request);
+        $message = 'Insert functions take objects with API properties as keys as an argument.';
 
         return new self($code, $data, $message);
     }

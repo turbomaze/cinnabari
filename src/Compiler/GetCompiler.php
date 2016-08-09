@@ -73,7 +73,7 @@ class GetCompiler extends AbstractCompiler
         return array($mysql, $formatInput, $this->phpOutput);
     }
 
-    protected function enterTable(&$idAlias, &$hasZero)
+    private function enterTable(&$idAlias, &$hasZero)
     {
         $firstElement = array_shift($this->request);
         list(, $token) = each($firstElement);
@@ -91,6 +91,10 @@ class GetCompiler extends AbstractCompiler
         $this->getOptionalSortFunction();
         $this->getOptionalSliceFunction();
 
+        if (!isset($this->request) || (count($this->request) !== 1)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
         $this->request = reset($this->request);
 
         if (!$this->readGet()) {
@@ -105,7 +109,7 @@ class GetCompiler extends AbstractCompiler
         $idA = $this->arguments->useArgument($nameA, $typeA);
         $idB = $this->arguments->useSubtractiveArgument($nameA, $nameB, $typeA, $typeB);
 
-        if ($idA === null || $idB === null) {
+        if (($idA === null) || ($idB === null)) {
             return false;
         }
 
@@ -201,6 +205,10 @@ class GetCompiler extends AbstractCompiler
             return false;
         }
 
+        if (!isset($arguments) || (count($arguments) !== 1)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
         // at this point they definitely intend to use a get function
         $this->request = reset($arguments);
 
@@ -234,10 +242,7 @@ class GetCompiler extends AbstractCompiler
                 }
 
                 /** @var AbstractExpression $expression */
-                $columnId = $this->mysql->addExpression(
-                    $this->context,
-                    $expression->getMysql()
-                );
+                $columnId = $this->mysql->addExpression($expression->getMysql());
 
                 $isNullable = true; // TODO
                 $this->phpOutput = Output::getValue(
@@ -314,7 +319,7 @@ class GetCompiler extends AbstractCompiler
             return false;
         }
 
-        $this->mysql->setLimit($this->context, $start, $end);
+        $this->mysql->setLimit($start, $end);
 
         array_shift($this->request);
 

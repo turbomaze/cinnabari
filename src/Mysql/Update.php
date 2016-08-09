@@ -29,21 +29,8 @@ use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\Column;
 
-class Update extends AbstractMysql
+class Update extends AbstractValuedMysql
 {
-    /** @var string[] */
-    protected $columns;
-
-    /** @var string[] */
-    protected $values;
-
-    public function __construct()
-    {
-        parent::__construct();
-        $this->columns = array();
-        $this->values = array();
-    }
-
     public function getMysql()
     {
         if (!$this->isValid()) {
@@ -60,12 +47,8 @@ class Update extends AbstractMysql
         return rtrim($mysql, "\n");
     }
 
-    public function setLimit($tableId, AbstractExpression $start, AbstractExpression $length)
+    public function setLimit(AbstractExpression $start, AbstractExpression $length)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
         $offset = $start->getMysql();
         $count = $length->getMysql();
         $mysql = "{$offset}, {$count}";
@@ -75,10 +58,6 @@ class Update extends AbstractMysql
 
     public function setOrderBy($tableId, $column, $isAscending)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            throw CompilerException::badTableId($tableId);
-        }
-
         $table = $this->getIdentifier($tableId);
         $name = self::getAbsoluteExpression($table, $column);
 
@@ -95,10 +74,6 @@ class Update extends AbstractMysql
 
     public function addPropertyValuePair($tableId, Column $column, AbstractExpression $expression)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            throw CompilerException::badTableId($tableId);
-        }
-
         $table = self::getIdentifier($tableId);
         $name = self::getAbsoluteExpression($table, $column->getMysql());
 
@@ -144,13 +119,6 @@ class Update extends AbstractMysql
         }
 
         return $mysql;
-    }
-
-    protected function isValid()
-    {
-        return (0 < count($this->tables)) &&
-            (0 < count($this->columns)) &&
-            (count($this->columns) === count($this->values));
     }
 
     protected static function getAliasedName($name, $id)

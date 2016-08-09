@@ -30,10 +30,6 @@ use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 
 abstract class AbstractMysql
 {
-    // mysql errors
-    const ERROR_BAD_TABLE_ID = 201;
-    const ERROR_INVALID_MYSQL = 202;
-
     const JOIN_INNER = 1;
     const JOIN_LEFT = 2;
 
@@ -95,10 +91,6 @@ abstract class AbstractMysql
 
     public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $hasZero, $hasMany)
     {
-        if (!self::isDefined($this->tables, $tableAId)) {
-            return null;
-        }
-
         $joinType = (!$hasZero && !$hasMany) ? self::JOIN_INNER : self::JOIN_LEFT;
         $tableAIdentifier = self::getIdentifier($tableAId);
         $key = json_encode(array($tableAIdentifier, $tableBIdentifier, $mysqlExpression, $joinType));
@@ -135,11 +127,6 @@ abstract class AbstractMysql
         }
 
         return $id;
-    }
-
-    protected static function isDefined($array, $id)
-    {
-        return is_int($id) && (-1 < $id) && ($id < count($array));
     }
 
     protected static function getIdentifier($name)
@@ -224,5 +211,15 @@ abstract class AbstractMysql
     {
         $rollbackState = array_pop($this->rollbackPoint);
         $this->tables = array_slice($this->tables, 0, $rollbackState[0]);
+    }
+
+    protected static function getColumnNameFromExpression($expression)
+    {
+        preg_match("/`[a-z0-9_$]+`/i", $expression, $matches);
+        if (count($matches) === 0) {
+            return $expression;
+        } else {
+            return $matches[0];
+        }
     }
 }

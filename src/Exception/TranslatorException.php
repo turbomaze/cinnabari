@@ -31,6 +31,7 @@ class TranslatorException extends AbstractException
     const UNKNOWN_LIST = 2;
     const UNKNOWN_CONNECTION = 3;
     const UNKNOWN_VALUE = 4;
+    const UNKNOWN_CONTEXT = 5;
 
     public static function unknownProperty($class, $property)
     {
@@ -94,6 +95,22 @@ class TranslatorException extends AbstractException
         $valueName = json_encode($value);
 
         $message = "Unknown value {$valueName} in table {$tableName}.";
+
+        return new self($code, $data, $message);
+    }
+
+    public static function unknownContext($function, $arguments)
+    {
+        $code = self::UNKNOWN_CONTEXT;
+
+        $data = array(
+            'function' => $function,
+            'arguments' => $arguments
+        );
+
+        $functionName = json_encode($function);
+
+        $message = "Expected the token {$functionName} to describe a table context.";
 
         return new self($code, $data, $message);
     }

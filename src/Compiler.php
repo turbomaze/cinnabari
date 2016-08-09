@@ -36,11 +36,10 @@ use Datto\Cinnabari\Exception\CompilerException;
  */
 class Compiler
 {
-    const TYPE_UNKNOWN = -1;
-    const TYPE_GET = 0;
-    const TYPE_DELETE = 1;
-    const TYPE_SET = 2;
-    const TYPE_INSERT = 3;
+    private static $TYPE_GET = 1;
+    private static $TYPE_DELETE = 2;
+    private static $TYPE_SET = 3;
+    private static $TYPE_INSERT = 4;
 
     private $getCompiler;
     private $deleteCompiler;
@@ -61,47 +60,51 @@ class Compiler
         $queryType = self::getQueryType($request);
 
         switch ($queryType) {
-            case self::TYPE_GET:
+            case self::$TYPE_GET:
                 $translatedRequest = $this->translator->translateIgnoringObjects($request);
                 return $this->getCompiler->compile($translatedRequest, $arguments);
 
-            case self::TYPE_DELETE:
+            case self::$TYPE_DELETE:
                 $translatedRequest = $this->translator->translateIgnoringObjects($request);
                 return $this->deleteCompiler->compile($translatedRequest, $arguments);
 
-            case self::TYPE_SET:
+            case self::$TYPE_SET:
                 $translatedRequest = $this->translator->translateIncludingObjects($request);
                 return $this->setCompiler->compile($translatedRequest, $arguments);
 
-            case self::TYPE_INSERT:
+            case self::$TYPE_INSERT:
                 $translatedRequest = $this->translator->translateIncludingObjects($request);
                 return $this->insertCompiler->compile($translatedRequest, $arguments);
-    
-            default:
-                throw CompilerException::unknownRequestType($request);
         }
+        
+        return null;
     }
 
     public static function getQueryType($request)
     {
-        list($tokenType, $functionName, ) = reset($request);
+        if (isset($request) && (count($request) >= 1)) {
+            $firstToken = reset($request);
+            if (count($firstToken) >= 3) {
+                list($tokenType, $functionName, ) = $firstToken;
 
-        if ($tokenType === Parser::TYPE_FUNCTION) {
-            switch ($functionName) {
-                case 'get':
-                    return self::TYPE_GET;
-                    
-                case 'delete':
-                    return self::TYPE_DELETE;
-                    
-                case 'set':
-                    return self::TYPE_SET;
+                if ($tokenType === Parser::TYPE_FUNCTION) {
+                    switch ($functionName) {
+                        case 'get':
+                            return self::$TYPE_GET;
+                            
+                        case 'delete':
+                            return self::$TYPE_DELETE;
+                            
+                        case 'set':
+                            return self::$TYPE_SET;
 
-                case 'insert':
-                    return self::TYPE_INSERT;
+                        case 'insert':
+                            return self::$TYPE_INSERT;
+                    }
+                }
             }
         }
-
-        return self::TYPE_UNKNOWN;
+    
+        throw CompilerException::unknownRequestType($request);
     }
 }
