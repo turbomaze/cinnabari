@@ -40,7 +40,7 @@ class DeleteCompiler extends AbstractCompiler
     /** @var Delete */
     protected $mysql;
 
-    public function compile($translatedRequest, $arguments)
+    public function compile($topLevelFunction, $translatedRequest, $arguments)
     {
         $this->request = $translatedRequest;
 

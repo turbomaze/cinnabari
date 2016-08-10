@@ -91,6 +91,12 @@ class Select extends AbstractMysql
         return self::insert($this->columns, $name);
     }
 
+    public function addCount()
+    {
+        $countExpression = 'COUNT(TRUE)';
+        return self::insert($this->columns, $countExpression);
+    }
+
     protected function getColumns()
     {
         return "SELECT\n\t" . implode(",\n\t", $this->getColumnNames()) . "\n";

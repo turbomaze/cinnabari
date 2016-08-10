@@ -46,7 +46,7 @@ class GetCompiler extends AbstractCompiler
     /** @var String */
     private $phpOutput;
     
-    public function compile($translatedRequest, $arguments)
+    public function compile($topLevelFunction, $translatedRequest, $arguments)
     {
         $this->request = $translatedRequest;
 
@@ -54,13 +54,11 @@ class GetCompiler extends AbstractCompiler
         $this->arguments = new Arguments($arguments);
         $this->phpOutput = null;
 
-        if (!$this->enterTable($idAlias, $hasZero)) {
+        if (!$this->enterTable($id, $hasZero)) {
             return null;
         }
 
-        $this->getFunctionSequence();
-
-        $this->phpOutput = Output::getList($idAlias, $hasZero, true, $this->phpOutput);
+        $this->getFunctionSequence($topLevelFunction, $id, $hasZero);
 
         $mysql = $this->mysql->getMysql();
 
@@ -73,20 +71,25 @@ class GetCompiler extends AbstractCompiler
         return array($mysql, $formatInput, $this->phpOutput);
     }
 
-    private function enterTable(&$idAlias, &$hasZero)
+    private function enterTable(&$id, &$hasZero)
     {
         $firstElement = array_shift($this->request);
         list(, $token) = each($firstElement);
 
         $this->context = $this->mysql->setTable($token['table']);
-        $idAlias = $this->mysql->addValue($this->context, $token['id']);
+        $id = $token['id'];
         $hasZero = $token['hasZero'];
 
         return true;
     }
 
-    protected function getFunctionSequence()
+    protected function getFunctionSequence($topLevelFunction, $id, $hasZero)
     {
+        $idAlias = null;
+        if ($topLevelFunction === 'get') {
+            $idAlias = $this->mysql->addValue($this->context, $id);
+        }
+            
         $this->getOptionalFilterFunction();
         $this->getOptionalSortFunction();
         $this->getOptionalSliceFunction();
@@ -97,11 +100,17 @@ class GetCompiler extends AbstractCompiler
 
         $this->request = reset($this->request);
 
-        if (!$this->readGet()) {
-            throw CompilerException::invalidMethodSequence($this->request);
+        if ($this->readGet()) {
+            $this->phpOutput = Output::getList($idAlias, $hasZero, true, $this->phpOutput);
+
+            return true;
         }
 
-        return true;
+        if ($this->readCount()) {
+            return true;
+        }
+
+        throw CompilerException::invalidMethodSequence($this->request);
     }
 
     protected function getSubtractiveParameters($nameA, $nameB, $typeA, $typeB, &$outputA, &$outputB)
@@ -215,6 +224,29 @@ class GetCompiler extends AbstractCompiler
         if (!$this->readExpression()) {
             throw CompilerException::badGetArgument($this->request);
         }
+
+        return true;
+    }
+
+    protected function readCount()
+    {
+        if (!self::scanFunction($this->request, $name, $arguments)) {
+            return false;
+        }
+
+        if ($name !== 'count') {
+            return false;
+        }
+
+        if (!isset($arguments) && (count($arguments) > 0)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        // at this point they definitely intend to use a count function
+        $this->request = reset($arguments);
+
+        $columnId = $this->mysql->addCount();
+        $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
 
         return true;
     }
