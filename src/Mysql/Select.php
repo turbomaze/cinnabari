@@ -97,6 +97,13 @@ class Select extends AbstractMysql
         return self::insert($this->columns, $countExpression);
     }
 
+    public function addAggregator($aggregator, $column)
+    {
+        $columnMysql = $column->getMysql();
+        $aggregatorExpression = "{$aggregator}({$columnMysql})";
+        return self::insert($this->columns, $aggregatorExpression);
+    }
+
     protected function getColumns()
     {
         return "SELECT\n\t" . implode(",\n\t", $this->getColumnNames()) . "\n";

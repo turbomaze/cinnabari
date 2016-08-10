@@ -45,6 +45,14 @@ class GetCompiler extends AbstractCompiler
 
     /** @var String */
     private $phpOutput;
+
+    /** @var String[] */
+    private static $parameterizedAggregators = array(
+        'average' => 'AVG',
+        'sum' => 'SUM',
+        'min' => 'MIN',
+        'max' => 'MAX'
+    );
     
     public function compile($topLevelFunction, $translatedRequest, $arguments)
     {
@@ -107,6 +115,10 @@ class GetCompiler extends AbstractCompiler
         }
 
         if ($this->readCount()) {
+            return true;
+        }
+
+        if ($this->readParameterizedAggregator($topLevelFunction)) {
             return true;
         }
 
@@ -246,6 +258,44 @@ class GetCompiler extends AbstractCompiler
         $this->request = reset($arguments);
 
         $columnId = $this->mysql->addCount();
+        $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
+
+        return true;
+    }
+
+    protected function readParameterizedAggregator($functionName)
+    {
+        if (!self::scanFunction($this->request, $name, $arguments)) {
+            return false;
+        }
+
+        if (!array_key_exists($functionName, self::$parameterizedAggregators)) {
+            return false;
+        }
+
+        if (!isset($arguments) && (count($arguments) !== 1)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        // at this point they definitely intend to use a parameterized aggregator
+        $this->request = reset($arguments);
+        if (!isset($this->request) || count($this->request) !== 1) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+        $this->request = reset($this->request);
+
+        if (!$this->scanProperty($this->request, $table, $name, $type, $hasZero)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        // add the aggregator with its corresponding column
+        $tableId = $this->context;
+        $tableAliasIdentifier = "`{$tableId}`";
+        $columnExpression = Select::getAbsoluteExpression($tableAliasIdentifier, $name);
+        $column = new Column($columnExpression);
+
+        $aggregatorName = self::$parameterizedAggregators[$functionName];
+        $columnId = $this->mysql->addAggregator($aggregatorName, $column);
         $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
 
         return true;
