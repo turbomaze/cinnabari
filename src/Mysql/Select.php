@@ -26,6 +26,7 @@ namespace Datto\Cinnabari\Mysql;
 
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
+use Datto\Cinnabari\Mysql\Expression\Column;
 
 class Select extends AbstractMysql
 {
@@ -97,7 +98,7 @@ class Select extends AbstractMysql
         return self::insert($this->columns, $countExpression);
     }
 
-    public function addAggregator($aggregator, $column)
+    public function addAggregator($aggregator, Column $column)
     {
         $columnMysql = $column->getMysql();
         $aggregatorExpression = "{$aggregator}({$columnMysql})";
