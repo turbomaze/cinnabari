@@ -141,6 +141,10 @@ class GetCompiler extends AbstractCompiler
 
     protected function readExpression()
     {
+        if (!isset($this->request) || (count($this->request) < 1)) {
+            return false;
+        }
+
         $firstElement = reset($this->request);
         list($tokenType, $token) = each($firstElement);
 
@@ -154,7 +158,7 @@ class GetCompiler extends AbstractCompiler
                 $this->handleJoin($token);
                 array_shift($this->request);
                 return $this->conditionallyRollback(
-                    $this->readExpression()
+                    $this->readExpression($token)
                 );
 
             case Translator::TYPE_VALUE:
@@ -210,10 +214,12 @@ class GetCompiler extends AbstractCompiler
         return true;
     }
 
-    protected function getGet($arguments)
+    protected function getGet($request)
     {
-        $this->request = reset($arguments);
-        return $this->readExpression();
+        // TODO: modify translator to account for nested gets
+        $this->request = $request;
+        $previousJoinToken = end($this->joins);
+        return $this->getFunctionSequence('get', $previousJoinToken['id'], $previousJoinToken['hasZero']);
     }
 
     protected function readGet()
@@ -309,7 +315,7 @@ class GetCompiler extends AbstractCompiler
 
         switch ($name) {
             case 'get':
-                return $this->getGet($arguments);
+                return $this->getGet($this->request);
 
             case 'plus':
             case 'minus':

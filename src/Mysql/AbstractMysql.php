@@ -153,9 +153,21 @@ abstract class AbstractMysql
 
             $joinIdentifier = self::getIdentifier($id);
 
+            $splitExpression = explode(' ', $expression);
+            $newExpression = array();
             $from = array('`0`', '`1`');
             $to = array($tableAIdentifier, $joinIdentifier);
-            $expression = str_replace($from, $to, $expression);
+
+            foreach ($splitExpression as $key => $token) {
+                for ($i = 0; $i < count($from); $i++) {
+                    $token = str_replace($from[$i], $to[$i], $token, $count);
+                    if ($count > 0) {
+                        break;
+                    }
+                }
+                $newExpression[] = $token;
+            }
+            $expression = implode(' ', $newExpression);
 
             if ($type === self::JOIN_INNER) {
                 $mysqlJoin = 'INNER JOIN';

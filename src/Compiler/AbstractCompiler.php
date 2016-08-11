@@ -64,11 +64,15 @@ abstract class AbstractCompiler implements CompilerInterface
     /** @var AbstractMysql */
     protected $mysql;
 
+    /** @var int[] */
+    protected $joins;
+
     /** @var array */
     protected $rollbackPoint;
 
     public function __construct()
     {
+        $this->joins = array();
         $this->rollbackPoint = array();
     }
 
@@ -111,6 +115,7 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected function handleJoin($token)
     {
+        $this->joins[] = $token;
         $this->context = $this->mysql->addJoin(
             $this->context,
             $token['tableB'],
@@ -650,7 +655,7 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected function setRollbackPoint()
     {
-        $this->rollbackPoint[] = array($this->context);
+        $this->rollbackPoint[] = array($this->context, count($this->joins));
         $this->mysql->setRollbackPoint();
     }
 
@@ -664,6 +669,7 @@ abstract class AbstractCompiler implements CompilerInterface
     {
         $rollbackState = array_pop($this->rollbackPoint);
         $this->context = $rollbackState[0];
+        $this->joins = array_slice($this->joins, 0, $rollbackState[1]);
         $this->mysql->rollback();
     }
 }
