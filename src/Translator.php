@@ -18,6 +18,7 @@
  * along with Cinnabari. If not, see <http://www.gnu.org/licenses/>.
  *
  * @author Spencer Mortensen <smortensen@datto.com>
+ * @author Anthony Liu <aliu@datto.com>
  * @license http://www.gnu.org/licenses/lgpl-3.0.html LGPL-3.0
  * @copyright 2016 Datto, Inc.
  */
@@ -31,14 +32,10 @@ class Translator
     const TYPE_PARAMETER = 1;
     const TYPE_FUNCTION = 3;
     const TYPE_OBJECT = 4;
-    const TYPE_TABLE = 5;
-    const TYPE_JOIN = 6;
-    const TYPE_VALUE = 7;
-
-    const EXCEPTION_UNKNOWN_PROPERTY = 1;
-    const EXCEPTION_UNKNOWN_LIST = 2;
-    const EXCEPTION_UNKNOWN_CONNECTION = 3;
-    const EXCEPTION_UNKNOWN_VALUE = 4;
+    const TYPE_LIST = 5;
+    const TYPE_TABLE = 6;
+    const TYPE_JOIN = 7;
+    const TYPE_VALUE = 8;
 
     /** @var array */
     private $schema;
@@ -49,14 +46,24 @@ class Translator
     }
 
     // NOTE: check for a valid $request before this method is executed
-    public function translate($request)
+    public function translateIgnoringObjects($request)
     {
-        $this->getExpression('Database', null, $request, $expression);
+        return $this->translate($request, false);
+    }
+
+    public function translateIncludingObjects($request)
+    {
+        return $this->translate($request, true);
+    }
+
+    private function translate($request, $translateObjectKeys)
+    {
+        $this->getExpression($translateObjectKeys, 'Database', null, $request, $expression);
 
         return $expression;
     }
 
-    private function getExpression($class, $table, $tokens, &$output)
+    private function getExpression($translateObjectKeys, $class, $table, $tokens, &$output)
     {
         foreach ($tokens as $token) {
             $type = $token[0];
@@ -73,14 +80,38 @@ class Translator
                     break;
 
                 case Parser::TYPE_FUNCTION:
-                    $function = $token[1];
-                    $arguments = array_slice($token, 2);
-                    $this->getFunction($class, $table, $function, $arguments, $output);
+                    self::scanFunction($token, $function, $arguments);
+                    switch ($function) {
+                        case 'get':
+                        case 'delete':
+                        case 'set':
+                        case 'insert':
+                            $this->getListFunction(
+                                $translateObjectKeys,
+                                $class,
+                                $table,
+                                $function,
+                                $arguments,
+                                $output
+                            );
+                            break;
+
+                        default:
+                            $this->getFunction(
+                                $translateObjectKeys,
+                                $class,
+                                $table,
+                                $function,
+                                $arguments,
+                                $output
+                            );
+                            break;
+                    }
                     break;
 
                 default: // Parser::TYPE_OBJECT:
                     $object = $token[1];
-                    $this->getObject($class, $table, $object, $output);
+                    $this->getObject($translateObjectKeys, $class, $table, $object, $output);
                     break;
             }
         }
@@ -161,29 +192,132 @@ class Translator
         );
     }
 
-    private function getFunction(&$class, &$table, $function, $arguments, &$output)
+    private function getFunction($translateObjectKeys, &$class, &$table, $function, $arguments, &$output)
     {
         $output[] = array(
             self::TYPE_FUNCTION => array(
                 'function' => $function,
-                'arguments' => $this->translateArray($class, $table, $arguments)
+                'arguments' => $this->translateArray($translateObjectKeys, $class, $table, $arguments)
             )
         );
     }
 
-    private function getObject(&$class, &$table, $object, &$output)
+    private function getListFunction($translateObjectKeys, &$class, &$table, $function, $arguments, &$output)
     {
-        $output[] = array(
-            self::TYPE_OBJECT => $this->translateArray($class, $table, $object)
-        );
+        $firstArgument = array_shift($arguments);
+
+        if (!isset($firstArgument) || (count($firstArgument) < 1)) {
+            throw TranslatorException::unknownContext($function, $arguments);
+        }
+
+        $firstArgument = reset($firstArgument);
+
+        if (!isset($firstArgument) || (count($firstArgument) < 2)) {
+            throw TranslatorException::unknownContext($function, $arguments);
+        }
+
+        $firstArgumentType = $firstArgument[0];
+
+        if ($firstArgumentType === Parser::TYPE_PROPERTY) {
+            $property = $firstArgument[1];
+            $this->getProperty($class, $table, $property, $output);
+            $this->getFunction($translateObjectKeys, $class, $table, $function, $arguments, $output);
+            return $property;
+        } else {
+            self::scanFunction($firstArgument, $childFunction, $childArguments);
+
+            $property = $this->getListFunction(
+                $translateObjectKeys,
+                $class,
+                $table,
+                $childFunction,
+                $childArguments,
+                $output
+            );
+
+            $output[] = array(
+                self::TYPE_FUNCTION => array(
+                    'function' => $function,
+                    'arguments' => $this->translateArray(
+                        $translateObjectKeys,
+                        $class,
+                        $table,
+                        $arguments
+                    )
+                )
+            );
+            
+            return $property;
+        }
     }
 
-    private function translateArray(&$class, &$table, $input)
+    private function getObject($translateObjectKeys, &$class, &$table, $object, &$output)
+    {
+        if ($translateObjectKeys) {
+            $output[] = array(
+                self::TYPE_LIST => $this->translateKeysAndArray(
+                    $translateObjectKeys,
+                    $class,
+                    $table,
+                    $object
+                )
+            );
+        } else {
+            $output[] = array(
+                self::TYPE_OBJECT => $this->translateArray(
+                    $translateObjectKeys,
+                    $class,
+                    $table,
+                    $object
+                )
+            );
+        }
+    }
+
+    private function translateArray($translateObjectKeys, &$class, &$table, $input)
     {
         $output = array();
 
         foreach ($input as $key => $value) {
-            $this->getExpression($class, $table, $value, $output[$key]);
+            $this->getExpression($translateObjectKeys, $class, $table, $value, $output[$key]);
+        }
+
+        return $output;
+    }
+
+    private function translateKeysAndArray($translateObjectKeys, &$class, &$table, $input)
+    {
+        $output = array();
+        $properties = array();
+        $values = array();
+
+        foreach ($input as $key => $value) {
+            $propertyList = self::stringToPropertyList($key);
+            $translatedKey = array();
+            $translatedValue = array();
+            $this->getExpression(
+                $translateObjectKeys,
+                $class,
+                $table,
+                $propertyList,
+                $translatedKey
+            );
+            $this->getExpression(
+                $translateObjectKeys,
+                $class,
+                $table,
+                $value,
+                $translatedValue
+            );
+            $properties[] = $translatedKey;
+            $values[] = $translatedValue;
+        }
+
+        for ($i = 0; $i < count($properties); $i++) {
+            $output[] = array(
+                'property' => $properties[$i],
+                'value' => $values[$i],
+            );
         }
 
         return $output;
@@ -234,5 +368,22 @@ class Translator
         }
 
         return $definition;
+    }
+
+    private static function stringToPropertyList($string)
+    {
+        // TODO: makes an assumption about the format of the Parser's output
+        return array_map(
+            function ($property) {
+                return array(Parser::TYPE_PROPERTY, $property);
+            },
+            explode('.', $string)
+        );
+    }
+
+    private static function scanFunction($token, &$function, &$arguments)
+    {
+        $function = $token[1];
+        $arguments = array_slice($token, 2);
     }
 }

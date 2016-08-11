@@ -43,7 +43,7 @@ class ArgumentsException extends AbstractException
 
     public static function wrongInputType($name, $userType, $neededType)
     {
-        $code = self::INPUT_NOT_PROVIDED;
+        $code = self::WRONG_INPUT_TYPE;
 
         $data = array(
             'name' => $name,

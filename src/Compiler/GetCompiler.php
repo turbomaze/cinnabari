@@ -37,12 +37,6 @@ use Datto\Cinnabari\Translator;
 /**
  * Class GetCompiler
  * @package Datto\Cinnabari
- *
- * EBNF:
- *
- * request = list, [ filter-function ], map-function
- * map-argument = path | property | object | map
- * object-value = path | property | object | map
  */
 class GetCompiler extends AbstractCompiler
 {
@@ -79,7 +73,7 @@ class GetCompiler extends AbstractCompiler
         return array($mysql, $formatInput, $this->phpOutput);
     }
 
-    protected function enterTable(&$idAlias, &$hasZero)
+    private function enterTable(&$idAlias, &$hasZero)
     {
         $firstElement = array_shift($this->request);
         list(, $token) = each($firstElement);
@@ -97,9 +91,13 @@ class GetCompiler extends AbstractCompiler
         $this->getOptionalSortFunction();
         $this->getOptionalSliceFunction();
 
+        if (!isset($this->request) || (count($this->request) !== 1)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
         $this->request = reset($this->request);
 
-        if (!$this->readMap()) {
+        if (!$this->readGet()) {
             throw CompilerException::invalidMethodSequence($this->request);
         }
 
@@ -111,7 +109,7 @@ class GetCompiler extends AbstractCompiler
         $idA = $this->arguments->useArgument($nameA, $typeA);
         $idB = $this->arguments->useSubtractiveArgument($nameA, $nameB, $typeA, $typeB);
 
-        if ($idA === null || $idB === null) {
+        if (($idA === null) || ($idB === null)) {
             return false;
         }
 
@@ -191,27 +189,31 @@ class GetCompiler extends AbstractCompiler
         return true;
     }
 
-    protected function getMap($arguments)
+    protected function getGet($arguments)
     {
         $this->request = reset($arguments);
         return $this->readExpression();
     }
 
-    protected function readMap()
+    protected function readGet()
     {
         if (!self::scanFunction($this->request, $name, $arguments)) {
             return false;
         }
 
-        if ($name !== 'map') {
+        if ($name !== 'get') {
             return false;
         }
 
-        // at this point they definitely intend to use a map function
+        if (!isset($arguments) || (count($arguments) !== 1)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        // at this point they definitely intend to use a get function
         $this->request = reset($arguments);
 
         if (!$this->readExpression()) {
-            throw CompilerException::badMapArgument($this->request);
+            throw CompilerException::badGetArgument($this->request);
         }
 
         return true;
@@ -224,8 +226,8 @@ class GetCompiler extends AbstractCompiler
         }
 
         switch ($name) {
-            case 'map':
-                return $this->getMap($arguments);
+            case 'get':
+                return $this->getGet($arguments);
 
             case 'plus':
             case 'minus':
@@ -240,10 +242,7 @@ class GetCompiler extends AbstractCompiler
                 }
 
                 /** @var AbstractExpression $expression */
-                $columnId = $this->mysql->addExpression(
-                    $this->context,
-                    $expression->getMysql()
-                );
+                $columnId = $this->mysql->addExpression($expression->getMysql());
 
                 $isNullable = true; // TODO
                 $this->phpOutput = Output::getValue(
@@ -257,6 +256,41 @@ class GetCompiler extends AbstractCompiler
             default:
                 return false;
         }
+    }
+
+    protected function getOptionalSortFunction()
+    {
+        if (!self::scanFunction(reset($this->request), $name, $arguments)) {
+            return false;
+        }
+
+        if ($name !== 'sort') {
+            return false;
+        }
+
+        // at this point, we're sure they want to sort
+        if (!isset($arguments) || count($arguments) !== 1) {
+            // TODO: add an explanation of the missing argument, or link to the documentation
+            throw CompilerException::noSortArguments($this->request);
+        }
+
+        $state = array($this->request, $this->context);
+
+        // consume all of the joins
+        $this->request = $arguments[0];
+        $this->request = $this->followJoins($this->request);
+
+        if (!$this->scanProperty(reset($this->request), $table, $name, $type, $hasZero)) {
+            return false;
+        }
+
+        $this->mysql->setOrderBy($this->context, $name, true);
+
+        list($this->request, $this->context) = $state;
+
+        array_shift($this->request);
+
+        return true;
     }
 
     protected function getOptionalSliceFunction()
@@ -285,7 +319,7 @@ class GetCompiler extends AbstractCompiler
             return false;
         }
 
-        $this->mysql->setLimit($this->context, $start, $end);
+        $this->mysql->setLimit($start, $end);
 
         array_shift($this->request);
 

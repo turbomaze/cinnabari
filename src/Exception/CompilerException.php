@@ -34,18 +34,22 @@ class CompilerException extends AbstractException
     const BAD_FILTER_EXPRESSION = 6;
     const NO_SORT_ARGUMENTS = 7;
     const BAD_SLICE_ARGUMENTS = 8;
-    const BAD_MAP_ARGUMENT = 9;
-    const BAD_SCHEMA = 10;
-    const BAD_TABLE_ID = 11;
-    const INVALID_SELECT = 12;
-    const INVALID_DELETE = 13;
-    const UNKNOWN_TYPECAST = 14;
+    const BAD_GET_ARGUMENT = 9;
+    const BAD_SET_ARGUMENT = 10;
+    const BAD_INSERT_ARGUMENT = 11;
+    const BAD_SCHEMA = 12;
+    const BAD_TABLE_ID = 13;
+    const INVALID_SELECT = 14;
+    const INVALID_DELETE = 15;
+    const INVALID_UPDATE = 16;
+    const INVALID_INSERT = 17;
+    const UNKNOWN_TYPECAST = 18;
 
     public static function unknownRequestType($request)
     {
         $code = self::UNKNOWN_REQUEST_TYPE;
         $data = array('request' => $request);
-        $message = 'Only get and delete queries are supported at the moment.';
+        $message = 'Only get, delete, and set queries are supported at the moment.';
 
         return new self($code, $data, $message);
     }
@@ -96,7 +100,7 @@ class CompilerException extends AbstractException
         $code = self::INVALID_METHOD_SEQUENCE;
         $data = array('request' => $request);
         $message = 'API requests must consist of optional filter/sort/slice ' .
-            'methods followed by a map or delete.';
+            'methods followed by a get, delete, or set.';
 
         return new self($code, $data, $message);
     }
@@ -123,12 +127,30 @@ class CompilerException extends AbstractException
         return new self($code, $data, $message);
     }
 
-    public static function badMapArgument($request)
+    public static function badGetArgument($request)
     {
-        $code = self::BAD_MAP_ARGUMENT;
+        $code = self::BAD_GET_ARGUMENT;
         $data = array('request' => $request);
-        $message = 'Map functions take a property, path, object, ' .
+        $message = 'Get functions take a property, path, object, ' .
             'or function as an argument.';
+
+        return new self($code, $data, $message);
+    }
+
+    public static function badSetArgument($request)
+    {
+        $code = self::BAD_SET_ARGUMENT;
+        $data = array('request' => $request);
+        $message = 'Set functions take objects with API properties as keys as an argument.';
+
+        return new self($code, $data, $message);
+    }
+
+    public static function badInsertArgument($request)
+    {
+        $code = self::BAD_INSERT_ARGUMENT;
+        $data = array('request' => $request);
+        $message = 'Insert functions take objects with API properties as keys as an argument.';
 
         return new self($code, $data, $message);
     }
@@ -178,6 +200,23 @@ class CompilerException extends AbstractException
         return new self($code, null, $message);
     }
     
+    public static function invalidUpdate()
+    {
+        $code = self::INVALID_UPDATE;
+        $message = 'SQL update queries must reference at least one table and one column,' .
+            ' and there must be one value associated with each column.';
+
+        return new self($code, null, $message);
+    }
+
+    public static function invalidInsert()
+    {
+        $code = self::INVALID_INSERT;
+        $message = 'SQL insert queries must reference exactly one table and at least one column.';
+
+        return new self($code, null, $message);
+    }
+
     public static function unknownTypecast($type)
     {
         $code = self::UNKNOWN_TYPECAST;

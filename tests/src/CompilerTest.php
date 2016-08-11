@@ -76,12 +76,191 @@ class CompilerTest extends PHPUnit_Framework_TestCase
 EOS;
     }
 
-    public function testMapValue()
+    private static function getRelationshipsScenario()
+    {
+        /*
+        DROP DATABASE IF EXISTS `database`;
+        CREATE DATABASE `database`;
+        USE `database`;
+
+        CREATE TABLE `Names` (
+            `Id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `First` VARCHAR(256) NOT NULL,
+            `Last` VARCHAR(256) NOT NULL
+        );
+
+        CREATE TABLE `PhoneNumbers` (
+            `Person` INT UNSIGNED NOT NULL,
+            `PhoneNumber` BIGINT UNSIGNED NOT NULL,
+            INDEX (`Person`)
+        );
+
+        CREATE TABLE `People` (
+            `Id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `Name` INT UNSIGNED NOT NULL,
+            `Age` TINYINT UNSIGNED NOT NULL,
+            CONSTRAINT `fk_People_Name__Names_Id` FOREIGN KEY (`Name`) REFERENCES `Names` (`Id`),
+            CONSTRAINT `fk_People_Id__PhoneNumbers_Person` FOREIGN KEY (`Id`) REFERENCES `PhoneNumbers` (`Person`)
+        );
+
+        CREATE TABLE `Spouses` (
+            `Person` INT UNSIGNED NOT NULL,
+            `Spouse` INT UNSIGNED NOT NULL,
+            CONSTRAINT `uc_Spouses_Person` UNIQUE (`Person`),
+            CONSTRAINT `fk_Spouses_Spouse__People_Id` FOREIGN KEY (`Spouse`) REFERENCES `People` (`Id`)
+        );
+
+        CREATE TABLE `Friends` (
+            `Person` INT UNSIGNED NOT NULL,
+            `Friend` INT UNSIGNED NOT NULL
+        );
+
+        INSERT INTO `Names`
+            (`Id`, `First`, `Last`) VALUES
+            (1, 'Ann', 'Adams'),
+            (2, 'Bob', 'Baker'),
+            (3, 'Carl', 'Clay'),
+            (4, 'Mary', 'May');
+
+        INSERT INTO `PhoneNumbers`
+            (`Person`, `PhoneNumber`) VALUES
+            (1, 12025550164),
+            (1, 12025550182),
+            (2, 12025550110),
+            (3, 12025550194),
+            (4, 12025550180);
+
+        INSERT INTO `People`
+            (`Id`, `Name`, `Age`) VALUES
+            (1, 1, 21),
+            (2, 2, 28),
+            (3, 3, 18),
+            (4, 4, 26);
+
+        INSERT INTO `Spouses`
+            (`Person`, `Spouse`) VALUES
+            (2, 4),
+            (4, 2);
+
+        INSERT INTO `Friends`
+            (`Person`, `Friend`) VALUES
+            (1, 2),
+            (1, 3),
+            (3, 1);
+        */
+
+        return <<<'EOS'
+{
+    "classes": {
+        "Database": {
+            "people": ["Person", "People"]
+        },
+        "Person": {
+            "name": ["Name", "Name"],
+            "age": [2, "Age"],
+            "phones": [2, "Phones", "Number"],
+            "spouse": ["Person", "Spouse", "Person"],
+            "friends": ["Friend", "Friends"]
+        },
+        "Name": {
+            "first": [4, "First"],
+            "last": [4, "Last"]
+        },
+        "Friend": {
+            "id": [2, "Id"]
+        }
+    },
+    "values": {
+        "`People`": {
+            "Age": ["`Age`", false]
+        },
+        "`Names`": {
+            "First": ["`First`", false],
+            "Last": ["`Last`", false]
+        },
+        "`PhoneNumbers`": {
+            "Number": ["`PhoneNumber`", false]
+        },
+        "`Friends`": {
+            "Id": ["`Friend`", false]
+        }
+    },
+    "lists": {
+        "People": ["`People`", "`Id`", false]
+    },
+    "connections": {
+        "`People`": {
+            "Name": ["`Names`", "`0`.`Name` <=> `1`.`Id`", "`Id`", false, false],
+            "Phones": ["`PhoneNumbers`", "`0`.`Id` <=> `1`.`Person`", "`Person`", false, true],
+            "Spouse": ["`Spouses`", "`0`.`Id` <=> `1`.`Person`", "`Person`", true, false],
+            "Friends": ["`Friends`", "`0`.`Id` <=> `1`.`Person`", "`Person`", true, true]
+        },
+        "`Spouses`": {
+            "Person": ["`People`", "`0`.`Spouse` <=> `1`.`Id`", "`Id`", true, true]
+        }
+    }
+}
+EOS;
+    }
+
+    private static function getFriendsScenario()
+    {
+        /*
+        DROP DATABASE IF EXISTS `database`;
+        CREATE DATABASE `database`;
+        USE `database`;
+
+        CREATE TABLE `Friends` (
+            `Person` INT UNSIGNED,
+            `Friend` INT UNSIGNED
+        );
+
+        INSERT INTO `Friends`
+            (`Person`, `Friend`) VALUES
+            (0, 1),
+            (1, 0),
+            (1, 2),
+            (2, null),
+            (null, null);
+        */
+
+        return <<<'EOS'
+{
+    "classes": {
+        "Database": {
+            "people": ["Person", "Friends"]
+        },
+        "Person": {
+            "id": [2, "Person"],
+            "friends": ["Person", "Friends"]
+        }
+    },
+    "values": {
+        "`Friends`": {
+            "Person": ["`Person`", true]
+        }
+    },
+    "lists": {
+        "Friends": ["`Friends`", "`Person`", true]
+    },
+    "connections": {
+        "`Friends`": {
+            "Friends": ["`Friends`", "`0`.`Friend` <=> `1`.`Person`", "`Person`", true, true]
+        }
+    }
+}
+EOS;
+    }
+
+    public function testGetValue()
     {
         $scenario = self::getPeopleScenario();
 
         $method = <<<'EOS'
-people.map(id)
+get(
+    people,
+    id
+)
 EOS;
 
         $arguments = array();
@@ -104,21 +283,25 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
-    
-    public function testMapBasicObject()
+
+    public function testGetBasicObject()
     {
         $scenario = self::getPeopleScenario();
 
         $method = <<<'EOS'
-people.map({
-    "id": id,
-    "married": isMarried,
-    "age": age,
-    "height": height,
-    "name": name
-})
+get(
+    people,
+    {
+        "id": id,
+        "married": isMarried,
+        "age": age,
+        "height": height,
+        "name": name
+    }
+)
 EOS;
 
         $arguments = array();
@@ -149,20 +332,24 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    public function testMapAdvancedObject()
+    public function testGetAdvancedObject()
     {
         $scenario = self::getPeopleScenario();
 
         $method = <<<'EOS'
-people.map({
-    "name": name,
-    "contact": {
-        "email": email
+get(
+    people,
+    {
+        "name": name,
+        "contact": {
+            "email": email
+        }
     }
-})
+)
 EOS;
 
         $arguments = array();
@@ -188,14 +375,20 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    public function testFilter()
+    public function testGetFilter()
     {
         $scenario = self::getPeopleScenario();
 
-        $method = 'people.filter(age = :0).map(id)';
+        $method = <<<'EOS'
+get(
+    filter(people, age = :0),
+    id
+)
+EOS;
 
         $arguments = array(
             21
@@ -222,21 +415,28 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    public function testAdvancedFilter()
+    public function testGetAdvancedFilter()
     {
         $scenario = self::getPeopleScenario();
 
-        $method = 'people.filter(
-            age = :null
-            or (not :true or :ageA < age)
-            and age <= :ageB
-            and age != :ageC
-            and age <= :ageD
-            and age < :ageE
-        ).map(id)';
+        $method = <<<'EOS'
+get(
+    filter(
+        people,
+        age = :null
+        or (not :true or :ageA < age)
+        and age <= :ageB
+        and age != :ageC
+        and age <= :ageD
+        and age < :ageE
+    ),
+    id
+)
+EOS;
 
         $arguments = array(
             'null' => null,
@@ -289,14 +489,20 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    public function testSort()
+    public function getSort()
     {
         $scenario = self::getPeopleScenario();
 
-        $method = 'people.sort(age).map(id)';
+        $method = <<<'EOS'
+get(
+    sort(people, age),
+    id
+)
+EOS;
 
         $arguments = array();
 
@@ -319,15 +525,19 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    public function testAdvancedSort()
+    public function testGetAdvancedSort()
     {
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
-people.sort(name.first).map(age)
+get(
+    sort(people, name.first),
+    age
+)
 EOS;
 
         $arguments = array();
@@ -353,15 +563,19 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    public function testSlice()
+    public function testGetSlice()
     {
         $scenario = self::getPeopleScenario();
 
         $method = <<<'EOS'
-people.sort(age).slice(:start, :stop).map(id)
+get(
+    slice(sort(people, age), :start, :stop),
+    id
+)
 EOS;
 
         $arguments = array(
@@ -392,64 +606,19 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    private static function getFriendsScenario()
-    {
-        /*
-        DROP DATABASE IF EXISTS `database`;
-        CREATE DATABASE `database`;
-        USE `database`;
-
-        CREATE TABLE `Friends` (
-            `Person` INT UNSIGNED,
-            `Friend` INT UNSIGNED
-        );
-
-        INSERT INTO `Friends`
-            (`Person`, `Friend`) VALUES
-            (0, 1),
-            (1, 0),
-            (1, 2),
-            (2, null),
-            (null, null);
-        */
-
-        return <<<'EOS'
-{
-    "classes": {
-        "Database": {
-            "people": ["Person", "Friends"]
-        },
-        "Person": {
-            "id": [2, "Person"],
-            "friends": ["Person", "Friends"]
-        }
-    },
-    "values": {
-        "`Friends`": {
-            "Person": ["`Person`", true]
-        }
-    },
-    "lists": {
-        "Friends": ["`Friends`", "`Person`", true]
-    },
-    "connections": {
-        "`Friends`": {
-            "Friends": ["`Friends`", "`0`.`Friend` <=> `1`.`Person`", "`Person`", true, true]
-        }
-    }
-}
-EOS;
-    }
-
-    public function testMapDepthZero()
+    public function testGet()
     {
         $scenario = self::getFriendsScenario();
 
         $method = <<<'EOS'
-people.map(id)
+get(
+    people,
+    id
+)
 EOS;
 
         $arguments = array();
@@ -474,18 +643,25 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    public function testMapDepthOne()
+    public function testGetGet()
     {
         $scenario = self::getFriendsScenario();
 
         $method = <<<'EOS'
-people.map({
-    "id": id,
-    "friends": friends.map(id)
-})
+get(
+    people,
+    {
+        "id": id,
+        "friends": get(
+            friends,
+            id
+        )
+    }
+)
 EOS;
 
         $arguments = array();
@@ -520,21 +696,31 @@ foreach ($output as &$x0) {
 }
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    public function testMapDepthTwo()
+    public function testGetGetGet()
     {
         $scenario = self::getFriendsScenario();
 
         $method = <<<'EOS'
-people.map({
-    "id": id,
-    "friends": friends.map({
+get(
+    people,
+    {
         "id": id,
-        "friends": friends.map(id)
-    })
-})
+        "friends": get(
+            friends,
+            {
+                "id": id,
+                "friends": get(
+                    friends,
+                    id
+                )
+            }
+        )
+    }
+)
 EOS;
 
         $arguments = array();
@@ -579,144 +765,19 @@ foreach ($output as &$x1) {
 }
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    private static function getRelationshipsScenario()
-    {
-        /*
-        DROP DATABASE IF EXISTS `database`;
-        CREATE DATABASE `database`;
-        USE `database`;
-
-        CREATE TABLE `Names` (
-            `Id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `First` VARCHAR(256) NOT NULL,
-            `Last` VARCHAR(256) NOT NULL
-        );
-
-        CREATE TABLE `PhoneNumbers` (
-            `Person` INT UNSIGNED NOT NULL,
-            `PhoneNumber` BIGINT UNSIGNED NOT NULL,
-            INDEX (`Person`)
-        );
-
-        CREATE TABLE `People` (
-            `Id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `Name` INT UNSIGNED NOT NULL,
-            `Age` TINYINT UNSIGNED NOT NULL,
-            `City` VARCHAR(256) NOT NULL,
-            CONSTRAINT `fk_People_Name__Names_Id` FOREIGN KEY (`Name`) REFERENCES `Names` (`Id`),
-            CONSTRAINT `fk_People_Id__PhoneNumbers_Person` FOREIGN KEY (`Id`) REFERENCES `PhoneNumbers` (`Person`)
-        );
-
-        CREATE TABLE `Spouses` (
-            `Person` INT UNSIGNED NOT NULL,
-            `Spouse` INT UNSIGNED NOT NULL,
-            CONSTRAINT `uc_Spouses_Person` UNIQUE (`Person`),
-            CONSTRAINT `fk_Spouses_Spouse__People_Id` FOREIGN KEY (`Spouse`) REFERENCES `People` (`Id`)
-        );
-
-        CREATE TABLE `Friends` (
-            `Person` INT UNSIGNED NOT NULL,
-            `Friend` INT UNSIGNED NOT NULL
-        );
-
-        INSERT INTO `Names`
-            (`Id`, `First`, `Last`) VALUES
-            (1, 'Ann', 'Adams'),
-            (2, 'Bob', 'Baker'),
-            (3, 'Carl', 'Clay'),
-            (4, 'Mary', 'May');
-
-        INSERT INTO `PhoneNumbers`
-            (`Person`, `PhoneNumber`) VALUES
-            (1, 12025550164),
-            (1, 12025550182),
-            (2, 12025550110),
-            (3, 12025550194),
-            (4, 12025550180);
-
-        INSERT INTO `People`
-            (`Id`, `Name`, `Age`, `City`) VALUES
-            (1, 1, 21, 'San Francisco'),
-            (2, 2, 28, 'Boston'),
-            (3, 3, 18, 'Baltimore'),
-            (4, 4, 26, 'San Antonio');
-
-        INSERT INTO `Spouses`
-            (`Person`, `Spouse`) VALUES
-            (2, 4),
-            (4, 2);
-
-        INSERT INTO `Friends`
-            (`Person`, `Friend`) VALUES
-            (1, 2),
-            (1, 3),
-            (3, 1);
-        */
-
-        return <<<'EOS'
-{
-    "classes": {
-        "Database": {
-            "people": ["Person", "People"]
-        },
-        "Person": {
-            "name": ["Name", "Name"],
-            "age": [2, "Age"],
-            "phones": [2, "Phones", "Number"],
-            "spouse": ["Person", "Spouse", "Person"],
-            "friends": ["Friend", "Friends"]
-        },
-        "Name": {
-            "first": [4, "First"],
-            "last": [4, "Last"]
-        },
-        "Friend": {
-            "id": [2, "Id"]
-        }
-    },
-    "values": {
-        "`People`": {
-            "Age": ["`Age`", false],
-            "City": ["`City`", false]
-        },
-        "`Names`": {
-            "First": ["`First`", false],
-            "Last": ["`Last`", false]
-        },
-        "`PhoneNumbers`": {
-            "Number": ["`PhoneNumber`", false]
-        },
-        "`Friends`": {
-            "Id": ["`Friend`", false]
-        }
-    },
-    "lists": {
-        "People": ["`People`", "`Id`", false]
-    },
-    "connections": {
-        "`People`": {
-            "Name": ["`Names`", "`0`.`Name` <=> `1`.`Id`", "`Id`", false, false],
-            "Phones": ["`PhoneNumbers`", "`0`.`Id` <=> `1`.`Person`", "`Person`", false, true],
-            "Spouse": ["`Spouses`", "`0`.`Id` <=> `1`.`Person`", "`Person`", true, false],
-            "Friends": ["`Friends`", "`0`.`Id` <=> `1`.`Person`", "`Person`", true, true]
-        },
-        "`Spouses`": {
-            "Person": ["`People`", "`0`.`Spouse` <=> `1`.`Id`", "`Id`", true, true]
-        }
-    }
-}
-EOS;
-    }
-
-    public function testMapMatch()
+    public function testGetFilterMatch()
     {
         $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
-people.filter(match(name.first, :firstName)).map(age)
+get(
+    filter(people, match(name.first, :firstName)),
+    age
+)
 EOS;
 
         $arguments = array(
@@ -746,165 +807,8 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
-    }
-    
-    public function testMapMatchPropertyPath()
-    {
-        $scenario = self::getRelationshipsScenario();
-
-        $method = <<<'EOS'
-people.filter(match(name.first, :regex)).map(age)
-EOS;
-
-        $arguments = array(
-            'regex' => '^'
-        );
-
-        $mysql = <<<'EOS'
-SELECT
-    `0`.`Id` AS `0`,
-    `0`.`Age` AS `1`
-    FROM `People` AS `0`
-    INNER JOIN `Names` AS `1` ON `0`.`Name` <=> `1`.`Id`
-    WHERE (`1`.`First` REGEXP BINARY :0)
-EOS;
-        
-        $phpInput = <<<'EOS'
-$output = array(
-    $input['regex']
-);
-EOS;
-
-        $phpOutput = <<<'EOS'
-foreach ($input as $row) {
-    $output[$row[0]] = (integer)$row[1];
-}
-
-$output = isset($output) ? array_values($output) : array();
-EOS;
-
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
-    }
-    
-    public function testMapParameterPath()
-    {
-        $scenario = self::getRelationshipsScenario();
-
-        $method = <<<'EOS'
-people.filter(match(name.:a, :regex)).map(age)
-EOS;
-        $arguments = array(
-            'regex' => '^',
-            'a' => 'foo'
-        );
-
-        $parameterPath = array(
-            0 => array(
-                6 => array(
-                    'tableA' => '`People`',
-                    'tableB' => '`Names`',
-                    'expression' => '`0`.`Name` <=> `1`.`Id`',
-                    'id' => '`Id`',
-                    'hasZero' => false,
-                    'hasMany' => false
-                )
-            ),
-            1 => array(
-                1 => 'a'
-            )
-        );
-
-        $matchFunction = array(
-            3 => array(
-                'function' => 'match',
-                'arguments' => array(
-                    0 => $parameterPath,
-                    1 => array(
-                        0 => array(
-                            1 => 'regex'
-                        )
-                    )
-                )
-            )
-        );
-
-        $this->verifyException(
-            $scenario,
-            $method,
-            $arguments,
-            // the universal code corresponding to this exception
-            306,
-            array(
-                'context' => 0,
-                'arguments' => $matchFunction
-            )
-        );
-    }
-    
-    public function testMapParameterPropertyPath()
-    {
-        $scenario = self::getRelationshipsScenario();
-
-        $method = <<<'EOS'
-people.filter(match(name.:a.first, :regex)).map(age)
-EOS;
-
-        $arguments = array(
-            'regex' => '^',
-            'a' => 'foo'
-        );
-
-        $parameterPropertyPath = array(
-           0 => array(
-               6 => array(
-                   'tableA' => '`People`',
-                   'tableB' => '`Names`',
-                   'expression' => '`0`.`Name` <=> `1`.`Id`',
-                   'id' => '`Id`',
-                   'hasZero' => false,
-                   'hasMany' => false
-               )
-           ),
-           1 => array(
-               1 => 'a'
-           ),
-           2 => array(
-               7 => array(
-                   'table' => '`Names`',
-                   'expression' => '`First`',
-                   'type' => 4,
-                   'hasZero' => false
-               )
-           )
-        );
-
-        $matchArguments = array(
-            0 => $parameterPropertyPath,
-            1 => array(
-                0 => array(
-                    1 => 'regex'
-                )
-            )
-        );
-
-        $matchFunction = array(
-            3 => array(
-                'function' => 'match',
-                'arguments' => $matchArguments
-            )
-        );
-
-        $this->verifyException(
-            $scenario,
-            $method,
-            $arguments,
-            306,
-            array(
-                'context' => 0,
-                'arguments' => $matchFunction
-            )
-        );
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testDelete()
@@ -912,7 +816,9 @@ EOS;
         $scenario = self::getPeopleScenario();
 
         $method = <<<'EOS'
-people.delete()
+delete(
+    people
+)
 EOS;
 
         $arguments = array();
@@ -930,7 +836,8 @@ EOS;
 $output = null;
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testDeleteFilter()
@@ -938,7 +845,9 @@ EOS;
         $scenario = self::getPeopleScenario();
 
         $method = <<<'EOS'
-people.filter(age < :age).delete()
+delete(
+    filter(people, age < :age)
+)
 EOS;
 
         $arguments = array(
@@ -961,7 +870,8 @@ EOS;
 $output = null;
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     /**
@@ -979,12 +889,14 @@ EOS;
      *
      * The following unit test, however, is valid and will always be valid:
      */
-    public function testDeleteSortSlice()
+    public function testDeleteSliceSort()
     {
         $scenario = self::getPeopleScenario();
 
         $method = <<<'EOS'
-people.sort(age).slice(:start, :stop).delete()
+delete(
+    slice(sort(people, age), :start, :stop)
+)
 EOS;
 
         $arguments = array(
@@ -1009,15 +921,18 @@ EOS;
 $output = null;
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
-    public function testDeleteFilterSortSlice()
+    public function testDeleteSliceSortFilter()
     {
         $scenario = self::getPeopleScenario();
 
         $method = <<<'EOS'
-people.filter(:age <= age).sort(age).slice(:start, :stop).delete()
+delete(
+    slice(sort(filter(people, :age <= age), age), :start, :stop)
+)
 EOS;
 
         $arguments = array(
@@ -1038,6 +953,97 @@ EOS;
 $output = array(
     $input['age'],
     $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testInsert()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+insert(
+    people,
+    {
+        "name": :name,
+        "email": :email,
+        "age": :age,
+        "height": :height,
+        "isMarried": :isMarried
+    }
+)
+EOS;
+
+        $arguments = array(
+            'isMarried' => false,
+            'age' => 28,
+            'height' => 5.3,
+            'name' => 'Eva',
+            'email' => 'eva@example.com'
+        );
+
+        $mysql = <<<'EOS'
+INSERT
+    INTO `People`
+    SET
+        `Name` = :0,
+        `Email` = :1,
+        `Age` = :2,
+        `Height` = :3,
+        `Married` = :4
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['name'],
+    $input['email'],
+    $input['age'],
+    $input['height'],
+    $input['isMarried']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testSet()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+set(
+    people,
+    {
+        "name": :name
+    }
+)
+EOS;
+
+        $arguments = array(
+            'name' => 'Nemo'
+        );
+
+        $mysql = <<<'EOS'
+UPDATE
+    `People` AS `0`
+    SET
+        `0`.`Name` = :0
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['name']
 );
 EOS;
 

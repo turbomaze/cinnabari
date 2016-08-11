@@ -24,9 +24,11 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\CompilerException;
-use Datto\Cinnabari\Compiler\GetCompiler;
 use Datto\Cinnabari\Compiler\DeleteCompiler;
+use Datto\Cinnabari\Compiler\GetCompiler;
+use Datto\Cinnabari\Compiler\SetCompiler;
+use Datto\Cinnabari\Compiler\InsertCompiler;
+use Datto\Cinnabari\Exception\CompilerException;
 
 /**
  * Class Compiler
@@ -34,45 +36,75 @@ use Datto\Cinnabari\Compiler\DeleteCompiler;
  */
 class Compiler
 {
-    const TYPE_GET = 0;
-    const TYPE_DELETE = 1;
+    private static $TYPE_GET = 1;
+    private static $TYPE_DELETE = 2;
+    private static $TYPE_SET = 3;
+    private static $TYPE_INSERT = 4;
 
     private $getCompiler;
     private $deleteCompiler;
+    private $setCompiler;
+    private $translator;
 
-    public function __construct()
+    public function __construct($schema)
     {
         $this->getCompiler = new GetCompiler();
         $this->deleteCompiler = new DeleteCompiler();
+        $this->setCompiler = new SetCompiler();
+        $this->insertCompiler = new InsertCompiler();
+        $this->translator = new Translator($schema);
     }
     
-    public function compile($translatedRequest, $arguments)
+    public function compile($request, $arguments)
     {
-        $queryType = self::getQueryType($translatedRequest);
+        $queryType = self::getQueryType($request);
 
         switch ($queryType) {
-            case self::TYPE_GET:
+            case self::$TYPE_GET:
+                $translatedRequest = $this->translator->translateIgnoringObjects($request);
                 return $this->getCompiler->compile($translatedRequest, $arguments);
 
-            case self::TYPE_DELETE:
+            case self::$TYPE_DELETE:
+                $translatedRequest = $this->translator->translateIgnoringObjects($request);
                 return $this->deleteCompiler->compile($translatedRequest, $arguments);
-    
-            default:
-                throw CompilerException::unknownRequestType($translatedRequest);
+
+            case self::$TYPE_SET:
+                $translatedRequest = $this->translator->translateIncludingObjects($request);
+                return $this->setCompiler->compile($translatedRequest, $arguments);
+
+            case self::$TYPE_INSERT:
+                $translatedRequest = $this->translator->translateIncludingObjects($request);
+                return $this->insertCompiler->compile($translatedRequest, $arguments);
         }
+        
+        return null;
     }
 
-    public static function getQueryType($translatedRequest)
+    public static function getQueryType($request)
     {
-        $lastRequest =  end($translatedRequest);
-        list($lastTokenType, $lastToken) = each($lastRequest);
+        if (isset($request) && (count($request) >= 1)) {
+            $firstToken = reset($request);
+            if (count($firstToken) >= 3) {
+                list($tokenType, $functionName, ) = $firstToken;
 
-        if ($lastTokenType === Translator::TYPE_FUNCTION) {
-            if ($lastToken['function'] === 'delete') {
-                return self::TYPE_DELETE;
+                if ($tokenType === Parser::TYPE_FUNCTION) {
+                    switch ($functionName) {
+                        case 'get':
+                            return self::$TYPE_GET;
+                            
+                        case 'delete':
+                            return self::$TYPE_DELETE;
+                            
+                        case 'set':
+                            return self::$TYPE_SET;
+
+                        case 'insert':
+                            return self::$TYPE_INSERT;
+                    }
+                }
             }
         }
-
-        return self::TYPE_GET;
+    
+        throw CompilerException::unknownRequestType($request);
     }
 }

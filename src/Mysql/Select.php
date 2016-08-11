@@ -53,21 +53,13 @@ class Select extends AbstractMysql
         return rtrim($mysql, "\n");
     }
 
-    public function addExpression($tableId, $expression)
+    public function addExpression($expression)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            throw CompilerException::badTableId($tableId);
-        }
-
         return self::insert($this->columns, $expression);
     }
 
-    public function setLimit($tableId, AbstractExpression $start, AbstractExpression $length)
+    public function setLimit(AbstractExpression $start, AbstractExpression $length)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            return null;
-        }
-
         $offset = $start->getMysql();
         $count = $length->getMysql();
         $mysql = "{$offset}, {$count}";
@@ -77,10 +69,6 @@ class Select extends AbstractMysql
 
     public function setOrderBy($tableId, $column, $isAscending)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            throw CompilerException::badTableId($tableId);
-        }
-
         $table = $this->getIdentifier($tableId);
         $name = self::getAbsoluteExpression($table, $column);
 
@@ -97,10 +85,6 @@ class Select extends AbstractMysql
 
     public function addValue($tableId, $column)
     {
-        if (!self::isDefined($this->tables, $tableId)) {
-            throw CompilerException::badTableId($tableId);
-        }
-
         $table = self::getIdentifier($tableId);
         $name = self::getAbsoluteExpression($table, $column);
 

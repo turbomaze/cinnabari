@@ -43,13 +43,11 @@ class Cinnabari
         try {
             $lexer = new Lexer();
             $parser = new Parser();
-            $translator = new Translator($this->schema);
             $compiler = new Compiler($this->schema);
 
             $tokens = $lexer->tokenize($query);
             $request = $parser->parse($tokens);
-            $translatedRequest = $translator->translate($request);
-            return $compiler->compile($translatedRequest, $arguments);
+            return $compiler->compile($request, $arguments);
         } catch (LexerException $exception) {
             throw CinnabariException::lexer($exception);
         } catch (TranslatorException $exception) {

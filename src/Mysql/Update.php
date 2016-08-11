@@ -27,17 +27,19 @@ namespace Datto\Cinnabari\Mysql;
 
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
+use Datto\Cinnabari\Mysql\Expression\Column;
 
-class Delete extends AbstractMysql
+class Update extends AbstractValuedMysql
 {
     public function getMysql()
     {
         if (!$this->isValid()) {
-            throw CompilerException::invalidDelete();
+            throw CompilerException::invalidUpdate();
         }
 
-        $mysql = "DELETE\n" .
+        $mysql = "UPDATE\n" .
             $this->getTables() .
+            $this->getColumnValuePairs() .
             $this->getWhereClause() .
             $this->getOrderByClause() .
             $this->getLimitClause();
@@ -45,9 +47,18 @@ class Delete extends AbstractMysql
         return rtrim($mysql, "\n");
     }
 
+    public function setLimit(AbstractExpression $start, AbstractExpression $length)
+    {
+        $offset = $start->getMysql();
+        $count = $length->getMysql();
+        $mysql = "{$offset}, {$count}";
+
+        $this->limit = $mysql;
+    }
+
     public function setOrderBy($tableId, $column, $isAscending)
     {
-        $table = $this->getTable($tableId);
+        $table = $this->getIdentifier($tableId);
         $name = self::getAbsoluteExpression($table, $column);
 
         $mysql = "ORDER BY {$name}";
@@ -61,17 +72,31 @@ class Delete extends AbstractMysql
         $this->orderBy = $mysql;
     }
 
-    public function setLimit(AbstractExpression $length)
+    public function addPropertyValuePair($tableId, Column $column, AbstractExpression $expression)
     {
-        $this->limit = $length->getMysql();
+        $table = self::getIdentifier($tableId);
+        $name = self::getAbsoluteExpression($table, $column->getMysql());
+
+        $this->values[$name] = $expression->getMysql();
+        return self::insert($this->columns, $name);
+    }
+
+    protected function getColumnValuePairs()
+    {
+        $pairs = array();
+
+        foreach ($this->columns as $column => $id) {
+            $pairs[] = $column . ' = ' . $this->values[$column];
+        }
+
+        return "\tSET\n\t\t" . implode(",\n\t\t", $pairs) . "\n";
     }
 
     protected function getTables()
     {
-        reset($this->tables);
-        list($table, ) = each($this->tables);
+        list($table, $id) = each($this->tables);
 
-        $mysql = "\tFROM " . $table . "\n";
+        $mysql = "\t" . self::getAliasedName($table, $id) . "\n";
 
         $tables = array_slice($this->tables, 1);
 
@@ -96,8 +121,9 @@ class Delete extends AbstractMysql
         return $mysql;
     }
 
-    protected function isValid()
+    protected static function getAliasedName($name, $id)
     {
-        return (0 < count($this->tables));
+        $alias = self::getIdentifier($id);
+        return "{$name} AS {$alias}";
     }
 }

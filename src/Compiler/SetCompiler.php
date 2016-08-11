@@ -17,7 +17,6 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with Cinnabari. If not, see <http://www.gnu.org/licenses/>.
  *
- * @author Spencer Mortensen <smortensen@datto.com>
  * @author Anthony Liu <aliu@datto.com>
  * @license http://www.gnu.org/licenses/lgpl-3.0.html LGPL-3.0
  * @copyright 2016 Datto, Inc.
@@ -29,22 +28,22 @@ use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\Column;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
-use Datto\Cinnabari\Mysql\Delete;
+use Datto\Cinnabari\Mysql\Update;
 
 /**
- * Class DeleteCompiler
+ * Class SetCompiler
  * @package Datto\Cinnabari
  */
-class DeleteCompiler extends AbstractCompiler
+class SetCompiler extends AbstractValuedCompiler
 {
-    /** @var Delete */
+    /** @var Update */
     protected $mysql;
-
+    
     public function compile($translatedRequest, $arguments)
     {
         $this->request = $translatedRequest;
 
-        $this->mysql = new Delete();
+        $this->mysql = new Update();
         $this->arguments = new Arguments($arguments);
 
         if (!$this->enterTable()) {
@@ -66,55 +65,65 @@ class DeleteCompiler extends AbstractCompiler
         return array($mysql, $formatInput, $phpOutput);
     }
 
-    private function enterTable()
-    {
-        $firstElement = array_shift($this->request);
-        list(, $token) = each($firstElement);
-
-        $this->context = $this->mysql->setTable($token['table']);
-
-        return true;
-    }
-
     protected function getFunctionSequence()
     {
         $this->getOptionalFilterFunction();
         $this->getOptionalSortFunction();
         $this->getOptionalSliceFunction();
 
+        if (!isset($this->request) || (count($this->request) !== 1)) {
+            throw CompilerException::badSetArgument($this->request);
+        }
+
         $this->request = reset($this->request);
 
-        if (!$this->readDelete()) {
+        if (!$this->readSet()) {
             throw CompilerException::invalidMethodSequence($this->request);
         }
 
         return true;
     }
 
-    protected function readDelete()
+    protected function getSubtractiveParameters($nameA, $nameB, $typeA, $typeB, &$outputA, &$outputB)
+    {
+        $idA = $this->arguments->useArgument($nameA, $typeA);
+        $idB = $this->arguments->useSubtractiveArgument($nameA, $nameB, $typeA, $typeB);
+
+        if (($idA === null) || ($idB === null)) {
+            return false;
+        }
+
+        $outputA = new Parameter($idA);
+        $outputB = new Parameter($idB);
+        return true;
+    }
+
+    protected function readSet()
     {
         if (!self::scanFunction($this->request, $name, $arguments)) {
             return false;
         }
 
-        if ($name !== 'delete') {
+        if ($name !== 'set') {
             return false;
         }
 
-        $this->request = reset($arguments);
-
-        return true;
-    }
-
-    protected function getSubtractiveParameters($nameA, $nameB, $typeA, $typeB, &$outputA)
-    {
-        $idA = $this->arguments->useSubtractiveArgument($nameA, $nameB, $typeA, $typeB);
-
-        if ($idA === null) {
-            return false;
+        if (!isset($arguments) || (count($arguments) !== 1)) {
+            throw CompilerException::badSetArgument($this->request);
         }
 
-        $outputA = new Parameter($idA);
+        $this->request = reset($arguments); // should have just one argument
+
+        if (!isset($this->request) || (count($this->request) !== 1)) {
+            throw CompilerException::badSetArgument($this->request);
+        }
+
+        $this->request = reset($this->request); // ...which should not be an array
+
+        if (!$this->readList()) {
+            throw CompilerException::badSetArgument($this->request);
+        }
+
         return true;
     }
 
@@ -129,7 +138,7 @@ class DeleteCompiler extends AbstractCompiler
         }
 
         // at this point, we're sure they want to sort
-        if (!isset($arguments) || (count($arguments) !== 1)) {
+        if (!isset($arguments) || count($arguments) !== 1) {
             // TODO: add an explanation of the missing argument, or link to the documentation
             throw CompilerException::noSortArguments($this->request);
         }
@@ -164,7 +173,7 @@ class DeleteCompiler extends AbstractCompiler
         }
 
         // at this point, we're sure they want to slice
-        if (!isset($arguments) || (count($arguments) !== 2)) {
+        if (!isset($arguments) || count($arguments) !== 2) {
             throw CompilerException::badSliceArguments($this->request);
         }
 
@@ -175,11 +184,11 @@ class DeleteCompiler extends AbstractCompiler
             return false;
         }
 
-        if (!$this->getSubtractiveParameters($nameA, $nameB, 'integer', 'integer', $length)) {
+        if (!$this->getSubtractiveParameters($nameA, $nameB, 'integer', 'integer', $start, $end)) {
             return false;
         }
 
-        $this->mysql->setLimit($length);
+        $this->mysql->setLimit($start, $end);
 
         array_shift($this->request);
 
@@ -188,7 +197,6 @@ class DeleteCompiler extends AbstractCompiler
 
     protected function getProperty($propertyToken, $neededType, &$output)
     {
-        $table = $propertyToken['table'];
         $actualType = $propertyToken['type'];
         $column = $propertyToken['expression'];
 
@@ -196,7 +204,9 @@ class DeleteCompiler extends AbstractCompiler
             return false;
         }
 
-        $columnExpression = Delete::getAbsoluteExpression($table, $column);
+        $tableId = $this->context;
+        $tableAliasIdentifier = "`{$tableId}`";
+        $columnExpression = Update::getAbsoluteExpression($tableAliasIdentifier, $column);
         $output = new Column($columnExpression);
 
         return true;
