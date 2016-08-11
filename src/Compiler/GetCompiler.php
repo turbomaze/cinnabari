@@ -158,7 +158,7 @@ class GetCompiler extends AbstractCompiler
                 $this->handleJoin($token);
                 array_shift($this->request);
                 return $this->conditionallyRollback(
-                    $this->readExpression($token)
+                    $this->readExpression()
                 );
 
             case Translator::TYPE_VALUE:
