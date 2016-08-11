@@ -26,7 +26,6 @@
 namespace Datto\Cinnabari\Compiler;
 
 use Datto\Cinnabari\Exception\CompilerException;
-use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\AbstractMysql;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\OperatorAnd;
@@ -43,6 +42,7 @@ use Datto\Cinnabari\Mysql\Expression\OperatorPlus;
 use Datto\Cinnabari\Mysql\Expression\OperatorRegexpBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
+use Datto\Cinnabari\Php\Input;
 use Datto\Cinnabari\Php\Output;
 use Datto\Cinnabari\Translator;
 
@@ -55,8 +55,8 @@ abstract class AbstractCompiler implements CompilerInterface
     /** @var array */
     protected $request;
 
-    /** @var Arguments */
-    protected $arguments;
+    /** @var Input */
+    protected $input;
 
     /** @var int */
     protected $context;
@@ -65,10 +65,17 @@ abstract class AbstractCompiler implements CompilerInterface
     protected $mysql;
 
     /** @var array */
+    protected $validTypes;
+
+    /** @var array */
     protected $rollbackPoint;
+
+    protected static $REQUIRED = false;
+    protected static $OPTIONAL = true;
 
     public function __construct()
     {
+        $this->validTypes = array();
         $this->rollbackPoint = array();
     }
 
@@ -95,7 +102,7 @@ abstract class AbstractCompiler implements CompilerInterface
         }
 
         // TODO: throw exception for bad filters
-        if (!$this->getBooleanExpression($arguments[0], $where)) {
+        if (!$this->getBooleanExpression($arguments[0], self::$REQUIRED, $where)) {
             throw CompilerException::badFilterExpression(
                 $this->context,
                 $arguments[0]
@@ -130,14 +137,15 @@ abstract class AbstractCompiler implements CompilerInterface
         return $arrayToken;
     }
 
-    protected function getExpression($arrayToken, &$expression, &$type)
+    protected function getExpression($arrayToken, $hasZero, &$expression)
     {
-        return $this->getBooleanExpression($arrayToken, $expression)
-            || $this->getNumericExpression($arrayToken, $expression, $type)
-            || $this->getStringExpression($arrayToken, $expression);
+        return $this->getBooleanExpression($arrayToken, $hasZero, $expression)
+            || $this->getIntegerExpression($arrayToken, $hasZero, $expression)
+            || $this->getFloatExpression($arrayToken, $hasZero, $expression)
+            || $this->getStringExpression($arrayToken, $hasZero, $expression);
     }
 
-    private function getBooleanExpression($arrayToken, &$output)
+    private function getBooleanExpression($arrayToken, $hasZero, &$output)
     {
         $firstElement = reset($arrayToken);
         list($tokenType, $token) = each($firstElement);
@@ -151,12 +159,12 @@ abstract class AbstractCompiler implements CompilerInterface
                 $this->handleJoin($token);
                 array_shift($arrayToken);
                 $result = $this->conditionallyRollback(
-                    $this->getBooleanExpression($arrayToken, $output)
+                    $this->getBooleanExpression($arrayToken, $hasZero, $output)
                 );
                 break;
 
             case Translator::TYPE_PARAMETER:
-                $result = $this->getBooleanParameter($token, $output);
+                $result = $this->getBooleanParameter($token, $hasZero, $output);
                 break;
 
             case Translator::TYPE_VALUE:
@@ -166,7 +174,7 @@ abstract class AbstractCompiler implements CompilerInterface
             case Translator::TYPE_FUNCTION:
                 $name = $token['function'];
                 $arguments = $token['arguments'];
-                $result = $this->getBooleanFunction($name, $arguments, $output);
+                $result = $this->getBooleanFunction($name, $arguments, $hasZero, $output);
                 break;
         }
 
@@ -174,7 +182,7 @@ abstract class AbstractCompiler implements CompilerInterface
         return $result;
     }
 
-    protected function getNumericExpression($arrayToken, &$output, &$type)
+    protected function getIntegerExpression($arrayToken, $hasZero, &$output)
     {
         $firstElement = reset($arrayToken);
         list($tokenType, $token) = each($firstElement);
@@ -188,16 +196,16 @@ abstract class AbstractCompiler implements CompilerInterface
                 $this->handleJoin($token);
                 array_shift($arrayToken);
                 $result = $this->conditionallyRollback(
-                    $this->getNumericExpression($arrayToken, $output, $type)
+                    $this->getIntegerExpression($arrayToken, $hasZero, $output)
                 );
                 break;
 
             case Translator::TYPE_PARAMETER:
-                $result = $this->getNumericParameter($token, $output, $type);
+                $result = $this->getIntegerParameter($token, $hasZero, $output);
                 break;
 
             case Translator::TYPE_VALUE:
-                $result = $this->getNumericProperty($token, $output, $type);
+                $result = $this->getIntegerProperty($token, $output);
                 break;
 
             case Translator::TYPE_FUNCTION:
@@ -208,7 +216,7 @@ abstract class AbstractCompiler implements CompilerInterface
                     return false;
                 }
 
-                $result = $this->getNumericBinaryFunction($name, $arguments[0], $arguments[1], $output, $type);
+                $result = $this->getIntegerBinaryFunction($name, $arguments[0], $arguments[1], $hasZero, $output);
                 break;
         }
 
@@ -216,7 +224,7 @@ abstract class AbstractCompiler implements CompilerInterface
         return $result;
     }
 
-    protected function getStringExpression($arrayToken, &$output)
+    protected function getFloatExpression($arrayToken, $hasZero, &$output)
     {
         $firstElement = reset($arrayToken);
         list($tokenType, $token) = each($firstElement);
@@ -230,12 +238,54 @@ abstract class AbstractCompiler implements CompilerInterface
                 $this->handleJoin($token);
                 array_shift($arrayToken);
                 $result = $this->conditionallyRollback(
-                    $this->getStringExpression($arrayToken, $output)
+                    $this->getFloatExpression($arrayToken, $hasZero, $output)
                 );
                 break;
 
             case Translator::TYPE_PARAMETER:
-                $result = $this->getStringParameter($token, $output);
+                $result = $this->getFloatParameter($token, $hasZero, $output);
+                break;
+
+            case Translator::TYPE_VALUE:
+                $result = $this->getFloatProperty($token, $output);
+                break;
+
+            case Translator::TYPE_FUNCTION:
+                $name = $token['function'];
+                $arguments = $token['arguments'];
+
+                if (count($arguments) < 2) {
+                    return false;
+                }
+
+                $result = $this->getFloatBinaryFunction($name, $arguments[0], $arguments[1], $hasZero, $output);
+                break;
+        }
+
+        $this->context = $context;
+        return $result;
+    }
+
+    protected function getStringExpression($arrayToken, $hasZero, &$output)
+    {
+        $firstElement = reset($arrayToken);
+        list($tokenType, $token) = each($firstElement);
+
+        $context = $this->context;
+        $result = false;
+
+        switch ($tokenType) {
+            case Translator::TYPE_JOIN:
+                $this->setRollbackPoint();
+                $this->handleJoin($token);
+                array_shift($arrayToken);
+                $result = $this->conditionallyRollback(
+                    $this->getStringExpression($arrayToken, $hasZero, $output)
+                );
+                break;
+
+            case Translator::TYPE_PARAMETER:
+                $result = $this->getStringParameter($token, $hasZero, $output);
                 break;
 
             case Translator::TYPE_VALUE:
@@ -247,30 +297,30 @@ abstract class AbstractCompiler implements CompilerInterface
         return $result;
     }
 
-    protected function getBooleanFunction($name, $arguments, &$output)
+    protected function getBooleanFunction($name, $arguments, $hasZero, &$output)
     {
         $countArguments = count($arguments);
 
         if ($countArguments === 1) {
             $argument = current($arguments);
-            return $this->getBooleanUnaryFunction($name, $argument, $output);
+            return $this->getBooleanUnaryFunction($name, $argument, $hasZero, $output);
         }
 
         if ($countArguments === 2) {
             list($argumentA, $argumentB) = $arguments;
-            return $this->getBooleanBinaryFunction($name, $argumentA, $argumentB, $output);
+            return $this->getBooleanBinaryFunction($name, $argumentA, $argumentB, $hasZero, $output);
         }
 
         return false;
     }
 
-    protected function getBooleanUnaryFunction($name, $argument, &$expression)
+    protected function getBooleanUnaryFunction($name, $argument, $hasZero, &$expression)
     {
         if ($name !== 'not') {
             return false;
         }
 
-        if (!$this->getBooleanExpression($argument, $childExpression)) {
+        if (!$this->getBooleanExpression($argument, $hasZero, $childExpression)) {
             return false;
         }
 
@@ -278,32 +328,32 @@ abstract class AbstractCompiler implements CompilerInterface
         return true;
     }
 
-    protected function getBooleanBinaryFunction($name, $argumentA, $argumentB, &$expression)
+    protected function getBooleanBinaryFunction($name, $argumentA, $argumentB, $hasZero, &$expression)
     {
         switch ($name) {
             case 'equal':
-                return $this->getEqualFunction($argumentA, $argumentB, $expression);
+                return $this->getEqualFunction($argumentA, $argumentB, $hasZero, $expression);
 
             case 'and':
-                return $this->getAndFunction($argumentA, $argumentB, $expression);
+                return $this->getAndFunction($argumentA, $argumentB, $hasZero, $expression);
 
             case 'or':
-                return $this->getOrFunction($argumentA, $argumentB, $expression);
+                return $this->getOrFunction($argumentA, $argumentB, $hasZero, $expression);
 
             case 'notEqual':
-                return $this->getNotEqualFunction($argumentA, $argumentB, $expression);
+                return $this->getNotEqualFunction($argumentA, $argumentB, $hasZero, $expression);
 
             case 'less':
-                return $this->getLessFunction($argumentA, $argumentB, $expression);
+                return $this->getLessFunction($argumentA, $argumentB, $hasZero, $expression);
 
             case 'lessEqual':
-                return $this->getLessEqualFunction($argumentA, $argumentB, $expression);
+                return $this->getLessEqualFunction($argumentA, $argumentB, $hasZero, $expression);
 
             case 'greater':
-                return $this->getGreaterFunction($argumentA, $argumentB, $expression);
+                return $this->getGreaterFunction($argumentA, $argumentB, $hasZero, $expression);
 
             case 'greaterEqual':
-                return $this->getGreaterEqualFunction($argumentA, $argumentB, $expression);
+                return $this->getGreaterEqualFunction($argumentA, $argumentB, $hasZero, $expression);
 
             case 'match':
                 return $this->getMatchFunction($argumentA, $argumentB, $expression);
@@ -313,18 +363,21 @@ abstract class AbstractCompiler implements CompilerInterface
         }
     }
 
-    protected function getEqualFunction($argumentA, $argumentB, &$expression)
+    protected function getEqualFunction($argumentA, $argumentB, $hasZero, &$expression)
     {
         if (
             (
-                $this->getBooleanExpression($argumentA, $expressionA) &&
-                $this->getBooleanExpression($argumentB, $expressionB)
+                $this->getBooleanExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getBooleanExpression($argumentB, $hasZero, $expressionB)
             ) || (
-                $this->getNumericExpression($argumentA, $expressionA, $typeA) &&
-                $this->getNumericExpression($argumentB, $expressionB, $typeB)
+                $this->getIntegerExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getIntegerExpression($argumentB, $hasZero, $expressionB)
             ) || (
-                $this->getStringExpression($argumentA, $expressionA) &&
-                $this->getStringExpression($argumentB, $expressionB)
+                $this->getFloatExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getFloatExpression($argumentB, $hasZero, $expressionB)
+            ) || (
+                $this->getStringExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getStringExpression($argumentB, $hasZero, $expressionB)
             )
         ) {
             $expression = new OperatorEqual($expressionA, $expressionB);
@@ -334,11 +387,11 @@ abstract class AbstractCompiler implements CompilerInterface
         return false;
     }
 
-    protected function getAndFunction($argumentA, $argumentB, &$expression)
+    protected function getAndFunction($argumentA, $argumentB, $hasZero, &$expression)
     {
         if (
-            !$this->getBooleanExpression($argumentA, $outputA) ||
-            !$this->getBooleanExpression($argumentB, $outputB)
+            !$this->getBooleanExpression($argumentA, $hasZero, $outputA) ||
+            !$this->getBooleanExpression($argumentB, $hasZero, $outputB)
         ) {
             return false;
         }
@@ -347,11 +400,11 @@ abstract class AbstractCompiler implements CompilerInterface
         return true;
     }
 
-    protected function getOrFunction($argumentA, $argumentB, &$expression)
+    protected function getOrFunction($argumentA, $argumentB, $hasZero, &$expression)
     {
         if (
-            !$this->getBooleanExpression($argumentA, $outputA) ||
-            !$this->getBooleanExpression($argumentB, $outputB)
+            !$this->getBooleanExpression($argumentA, $hasZero, $outputA) ||
+            !$this->getBooleanExpression($argumentB, $hasZero, $outputB)
         ) {
             return false;
         }
@@ -360,9 +413,9 @@ abstract class AbstractCompiler implements CompilerInterface
         return true;
     }
 
-    protected function getNotEqualFunction($argumentA, $argumentB, &$expression)
+    protected function getNotEqualFunction($argumentA, $argumentB, $hasZero, &$expression)
     {
-        if (!$this->getEqualFunction($argumentA, $argumentB, $equalExpression)) {
+        if (!$this->getEqualFunction($argumentA, $argumentB, $hasZero, $equalExpression)) {
             return false;
         }
 
@@ -370,15 +423,18 @@ abstract class AbstractCompiler implements CompilerInterface
         return true;
     }
 
-    protected function getLessFunction($argumentA, $argumentB, &$expression)
+    protected function getLessFunction($argumentA, $argumentB, $hasZero, &$expression)
     {
         if (
             (
-                $this->getNumericExpression($argumentA, $expressionA, $typeA) &&
-                $this->getNumericExpression($argumentB, $expressionB, $typeB)
+                $this->getIntegerExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getIntegerExpression($argumentB, $hasZero, $expressionB)
             ) || (
-                $this->getStringExpression($argumentA, $expressionA) &&
-                $this->getStringExpression($argumentB, $expressionB)
+                $this->getFloatExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getFloatExpression($argumentB, $hasZero, $expressionB)
+            ) || (
+                $this->getStringExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getStringExpression($argumentB, $hasZero, $expressionB)
             )
         ) {
             $expression = new OperatorLess($expressionA, $expressionB);
@@ -388,15 +444,18 @@ abstract class AbstractCompiler implements CompilerInterface
         return false;
     }
 
-    protected function getLessEqualFunction($argumentA, $argumentB, &$expression)
+    protected function getLessEqualFunction($argumentA, $argumentB, $hasZero, &$expression)
     {
         if (
             (
-                $this->getNumericExpression($argumentA, $expressionA, $typeA) &&
-                $this->getNumericExpression($argumentB, $expressionB, $typeB)
+                $this->getIntegerExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getIntegerExpression($argumentB, $hasZero, $expressionB)
             ) || (
-                $this->getStringExpression($argumentA, $expressionA) &&
-                $this->getStringExpression($argumentB, $expressionB)
+                $this->getFloatExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getFloatExpression($argumentB, $hasZero, $expressionB)
+            ) || (
+                $this->getStringExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getStringExpression($argumentB, $hasZero, $expressionB)
             )
         ) {
             $expression = new OperatorLessEqual($expressionA, $expressionB);
@@ -406,15 +465,18 @@ abstract class AbstractCompiler implements CompilerInterface
         return false;
     }
 
-    protected function getGreaterFunction($argumentA, $argumentB, &$expression)
+    protected function getGreaterFunction($argumentA, $argumentB, $hasZero, &$expression)
     {
         if (
             (
-                $this->getNumericExpression($argumentA, $expressionA, $typeA) &&
-                $this->getNumericExpression($argumentB, $expressionB, $typeB)
+                $this->getIntegerExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getIntegerExpression($argumentB, $hasZero, $expressionB)
             ) || (
-                $this->getStringExpression($argumentA, $expressionA) &&
-                $this->getStringExpression($argumentB, $expressionB)
+                $this->getFloatExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getFloatExpression($argumentB, $hasZero, $expressionB)
+            ) || (
+                $this->getStringExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getStringExpression($argumentB, $hasZero, $expressionB)
             )
         ) {
             $expression = new OperatorGreater($expressionA, $expressionB);
@@ -424,15 +486,18 @@ abstract class AbstractCompiler implements CompilerInterface
         return false;
     }
 
-    protected function getGreaterEqualFunction($argumentA, $argumentB, &$expression)
+    protected function getGreaterEqualFunction($argumentA, $argumentB, $hasZero, &$expression)
     {
         if (
             (
-                $this->getNumericExpression($argumentA, $expressionA, $typeA) &&
-                $this->getNumericExpression($argumentB, $expressionB, $typeB)
+                $this->getIntegerExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getIntegerExpression($argumentB, $hasZero, $expressionB)
             ) || (
-                $this->getStringExpression($argumentA, $expressionA) &&
-                $this->getStringExpression($argumentB, $expressionB)
+                $this->getFloatExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getFloatExpression($argumentB, $hasZero, $expressionB)
+            ) || (
+                $this->getStringExpression($argumentA, $hasZero, $expressionA) &&
+                $this->getStringExpression($argumentB, $hasZero, $expressionB)
             )
         ) {
             $expression = new OperatorGreaterEqual($expressionA, $expressionB);
@@ -442,28 +507,44 @@ abstract class AbstractCompiler implements CompilerInterface
         return false;
     }
 
-    protected function getNumericBinaryFunction($name, $argumentA, $argumentB, &$expression, &$type)
+    protected function getIntegerBinaryFunction($name, $argumentA, $argumentB, $hasZero, &$expression)
     {
         if (
-            !$this->getNumericExpression($argumentA, $expressionA, $typeA) ||
-            !$this->getNumericExpression($argumentB, $expressionB, $typeB)
+            !$this->getIntegerExpression($argumentA, $hasZero, $expressionA) ||
+            !$this->getIntegerExpression($argumentB, $hasZero, $expressionB)
         ) {
             return false;
         }
 
-        $aIsAnInteger = ($typeA === Output::TYPE_INTEGER);
-        $bIsAnInteger = ($typeB === Output::TYPE_INTEGER);
-        $aIsAFloat = ($typeA === Output::TYPE_FLOAT);
-        $bIsAFloat = ($typeB === Output::TYPE_FLOAT);
+        switch ($name) {
+            case 'plus':
+                $expression = new OperatorPlus($expressionA, $expressionB);
+                return true;
 
-        if (($name === 'plus') || ($name === 'minus') || ($name === 'times') || ($name === 'divides')) {
-            if ($aIsAnInteger && $bIsAnInteger) {
-                $type = Output::TYPE_INTEGER;
-            } elseif (($aIsAnInteger && $bIsAFloat) || ($aIsAFloat && $bIsAnInteger) || ($aIsAFloat && $bIsAFloat)) {
-                $type = Output::TYPE_FLOAT;
-            } else {
+            case 'minus':
+                $expression = new OperatorMinus($expressionA, $expressionB);
+                return true;
+
+            case 'times':
+                $expression = new OperatorTimes($expressionA, $expressionB);
+                return true;
+
+            case 'divides':
+                $expression = new OperatorDivides($expressionA, $expressionB);
+                return true;
+
+            default:
                 return false;
-            }
+        }
+    }
+
+    protected function getFloatBinaryFunction($name, $argumentA, $argumentB, $hasZero, &$expression)
+    {
+        if (
+            !$this->getFloatExpression($argumentA, $hasZero, $expressionA) ||
+            !$this->getFloatExpression($argumentB, $hasZero, $expressionB)
+        ) {
+            return false;
         }
 
         switch ($name) {
@@ -513,7 +594,7 @@ abstract class AbstractCompiler implements CompilerInterface
 
         if (
             !$this->getStringProperty($propertyToken, $argumentExpression) ||
-            !$this->getStringParameter($name, $patternExpression)
+            !$this->getStringParameter($name, self::$REQUIRED, $patternExpression)
         ) {
             $this->context = $state;
             return false;
@@ -529,35 +610,29 @@ abstract class AbstractCompiler implements CompilerInterface
         return $this->getProperty($propertyToken, Output::TYPE_BOOLEAN, $output);
     }
 
-    protected function getBooleanParameter($name, &$output)
+    protected function getBooleanParameter($name, $hasZero, &$output)
     {
-        return $this->getParameter($name, 'boolean', $output);
+        return $this->getParameter($name, 'boolean', $hasZero, $output);
     }
 
-    protected function getNumericProperty($propertyToken, &$output, &$type)
+    protected function getIntegerProperty($propertyToken, &$output)
     {
-        if ($this->getProperty($propertyToken, Output::TYPE_INTEGER, $output)) {
-            $type = Output::TYPE_INTEGER;
-            return true;
-        } elseif ($this->getProperty($propertyToken, Output::TYPE_FLOAT, $output)) {
-            $type = Output::TYPE_FLOAT;
-            return true;
-        } else {
-            return false;
-        }
+        return $this->getProperty($propertyToken, Output::TYPE_INTEGER, $output);
     }
 
-    protected function getNumericParameter($name, &$output, &$type)
+    protected function getIntegerParameter($name, $hasZero, &$output)
     {
-        if ($this->getParameter($name, 'integer', $output)) {
-            $type = Output::TYPE_INTEGER;
-            return true;
-        } elseif ($this->getParameter($name, 'double', $output)) {
-            $type = Output::TYPE_FLOAT;
-            return true;
-        } else {
-            return false;
-        }
+        return $this->getParameter($name, 'integer', $hasZero, $output);
+    }
+
+    protected function getFloatProperty($propertyToken, &$output)
+    {
+        return $this->getProperty($propertyToken, Output::TYPE_FLOAT, $output);
+    }
+
+    protected function getFloatParameter($name, $hasZero, &$output)
+    {
+        return $this->getParameter($name, 'float', $hasZero, $output);
     }
 
     protected function getStringProperty($propertyToken, &$output)
@@ -565,18 +640,24 @@ abstract class AbstractCompiler implements CompilerInterface
         return $this->getProperty($propertyToken, Output::TYPE_STRING, $output);
     }
 
-    protected function getStringParameter($name, &$output)
+    protected function getStringParameter($name, $hasZero, &$output)
     {
-        return $this->getParameter($name, 'string', $output);
+        return $this->getParameter($name, 'string', $hasZero, $output);
     }
 
-    protected function getParameter($name, $type, &$output)
+    protected function getParameter($name, $type, $hasZero, &$output)
     {
-        $id = $this->arguments->useArgument($name, $type);
+        $id = $this->input->useArgument($name);
 
         if ($id === null) {
             return false;
         }
+
+        $this->validTypes[] = array(
+            'name' => $name,
+            'type' => $type,
+            'hasZero' => $hasZero
+        );
 
         $output = new Parameter($id);
         return true;
@@ -650,7 +731,7 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected function setRollbackPoint()
     {
-        $this->rollbackPoint[] = array($this->context);
+        $this->rollbackPoint[] = array($this->context, $this->validTypes);
         $this->mysql->setRollbackPoint();
     }
 
@@ -664,6 +745,7 @@ abstract class AbstractCompiler implements CompilerInterface
     {
         $rollbackState = array_pop($this->rollbackPoint);
         $this->context = $rollbackState[0];
+        $this->validTypes = $rollbackState[1];
         $this->mysql->rollback();
     }
 }

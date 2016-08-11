@@ -24,10 +24,9 @@
 
 namespace Datto\Cinnabari\Compiler;
 
-use Datto\Cinnabari\Exception\ArgumentsException;
 use Datto\Cinnabari\Mysql\AbstractValuedMysql;
 use Datto\Cinnabari\Mysql\Expression\Column;
-use Datto\Cinnabari\Mysql\Expression\Parameter;
+use Datto\Cinnabari\Php\Output;
 use Datto\Cinnabari\Translator;
 
 /**
@@ -59,11 +58,31 @@ abstract class AbstractValuedCompiler extends AbstractCompiler
         foreach ($list as $index => $pair) {
             $this->context = $initialContext;
             $property = $pair['property'];
-            $this->getColumnFromPropertyPath($property, $column);
+            $this->getColumnFromPropertyPath($property, $column, $type, $hasZero);
 
             $this->context = $initialContext;
             $value = $pair['value'];
-            $this->getExpression($value, $expression, $type);
+
+            switch ($type) {
+                case Output::TYPE_BOOLEAN:
+                    $this->getStringExpression($value, $hasZero, $expression);
+                    break;
+
+                case Output::TYPE_INTEGER:
+                    $this->getIntegerExpression($value, $hasZero, $expression);
+                    break;
+
+                case Output::TYPE_FLOAT:
+                    $this->getFloatExpression($value, $hasZero, $expression);
+                    break;
+
+                case Output::TYPE_STRING:
+                    $this->getStringExpression($value, $hasZero, $expression);
+                    break;
+
+                default:
+                    return false;
+            }
 
             $this->mysql->addPropertyValuePair($this->context, $column, $expression);
         }
@@ -72,32 +91,14 @@ abstract class AbstractValuedCompiler extends AbstractCompiler
     }
 
     // TODO: type checking
-    protected function getColumnFromPropertyPath($arrayToken, &$output)
+    protected function getColumnFromPropertyPath($arrayToken, &$output, &$type, &$hasZero)
     {
         $arrayToken = $this->followJoins($arrayToken);
         $propertyToken = reset($arrayToken);
         list(, $property) = each($propertyToken);
         $output = new Column($property['expression']);
-        return true;
-    }
-
-    protected function getParameter($name, $type, &$output)
-    {
-        $id = null;
-        try {
-            $id = $this->arguments->useArgument($name, $type);
-        } catch (ArgumentsException $exception) {
-            // suppress type exceptions for now
-            if ($exception->getCode() !== ArgumentsException::WRONG_INPUT_TYPE) {
-                throw $exception;
-            }
-        }
-
-        if ($id === null) {
-            return false;
-        }
-
-        $output = new Parameter($id);
+        $type = $property['type'];
+        $hasZero = $property['hasZero'];
         return true;
     }
 

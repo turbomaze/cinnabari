@@ -25,9 +25,9 @@
 namespace Datto\Cinnabari\Compiler;
 
 use Datto\Cinnabari\Exception\CompilerException;
-use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\Column;
 use Datto\Cinnabari\Mysql\Insert;
+use Datto\Cinnabari\Php\Input;
 
 /**
  * Class InsertCompiler
@@ -38,12 +38,12 @@ class InsertCompiler extends AbstractValuedCompiler
     /** @var Insert */
     protected $mysql;
     
-    public function compile($translatedRequest, $arguments)
+    public function compile($translatedRequest)
     {
         $this->request = $translatedRequest;
 
         $this->mysql = new Insert();
-        $this->arguments = new Arguments($arguments);
+        $this->input = new Input();
 
         if (!$this->enterTable()) {
             return null;
@@ -53,7 +53,8 @@ class InsertCompiler extends AbstractValuedCompiler
 
         $mysql = $this->mysql->getMysql();
 
-        $formatInput = $this->arguments->getPhp();
+        $this->input->setArgumentTypes($this->validTypes);
+        $formatInput = $this->input->getPhp();
 
         if (!isset($mysql, $formatInput)) {
             return null;

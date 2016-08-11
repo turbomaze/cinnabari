@@ -24,7 +24,6 @@
 
 namespace Datto\Cinnabari;
 
-use Datto\Cinnabari\Exception\ArgumentsException;
 use Datto\Cinnabari\Exception\CinnabariException;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Exception\LexerException;
@@ -54,8 +53,6 @@ class Cinnabari
             throw CinnabariException::translator($exception);
         } catch (CompilerException $exception) {
             throw CinnabariException::compiler($exception);
-        } catch (ArgumentsException $exception) {
-            throw CinnabariException::arguments($exception);
         }
     }
 }

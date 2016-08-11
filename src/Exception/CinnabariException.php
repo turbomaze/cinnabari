@@ -29,7 +29,6 @@ class CinnabariException extends AbstractException
     private static $lexer = 1;
     private static $translator = 2;
     private static $compiler = 3;
-    private static $arguments = 4;
 
     private static $multiplier = 100;
     
@@ -54,15 +53,6 @@ class CinnabariException extends AbstractException
     public static function compiler(CompilerException $exception)
     {
         $code = self::getUniversalCode(self::$compiler, $exception->getCode());
-        $data = $exception->getData();
-        $message = $exception->getMessage();
-
-        return new self($code, $data, $message);
-    }
-
-    public static function arguments(ArgumentsException $exception)
-    {
-        $code = self::getUniversalCode(self::$arguments, $exception->getCode());
         $data = $exception->getData();
         $message = $exception->getMessage();
 

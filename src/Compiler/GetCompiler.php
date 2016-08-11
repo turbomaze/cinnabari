@@ -26,11 +26,11 @@
 namespace Datto\Cinnabari\Compiler;
 
 use Datto\Cinnabari\Exception\CompilerException;
-use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\Column;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Mysql\Select;
+use Datto\Cinnabari\Php\Input;
 use Datto\Cinnabari\Php\Output;
 use Datto\Cinnabari\Translator;
 
@@ -46,12 +46,12 @@ class GetCompiler extends AbstractCompiler
     /** @var String */
     private $phpOutput;
     
-    public function compile($translatedRequest, $arguments)
+    public function compile($translatedRequest)
     {
         $this->request = $translatedRequest;
 
         $this->mysql = new Select();
-        $this->arguments = new Arguments($arguments);
+        $this->input = new Input();
         $this->phpOutput = null;
 
         if (!$this->enterTable($idAlias, $hasZero)) {
@@ -64,7 +64,8 @@ class GetCompiler extends AbstractCompiler
 
         $mysql = $this->mysql->getMysql();
 
-        $formatInput = $this->arguments->getPhp();
+        $this->input->setArgumentTypes($this->validTypes);
+        $formatInput = $this->input->getPhp();
 
         if (!isset($mysql, $formatInput, $this->phpOutput)) {
             return null;
@@ -104,10 +105,10 @@ class GetCompiler extends AbstractCompiler
         return true;
     }
 
-    protected function getSubtractiveParameters($nameA, $nameB, $typeA, $typeB, &$outputA, &$outputB)
+    protected function getSubtractiveParameters($nameA, $nameB, &$outputA, &$outputB)
     {
-        $idA = $this->arguments->useArgument($nameA, $typeA);
-        $idB = $this->arguments->useSubtractiveArgument($nameA, $nameB, $typeA, $typeB);
+        $idA = $this->input->useArgument($nameA);
+        $idB = $this->input->useSubtractiveArgument($nameA, $nameB);
 
         if (($idA === null) || ($idB === null)) {
             return false;
@@ -235,8 +236,8 @@ class GetCompiler extends AbstractCompiler
             case 'divides':
                 if (!$this->getExpression(
                     $this->request,
-                    $expression,
-                    $type
+                    self::$REQUIRED,
+                    $expression
                 )) {
                     return false;
                 }
@@ -245,6 +246,7 @@ class GetCompiler extends AbstractCompiler
                 $columnId = $this->mysql->addExpression($expression->getMysql());
 
                 $isNullable = true; // TODO
+                $type = 'float'; // TODO
                 $this->phpOutput = Output::getValue(
                     $columnId,
                     $isNullable,
@@ -315,7 +317,7 @@ class GetCompiler extends AbstractCompiler
             return false;
         }
 
-        if (!$this->getSubtractiveParameters($nameA, $nameB, 'integer', 'integer', $start, $end)) {
+        if (!$this->getSubtractiveParameters($nameA, $nameB, $start, $end)) {
             return false;
         }
 

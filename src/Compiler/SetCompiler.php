@@ -25,10 +25,10 @@
 namespace Datto\Cinnabari\Compiler;
 
 use Datto\Cinnabari\Exception\CompilerException;
-use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\Column;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Mysql\Update;
+use Datto\Cinnabari\Php\Input;
 
 /**
  * Class SetCompiler
@@ -39,12 +39,12 @@ class SetCompiler extends AbstractValuedCompiler
     /** @var Update */
     protected $mysql;
     
-    public function compile($translatedRequest, $arguments)
+    public function compile($translatedRequest)
     {
         $this->request = $translatedRequest;
 
         $this->mysql = new Update();
-        $this->arguments = new Arguments($arguments);
+        $this->input = new Input();
 
         if (!$this->enterTable()) {
             return null;
@@ -52,9 +52,11 @@ class SetCompiler extends AbstractValuedCompiler
 
         $this->getFunctionSequence();
 
+
         $mysql = $this->mysql->getMysql();
 
-        $formatInput = $this->arguments->getPhp();
+        $this->input->setArgumentTypes($this->validTypes);
+        $formatInput = $this->input->getPhp();
 
         if (!isset($mysql, $formatInput)) {
             return null;
@@ -86,8 +88,8 @@ class SetCompiler extends AbstractValuedCompiler
 
     protected function getSubtractiveParameters($nameA, $nameB, $typeA, $typeB, &$outputA, &$outputB)
     {
-        $idA = $this->arguments->useArgument($nameA, $typeA);
-        $idB = $this->arguments->useSubtractiveArgument($nameA, $nameB, $typeA, $typeB);
+        $idA = $this->input->useArgument($nameA);
+        $idB = $this->input->useSubtractiveArgument($nameA, $nameB);
 
         if (($idA === null) || ($idB === null)) {
             return false;
