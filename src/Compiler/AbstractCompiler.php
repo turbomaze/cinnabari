@@ -658,14 +658,12 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected function setRollbackPoint()
     {
-        $this->rollbackPoint[] = array($this->context, $this->contextJoin);
-        $this->mysql->setRollbackPoint();
+        $this->rollbackPoint[] = array($this->context, $this->contextJoin, $this->mysql);
     }
 
     protected function clearRollbackPoint()
     {
         array_pop($this->rollbackPoint);
-        $this->mysql->clearRollbackPoint();
     }
 
     protected function rollback()
@@ -673,6 +671,6 @@ abstract class AbstractCompiler implements CompilerInterface
         $rollbackState = array_pop($this->rollbackPoint);
         $this->context = $rollbackState[0];
         $this->contextJoin = $rollbackState[1];
-        $this->mysql->rollback();
+        $this->mysql = $rollbackState[2];
     }
 }

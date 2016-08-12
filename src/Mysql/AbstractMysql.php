@@ -45,16 +45,12 @@ abstract class AbstractMysql
     /** @var string */
     protected $limit;
 
-    /** @var array */
-    protected $rollbackPoint;
-
     public function __construct()
     {
         $this->tables = array();
         $this->where = null;
         $this->orderBy = null;
         $this->limit = null;
-        $this->rollbackPoint = array();
     }
 
     /**
@@ -207,22 +203,6 @@ abstract class AbstractMysql
         }
 
         return "\tLIMIT {$this->limit}\n";
-    }
-
-    public function setRollbackPoint()
-    {
-        $this->rollbackPoint[] = array(count($this->tables));
-    }
-
-    public function clearRollbackPoint()
-    {
-        array_pop($this->rollbackPoint);
-    }
-
-    public function rollback()
-    {
-        $rollbackState = array_pop($this->rollbackPoint);
-        $this->tables = array_slice($this->tables, 0, $rollbackState[0]);
     }
 
     protected static function getColumnNameFromExpression($expression)
