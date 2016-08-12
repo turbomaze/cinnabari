@@ -1054,6 +1054,143 @@ EOS;
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
+    public function testSetFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+set(
+    filter(people, age < :age),
+    {
+        "name": :name,
+        "age": :age
+    }
+)
+EOS;
+
+        $arguments = array(
+            'name' => 'Nemo',
+            'age' => 18
+        );
+
+        $mysql = <<<'EOS'
+UPDATE
+    `People` AS `0`
+    SET
+        `0`.`Name` = :1,
+        `0`.`Age` = :0
+    WHERE (`0`.`Age` < :0)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['age'],
+    $input['name']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testSetSliceSort()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+set(
+    slice(sort(people, age), :start, :end),
+    {
+        "name": :name,
+        "age": :age
+    }
+)
+EOS;
+
+        $arguments = array(
+            'name' => 'Nemo',
+            'age' => 18,
+            'start' => 0,
+            'end' => 10
+        );
+
+        $mysql = <<<'EOS'
+UPDATE
+    `People` AS `0`
+    SET
+        `0`.`Name` = :1,
+        `0`.`Age` = :2
+    ORDER BY `0`.`Age` ASC
+    LIMIT :0
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['end'] - $input['start'],
+    $input['name'],
+    $input['age']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testSetSliceSortFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+set(
+    slice(sort(filter(people, age < :age), age), :start, :end),
+    {
+        "name": :name,
+        "age": :age
+    }
+)
+EOS;
+
+        $arguments = array(
+            'name' => 'Nemo',
+            'age' => 18,
+            'start' => 0,
+            'end' => 10
+        );
+
+        $mysql = <<<'EOS'
+UPDATE
+    `People` AS `0`
+    SET
+        `0`.`Name` = :2,
+        `0`.`Age` = :0
+    WHERE (`0`.`Age` < :0)
+    ORDER BY `0`.`Age` ASC
+    LIMIT :1
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['age'],
+    $input['end'] - $input['start'],
+    $input['name']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+
+
     private function verifyResult($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
     {
         $actual = self::translate($scenarioJson, $method, $arguments);

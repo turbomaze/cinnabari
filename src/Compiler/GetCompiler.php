@@ -220,7 +220,9 @@ class GetCompiler extends AbstractCompiler
         }
 
         return $this->getFunctionSequence(
-            'get', $this->contextJoin['id'], $this->contextJoin['hasZero']
+            'get',
+            $this->contextJoin['id'],
+            $this->contextJoin['hasZero']
         );
     }
 

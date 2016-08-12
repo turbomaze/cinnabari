@@ -47,11 +47,10 @@ class Update extends AbstractValuedMysql
         return rtrim($mysql, "\n");
     }
 
-    public function setLimit(AbstractExpression $start, AbstractExpression $length)
+    public function setLimit(AbstractExpression $length)
     {
-        $offset = $start->getMysql();
         $count = $length->getMysql();
-        $mysql = "{$offset}, {$count}";
+        $mysql = "{$count}";
 
         $this->limit = $mysql;
     }
