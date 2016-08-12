@@ -64,7 +64,6 @@ class GetCompiler extends AbstractCompiler
 
         $mysql = $this->mysql->getMysql();
 
-        $this->input->setArgumentTypes($this->validTypes);
         $formatInput = $this->input->getPhp();
 
         if (!isset($mysql, $formatInput, $this->phpOutput)) {
@@ -237,7 +236,8 @@ class GetCompiler extends AbstractCompiler
                 if (!$this->getExpression(
                     $this->request,
                     self::$REQUIRED,
-                    $expression
+                    $expression,
+                    $type
                 )) {
                     return false;
                 }
@@ -245,8 +245,7 @@ class GetCompiler extends AbstractCompiler
                 /** @var AbstractExpression $expression */
                 $columnId = $this->mysql->addExpression($expression->getMysql());
 
-                $isNullable = true; // TODO
-                $type = 'float'; // TODO
+                $isNullable = false; // TODO: assumption
                 $this->phpOutput = Output::getValue(
                     $columnId,
                     $isNullable,

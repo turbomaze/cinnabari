@@ -53,7 +53,6 @@ class InsertCompiler extends AbstractValuedCompiler
 
         $mysql = $this->mysql->getMysql();
 
-        $this->input->setArgumentTypes($this->validTypes);
         $formatInput = $this->input->getPhp();
 
         if (!isset($mysql, $formatInput)) {

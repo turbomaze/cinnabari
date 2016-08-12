@@ -51,10 +51,16 @@ class Input
         $this->output = array();
     }
 
-    public function useArgument($name)
+    public function useArgument($name, $type, $hasZero)
     {
         $input = self::getInputPhp($name);
         $id = $this->insertParameter($input);
+
+        $this->argumentTypes[] = array(
+            'name' => $name,
+            'type' => $type,
+            'hasZero' => $hasZero
+        );
 
         return $id;
     }
@@ -70,11 +76,6 @@ class Input
         $idB = $this->insertParameter("{$inputB} - {$inputA}");
 
         return $idB;
-    }
-
-    public function setArgumentTypes($types)
-    {
-        $this->argumentTypes = $types;
     }
 
     public function getPhp()
@@ -102,9 +103,12 @@ class Input
             );
             if ($restriction['hasZero']) {
                 $nullCheck = self::$typeCheckingFunctions['null'] . "({$input})";
-                $checks[] = self::group(
-                    self::getOr(array($typeCheck, $nullCheck))
-                );
+                $parameterTypeCheck = self::getOr(array($typeCheck, $nullCheck));
+                if (count($this->argumentTypes) > 1) {
+                    $checks[] = self::group($parameterTypeCheck);
+                } else {
+                    $checks[] = $parameterTypeCheck;
+                }        
             } else {
                 $checks[] = $typeCheck;
             }

@@ -65,9 +65,6 @@ abstract class AbstractCompiler implements CompilerInterface
     protected $mysql;
 
     /** @var array */
-    protected $validTypes;
-
-    /** @var array */
     protected $rollbackPoint;
 
     protected static $REQUIRED = false;
@@ -75,7 +72,6 @@ abstract class AbstractCompiler implements CompilerInterface
 
     public function __construct()
     {
-        $this->validTypes = array();
         $this->rollbackPoint = array();
     }
 
@@ -137,12 +133,21 @@ abstract class AbstractCompiler implements CompilerInterface
         return $arrayToken;
     }
 
-    protected function getExpression($arrayToken, $hasZero, &$expression)
+    protected function getExpression($arrayToken, $hasZero, &$expression, &$type)
     {
-        return $this->getBooleanExpression($arrayToken, $hasZero, $expression)
-            || $this->getIntegerExpression($arrayToken, $hasZero, $expression)
-            || $this->getFloatExpression($arrayToken, $hasZero, $expression)
-            || $this->getStringExpression($arrayToken, $hasZero, $expression);
+        if ($this->getBooleanExpression($arrayToken, $hasZero, $expression)) {
+            $type = Output::TYPE_BOOLEAN;
+        } else if ($this->getIntegerExpression($arrayToken, $hasZero, $expression)) {
+            $type = Output::TYPE_INTEGER;
+        } else if ($this->getFloatExpression($arrayToken, $hasZero, $expression)) {
+            $type = Output::TYPE_FLOAT;
+        } else if ($this->getStringExpression($arrayToken, $hasZero, $expression)) {
+            $type = Output::TYPE_STRING;
+        } else {
+            return false;
+        }
+
+        return true;
     }
 
     private function getBooleanExpression($arrayToken, $hasZero, &$output)
@@ -647,17 +652,11 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected function getParameter($name, $type, $hasZero, &$output)
     {
-        $id = $this->input->useArgument($name);
+        $id = $this->input->useArgument($name, $type, $hasZero);
 
         if ($id === null) {
             return false;
         }
-
-        $this->validTypes[] = array(
-            'name' => $name,
-            'type' => $type,
-            'hasZero' => $hasZero
-        );
 
         $output = new Parameter($id);
         return true;
@@ -731,7 +730,7 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected function setRollbackPoint()
     {
-        $this->rollbackPoint[] = array($this->context, $this->validTypes);
+        $this->rollbackPoint[] = array($this->context, $this->input);
         $this->mysql->setRollbackPoint();
     }
 
@@ -745,7 +744,7 @@ abstract class AbstractCompiler implements CompilerInterface
     {
         $rollbackState = array_pop($this->rollbackPoint);
         $this->context = $rollbackState[0];
-        $this->validTypes = $rollbackState[1];
+        $this->input = $rollbackState[1];
         $this->mysql->rollback();
     }
 }

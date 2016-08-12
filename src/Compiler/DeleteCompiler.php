@@ -55,7 +55,6 @@ class DeleteCompiler extends AbstractCompiler
 
         $mysql = $this->mysql->getMysql();
 
-        $this->input->setArgumentTypes($this->validTypes);
         $formatInput = $this->input->getPhp();
 
         if (!isset($mysql, $formatInput)) {
