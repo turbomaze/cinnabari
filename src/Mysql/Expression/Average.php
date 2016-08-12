@@ -39,4 +39,3 @@ class Average extends AbstractExpression
         return $this->mysql;
     }
 }
-

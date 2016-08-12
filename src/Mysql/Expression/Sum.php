@@ -39,4 +39,3 @@ class Sum extends AbstractExpression
         return $this->mysql;
     }
 }
-

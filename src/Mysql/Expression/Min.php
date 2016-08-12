@@ -39,4 +39,3 @@ class Min extends AbstractExpression
         return $this->mysql;
     }
 }
-
