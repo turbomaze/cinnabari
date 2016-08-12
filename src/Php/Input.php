@@ -109,7 +109,7 @@ class Input
                 $checks[] = $typeCheck;
             }
         }
-        $conditional = self::negate(self::group(self::getAnd($checks)));
+        $conditional = self::getAnd($checks);
         $ifStatement = self::getIf($conditional, $body);
         return $ifStatement;
     }

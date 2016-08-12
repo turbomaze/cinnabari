@@ -86,7 +86,7 @@ class SetCompiler extends AbstractValuedCompiler
         return true;
     }
 
-    protected function getSubtractiveParameters($nameA, $nameB, $typeA, $typeB, &$outputA, &$outputB)
+    protected function getSubtractiveParameters($nameA, $nameB, &$outputA, &$outputB)
     {
         $idA = $this->input->useArgument($nameA);
         $idB = $this->input->useSubtractiveArgument($nameA, $nameB);
@@ -186,7 +186,7 @@ class SetCompiler extends AbstractValuedCompiler
             return false;
         }
 
-        if (!$this->getSubtractiveParameters($nameA, $nameB, 'integer', 'integer', $start, $end)) {
+        if (!$this->getSubtractiveParameters($nameA, $nameB, $start, $end)) {
             return false;
         }
 
