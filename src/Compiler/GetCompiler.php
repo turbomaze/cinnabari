@@ -213,10 +213,15 @@ class GetCompiler extends AbstractCompiler
 
     protected function getGet($request)
     {
-        // TODO: modify translator to account for nested gets
         $this->request = $request;
-        $previousJoinToken = end($this->joins);
-        return $this->getFunctionSequence('get', $previousJoinToken['id'], $previousJoinToken['hasZero']);
+
+        if (!isset($this->contextJoin)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        return $this->getFunctionSequence(
+            'get', $this->contextJoin['id'], $this->contextJoin['hasZero']
+        );
     }
 
     protected function readGet()
