@@ -49,7 +49,7 @@ class CompilerException extends AbstractException
     {
         $code = self::UNKNOWN_REQUEST_TYPE;
         $data = array('request' => $request);
-        $message = 'Only get, delete, set, and insert queries are supported at the moment.';
+        $message = 'That top level function is not supported at the moment.';
 
         return new self($code, $data, $message);
     }
