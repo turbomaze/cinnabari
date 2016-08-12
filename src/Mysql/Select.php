@@ -92,12 +92,6 @@ class Select extends AbstractMysql
         return self::insert($this->columns, $name);
     }
 
-    public function addCount()
-    {
-        $countExpression = 'COUNT(TRUE)';
-        return self::insert($this->columns, $countExpression);
-    }
-
     public function addAggregator($aggregator, Column $column)
     {
         $columnMysql = $column->getMysql();

@@ -28,8 +28,13 @@ namespace Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
+use Datto\Cinnabari\Mysql\Expression\Average;
 use Datto\Cinnabari\Mysql\Expression\Column;
+use Datto\Cinnabari\Mysql\Expression\Count;
+use Datto\Cinnabari\Mysql\Expression\Max;
+use Datto\Cinnabari\Mysql\Expression\Min;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
+use Datto\Cinnabari\Mysql\Expression\Sum;
 use Datto\Cinnabari\Mysql\Select;
 use Datto\Cinnabari\Php\Output;
 use Datto\Cinnabari\Translator;
@@ -45,14 +50,6 @@ class GetCompiler extends AbstractCompiler
 
     /** @var String */
     private $phpOutput;
-
-    /** @var String[] */
-    private static $parameterizedAggregators = array(
-        'average' => 'AVG',
-        'sum' => 'SUM',
-        'min' => 'MIN',
-        'max' => 'MAX'
-    );
     
     public function compile($topLevelFunction, $translatedRequest, $arguments)
     {
@@ -250,14 +247,15 @@ class GetCompiler extends AbstractCompiler
             return false;
         }
 
-        if (!isset($arguments) && (count($arguments) > 0)) {
+        if (!isset($arguments) || (count($arguments) > 0)) {
             throw CompilerException::badGetArgument($this->request);
         }
 
         // at this point they definitely intend to use a count function
         $this->request = reset($arguments);
 
-        $columnId = $this->mysql->addCount();
+        $count = new Count('TRUE');
+        $columnId = $this->mysql->addExpression($count->getMysql());
         $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
 
         return true;
@@ -269,21 +267,22 @@ class GetCompiler extends AbstractCompiler
             return false;
         }
 
-        if (!array_key_exists($functionName, self::$parameterizedAggregators)) {
-            return false;
-        }
-
-        if (!isset($arguments) && (count($arguments) !== 1)) {
+        if (!isset($arguments) || (count($arguments) !== 1)) {
             throw CompilerException::badGetArgument($this->request);
         }
 
         // at this point they definitely intend to use a parameterized aggregator
         $this->request = reset($arguments);
-        if (!isset($this->request) || count($this->request) !== 1) {
+        if (!isset($this->request) || (count($this->request) === 0)) {
             throw CompilerException::badGetArgument($this->request);
         }
-        $this->request = reset($this->request);
 
+        $this->request = $this->followJoins($this->request);
+        if (!isset($this->request) || (count($this->request) === 0)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        $this->request = reset($this->request);
         if (!$this->scanProperty($this->request, $table, $name, $type, $hasZero)) {
             throw CompilerException::badGetArgument($this->request);
         }
@@ -294,8 +293,28 @@ class GetCompiler extends AbstractCompiler
         $columnExpression = Select::getAbsoluteExpression($tableAliasIdentifier, $name);
         $column = new Column($columnExpression);
 
-        $aggregatorName = self::$parameterizedAggregators[$functionName];
-        $columnId = $this->mysql->addAggregator($aggregatorName, $column);
+        switch ($functionName) {
+            case 'average':
+                $aggregator = new Average($column->getMysql());
+                break;
+
+            case 'sum':
+                $aggregator = new Sum($column->getMysql());
+                break;
+
+            case 'min':
+                $aggregator = new Min($column->getMysql());
+                break;
+
+            case 'max':
+                $aggregator = new Max($column->getMysql());
+                break;
+
+            default:
+                throw CompilerException::unknownRequestType($functionName);
+        }
+
+        $columnId = $this->mysql->addExpression($aggregator->getMysql());
         $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
 
         return true;
