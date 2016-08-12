@@ -31,7 +31,7 @@ class Sum extends AbstractExpression
 
     public function __construct($mysql)
     {
-        $this->mysql = "SUM({$mysql})";
+        $this->mysql = "SUM({$mysql->getMysql()})";
     }
 
     public function getMysql()

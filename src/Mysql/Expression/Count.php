@@ -31,7 +31,7 @@ class Count extends AbstractExpression
 
     public function __construct($mysql)
     {
-        $this->mysql = "COUNT({$mysql})";
+        $this->mysql = "COUNT({$mysql->getMysql()})";
     }
 
     public function getMysql()

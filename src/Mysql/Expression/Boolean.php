@@ -24,14 +24,17 @@
 
 namespace Datto\Cinnabari\Mysql\Expression;
 
-class Average extends AbstractExpression
+class Boolean extends AbstractExpression
 {
     /** @var string */
     private $mysql;
 
-    public function __construct($mysql)
+    public function __construct($isTrue)
     {
-        $this->mysql = "AVG({$mysql->getMysql()})";
+        $this->mysql = 'FALSE';
+        if ($isTrue) {
+            $this->mysql = 'TRUE';
+        }
     }
 
     public function getMysql()
@@ -39,3 +42,4 @@ class Average extends AbstractExpression
         return $this->mysql;
     }
 }
+

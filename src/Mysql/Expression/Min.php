@@ -31,7 +31,7 @@ class Min extends AbstractExpression
 
     public function __construct($mysql)
     {
-        $this->mysql = "MIN({$mysql})";
+        $this->mysql = "MIN({$mysql->getMysql()})";
     }
 
     public function getMysql()

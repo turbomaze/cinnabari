@@ -29,6 +29,7 @@ use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
 use Datto\Cinnabari\Mysql\Expression\Average;
+use Datto\Cinnabari\Mysql\Expression\Boolean;
 use Datto\Cinnabari\Mysql\Expression\Column;
 use Datto\Cinnabari\Mysql\Expression\Count;
 use Datto\Cinnabari\Mysql\Expression\Max;
@@ -254,8 +255,8 @@ class GetCompiler extends AbstractCompiler
         // at this point they definitely intend to use a count function
         $this->request = reset($arguments);
 
-        $count = new Count('TRUE');
-        $columnId = $this->mysql->addExpression($count->getMysql());
+        $count = new Count(new Boolean(true));
+        $columnId = $this->mysql->addExpression($count);
         $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
 
         return true;
@@ -295,26 +296,26 @@ class GetCompiler extends AbstractCompiler
 
         switch ($functionName) {
             case 'average':
-                $aggregator = new Average($column->getMysql());
+                $aggregator = new Average($column);
                 break;
 
             case 'sum':
-                $aggregator = new Sum($column->getMysql());
+                $aggregator = new Sum($column);
                 break;
 
             case 'min':
-                $aggregator = new Min($column->getMysql());
+                $aggregator = new Min($column);
                 break;
 
             case 'max':
-                $aggregator = new Max($column->getMysql());
+                $aggregator = new Max($column);
                 break;
 
             default:
                 throw CompilerException::unknownRequestType($functionName);
         }
 
-        $columnId = $this->mysql->addExpression($aggregator->getMysql());
+        $columnId = $this->mysql->addExpression($aggregator);
         $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
 
         return true;
@@ -343,7 +344,7 @@ class GetCompiler extends AbstractCompiler
                 }
 
                 /** @var AbstractExpression $expression */
-                $columnId = $this->mysql->addExpression($expression->getMysql());
+                $columnId = $this->mysql->addExpression($expression);
 
                 $isNullable = true; // TODO
                 $this->phpOutput = Output::getValue(
