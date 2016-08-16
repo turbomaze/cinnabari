@@ -567,7 +567,7 @@ EOS;
             $phpOutput);
     }
 
-    public function testGetSlice()
+    public function testGetSliceSort()
     {
         $scenario = self::getPeopleScenario();
 
@@ -805,6 +805,203 @@ foreach ($input as $row) {
 }
 
 $output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSum()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+sum(
+    people,
+    age
+)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    SUM(`0`.`Age`) AS `0`
+    FROM `People` AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = isset($row[0]) ? (integer)$row[0] : null;
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSumSort()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+sum(
+    sort(people, age),
+    age
+)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    SUM(`0`.`Age`) AS `0`
+    FROM `People` AS `0`
+    ORDER BY `0`.`Age` ASC
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = isset($row[0]) ? (integer)$row[0] : null;
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSumFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+sum(
+    filter(people, age < :minimumAge),
+    age
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    SUM(`0`.`Age`) AS `0`
+    FROM `People` AS `0`
+    WHERE (`0`.`Age` < :0)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['minimumAge']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = isset($row[0]) ? (integer)$row[0] : null;
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSumSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+sum(
+    slice(people, :start, :stop),
+    age
+)
+EOS;
+
+        $arguments = array(
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    SUM(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            `0`.`Age` AS `0`
+            FROM `People` AS `0`
+            LIMIT :0, :1
+    ) AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = isset($row[0]) ? (integer)$row[0] : null;
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSumSliceSortFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+sum(
+    slice(sort(filter(people, age < :minimumAge), age), :start, :stop),
+    age
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18,
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    SUM(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            `0`.`Age` AS `0`
+            FROM `People` AS `0`
+            WHERE (`0`.`Age` < :0)
+            ORDER BY `0`.`Age` ASC
+            LIMIT :1, :2
+    ) AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['minimumAge'],
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = isset($row[0]) ? (integer)$row[0] : null;
+}
 EOS;
 
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
