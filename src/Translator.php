@@ -83,6 +83,11 @@ class Translator
                     self::scanFunction($token, $function, $arguments);
                     switch ($function) {
                         case 'get':
+                        case 'count':
+                        case 'average':
+                        case 'sum':
+                        case 'min':
+                        case 'max':
                         case 'delete':
                         case 'set':
                         case 'insert':

@@ -53,9 +53,9 @@ class Select extends AbstractMysql
         return rtrim($mysql, "\n");
     }
 
-    public function addExpression($expression)
+    public function addExpression(AbstractExpression $expression)
     {
-        return self::insert($this->columns, $expression);
+        return self::insert($this->columns, $expression->getMysql());
     }
 
     public function setLimit(AbstractExpression $start, AbstractExpression $length)

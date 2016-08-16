@@ -22,9 +22,20 @@
  * @copyright 2016 Datto, Inc.
  */
 
-namespace Datto\Cinnabari\Compiler;
+namespace Datto\Cinnabari\Mysql\Expression;
 
-interface CompilerInterface
+class Average extends AbstractExpression
 {
-    public function compile($topLevelFunction, $translatedRequest, $arguments);
+    /** @var string */
+    private $mysql;
+
+    public function __construct($mysql)
+    {
+        $this->mysql = "AVG({$mysql->getMysql()})";
+    }
+
+    public function getMysql()
+    {
+        return $this->mysql;
+    }
 }

@@ -28,8 +28,14 @@ namespace Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Format\Arguments;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
+use Datto\Cinnabari\Mysql\Expression\Average;
+use Datto\Cinnabari\Mysql\Expression\Boolean;
 use Datto\Cinnabari\Mysql\Expression\Column;
+use Datto\Cinnabari\Mysql\Expression\Count;
+use Datto\Cinnabari\Mysql\Expression\Max;
+use Datto\Cinnabari\Mysql\Expression\Min;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
+use Datto\Cinnabari\Mysql\Expression\Sum;
 use Datto\Cinnabari\Mysql\Select;
 use Datto\Cinnabari\Php\Output;
 use Datto\Cinnabari\Translator;
@@ -46,7 +52,7 @@ class GetCompiler extends AbstractCompiler
     /** @var String */
     private $phpOutput;
     
-    public function compile($translatedRequest, $arguments)
+    public function compile($topLevelFunction, $translatedRequest, $arguments)
     {
         $this->request = $translatedRequest;
 
@@ -54,13 +60,11 @@ class GetCompiler extends AbstractCompiler
         $this->arguments = new Arguments($arguments);
         $this->phpOutput = null;
 
-        if (!$this->enterTable($idAlias, $hasZero)) {
+        if (!$this->enterTable($id, $hasZero)) {
             return null;
         }
 
-        $this->getFunctionSequence();
-
-        $this->phpOutput = Output::getList($idAlias, $hasZero, true, $this->phpOutput);
+        $this->getFunctionSequence($topLevelFunction, $id, $hasZero);
 
         $mysql = $this->mysql->getMysql();
 
@@ -73,20 +77,25 @@ class GetCompiler extends AbstractCompiler
         return array($mysql, $formatInput, $this->phpOutput);
     }
 
-    private function enterTable(&$idAlias, &$hasZero)
+    private function enterTable(&$id, &$hasZero)
     {
         $firstElement = array_shift($this->request);
         list(, $token) = each($firstElement);
 
         $this->context = $this->mysql->setTable($token['table']);
-        $idAlias = $this->mysql->addValue($this->context, $token['id']);
+        $id = $token['id'];
         $hasZero = $token['hasZero'];
 
         return true;
     }
 
-    protected function getFunctionSequence()
+    protected function getFunctionSequence($topLevelFunction, $id, $hasZero)
     {
+        $idAlias = null;
+        if ($topLevelFunction === 'get') {
+            $idAlias = $this->mysql->addValue($this->context, $id);
+        }
+            
         $this->getOptionalFilterFunction();
         $this->getOptionalSortFunction();
         $this->getOptionalSliceFunction();
@@ -97,11 +106,21 @@ class GetCompiler extends AbstractCompiler
 
         $this->request = reset($this->request);
 
-        if (!$this->readGet()) {
-            throw CompilerException::invalidMethodSequence($this->request);
+        if ($this->readGet()) {
+            $this->phpOutput = Output::getList($idAlias, $hasZero, true, $this->phpOutput);
+
+            return true;
         }
 
-        return true;
+        if ($this->readCount()) {
+            return true;
+        }
+
+        if ($this->readParameterizedAggregator($topLevelFunction)) {
+            return true;
+        }
+
+        throw CompilerException::invalidMethodSequence($this->request);
     }
 
     protected function getSubtractiveParameters($nameA, $nameB, $typeA, $typeB, &$outputA, &$outputB)
@@ -219,6 +238,89 @@ class GetCompiler extends AbstractCompiler
         return true;
     }
 
+    protected function readCount()
+    {
+        if (!self::scanFunction($this->request, $name, $arguments)) {
+            return false;
+        }
+
+        if ($name !== 'count') {
+            return false;
+        }
+
+        if (!isset($arguments) || (count($arguments) > 0)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        // at this point they definitely intend to use a count function
+        $this->request = reset($arguments);
+
+        $count = new Count(new Boolean(true));
+        $columnId = $this->mysql->addExpression($count);
+        $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
+
+        return true;
+    }
+
+    protected function readParameterizedAggregator($functionName)
+    {
+        if (!self::scanFunction($this->request, $name, $arguments)) {
+            return false;
+        }
+
+        if (!isset($arguments) || (count($arguments) !== 1)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        // at this point they definitely intend to use a parameterized aggregator
+        $this->request = reset($arguments);
+        if (!isset($this->request) || (count($this->request) === 0)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        $this->request = $this->followJoins($this->request);
+        if (!isset($this->request) || (count($this->request) === 0)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        $this->request = reset($this->request);
+        if (!$this->scanProperty($this->request, $table, $name, $type, $hasZero)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        // add the aggregator with its corresponding column
+        $tableId = $this->context;
+        $tableAliasIdentifier = "`{$tableId}`";
+        $columnExpression = Select::getAbsoluteExpression($tableAliasIdentifier, $name);
+        $column = new Column($columnExpression);
+
+        switch ($functionName) {
+            case 'average':
+                $aggregator = new Average($column);
+                break;
+
+            case 'sum':
+                $aggregator = new Sum($column);
+                break;
+
+            case 'min':
+                $aggregator = new Min($column);
+                break;
+
+            case 'max':
+                $aggregator = new Max($column);
+                break;
+
+            default:
+                throw CompilerException::unknownRequestType($functionName);
+        }
+
+        $columnId = $this->mysql->addExpression($aggregator);
+        $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
+
+        return true;
+    }
+
     protected function readFunction()
     {
         if (!self::scanFunction(reset($this->request), $name, $arguments)) {
@@ -242,7 +344,7 @@ class GetCompiler extends AbstractCompiler
                 }
 
                 /** @var AbstractExpression $expression */
-                $columnId = $this->mysql->addExpression($expression->getMysql());
+                $columnId = $this->mysql->addExpression($expression);
 
                 $isNullable = true; // TODO
                 $this->phpOutput = Output::getValue(

@@ -57,30 +57,30 @@ class Compiler
     
     public function compile($request, $arguments)
     {
-        $queryType = self::getQueryType($request);
+        $queryType = self::getQueryType($request, $topLevelFunction);
 
         switch ($queryType) {
             case self::$TYPE_GET:
                 $translatedRequest = $this->translator->translateIgnoringObjects($request);
-                return $this->getCompiler->compile($translatedRequest, $arguments);
+                return $this->getCompiler->compile($topLevelFunction, $translatedRequest, $arguments);
 
             case self::$TYPE_DELETE:
                 $translatedRequest = $this->translator->translateIgnoringObjects($request);
-                return $this->deleteCompiler->compile($translatedRequest, $arguments);
+                return $this->deleteCompiler->compile($topLevelFunction, $translatedRequest, $arguments);
 
             case self::$TYPE_SET:
                 $translatedRequest = $this->translator->translateIncludingObjects($request);
-                return $this->setCompiler->compile($translatedRequest, $arguments);
+                return $this->setCompiler->compile($topLevelFunction, $translatedRequest, $arguments);
 
             case self::$TYPE_INSERT:
                 $translatedRequest = $this->translator->translateIncludingObjects($request);
-                return $this->insertCompiler->compile($translatedRequest, $arguments);
+                return $this->insertCompiler->compile($topLevelFunction, $translatedRequest, $arguments);
         }
         
         return null;
     }
 
-    public static function getQueryType($request)
+    public static function getQueryType($request, &$topLevelFunction)
     {
         if (isset($request) && (count($request) >= 1)) {
             $firstToken = reset($request);
@@ -88,8 +88,15 @@ class Compiler
                 list($tokenType, $functionName, ) = $firstToken;
 
                 if ($tokenType === Parser::TYPE_FUNCTION) {
+                    $topLevelFunction = $functionName;
+
                     switch ($functionName) {
                         case 'get':
+                        case 'count':
+                        case 'average':
+                        case 'sum':
+                        case 'min':
+                        case 'max':
                             return self::$TYPE_GET;
                             
                         case 'delete':
@@ -105,6 +112,7 @@ class Compiler
             }
         }
     
+        $topLevelFunction = null;
         throw CompilerException::unknownRequestType($request);
     }
 }
