@@ -139,6 +139,10 @@ class GetCompiler extends AbstractCompiler
 
     protected function readExpression()
     {
+        if (!isset($this->request) || (count($this->request) < 1)) {
+            return false;
+        }
+
         $firstElement = reset($this->request);
         list($tokenType, $token) = each($firstElement);
 
@@ -208,10 +212,19 @@ class GetCompiler extends AbstractCompiler
         return true;
     }
 
-    protected function getGet($arguments)
+    protected function getGet($request)
     {
-        $this->request = reset($arguments);
-        return $this->readExpression();
+        $this->request = $request;
+
+        if (!isset($this->contextJoin)) {
+            throw CompilerException::badGetArgument($this->request);
+        }
+
+        return $this->getFunctionSequence(
+            'get',
+            $this->contextJoin['id'],
+            $this->contextJoin['hasZero']
+        );
     }
 
     protected function readGet()
@@ -329,7 +342,7 @@ class GetCompiler extends AbstractCompiler
 
         switch ($name) {
             case 'get':
-                return $this->getGet($arguments);
+                return $this->getGet($this->request);
 
             case 'plus':
             case 'minus':

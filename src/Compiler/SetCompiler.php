@@ -84,17 +84,15 @@ class SetCompiler extends AbstractValuedCompiler
         return true;
     }
 
-    protected function getSubtractiveParameters($nameA, $nameB, $typeA, $typeB, &$outputA, &$outputB)
+    protected function getSubtractiveParameters($nameA, $nameB, $typeA, $typeB, &$output)
     {
-        $idA = $this->arguments->useArgument($nameA, $typeA);
-        $idB = $this->arguments->useSubtractiveArgument($nameA, $nameB, $typeA, $typeB);
+        $id = $this->arguments->useSubtractiveArgument($nameA, $nameB, $typeA, $typeB);
 
-        if (($idA === null) || ($idB === null)) {
+        if ($id === null) {
             return false;
         }
 
-        $outputA = new Parameter($idA);
-        $outputB = new Parameter($idB);
+        $output = new Parameter($id);
         return true;
     }
 
@@ -184,11 +182,11 @@ class SetCompiler extends AbstractValuedCompiler
             return false;
         }
 
-        if (!$this->getSubtractiveParameters($nameA, $nameB, 'integer', 'integer', $start, $end)) {
+        if (!$this->getSubtractiveParameters($nameA, $nameB, 'integer', 'integer', $length)) {
             return false;
         }
 
-        $this->mysql->setLimit($start, $end);
+        $this->mysql->setLimit($length);
 
         array_shift($this->request);
 

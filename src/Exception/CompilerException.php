@@ -131,7 +131,7 @@ class CompilerException extends AbstractException
     {
         $code = self::BAD_GET_ARGUMENT;
         $data = array('request' => $request);
-        $message = 'Get functions take a property, path, object, ' .
+        $message = 'Get functions take a fully resolved property, object, ' .
             'or function as an argument.';
 
         return new self($code, $data, $message);

@@ -66,36 +66,6 @@ class Delete extends AbstractMysql
         $this->limit = $length->getMysql();
     }
 
-    protected function getTables()
-    {
-        reset($this->tables);
-        list($table, ) = each($this->tables);
-
-        $mysql = "\tFROM " . $table . "\n";
-
-        $tables = array_slice($this->tables, 1);
-
-        foreach ($tables as $joinJson => $id) {
-            list($tableAIdentifier, $tableBIdentifier, $expression, $type) = json_decode($joinJson, true);
-
-            $joinIdentifier = self::getIdentifier($id);
-
-            $from = array('`0`', '`1`');
-            $to = array($tableAIdentifier, $joinIdentifier);
-            $expression = str_replace($from, $to, $expression);
-
-            if ($type === self::JOIN_INNER) {
-                $mysqlJoin = 'INNER JOIN';
-            } else {
-                $mysqlJoin = 'LEFT JOIN';
-            }
-
-            $mysql .= "\t{$mysqlJoin} {$tableBIdentifier} AS {$joinIdentifier} ON {$expression}\n";
-        }
-
-        return $mysql;
-    }
-
     protected function isValid()
     {
         return (0 < count($this->tables));

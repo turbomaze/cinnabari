@@ -76,7 +76,7 @@ class Translator
 
                 case Parser::TYPE_PROPERTY:
                     $property = $token[1];
-                    $this->getProperty($class, $table, $property, $output);
+                    $this->getProperty($class, $table, $property, false, $output);
                     break;
 
                 case Parser::TYPE_FUNCTION:
@@ -129,7 +129,7 @@ class Translator
         );
     }
 
-    private function getProperty(&$class, &$table, $property, &$output)
+    private function getProperty(&$class, &$table, $property, $isContextual, &$output)
     {
         list($type, $path) = $this->getPropertyDefinition($class, $property);
         $isPrimitiveProperty = is_int($type);
@@ -142,7 +142,7 @@ class Translator
         $value = $isPrimitiveProperty ? array_pop($path) : null;
 
         foreach ($path as $connection) {
-            $this->getConnection($table, $connection, $output);
+            $this->getConnection($table, $connection, $isContextual, $output);
         }
 
         if ($isPrimitiveProperty) {
@@ -165,7 +165,7 @@ class Translator
         );
     }
 
-    private function getConnection(&$table, $connection, &$output)
+    private function getConnection(&$table, $connection, $isContextual, &$output)
     {
         $definition = $this->getConnectionDefinition($table, $connection);
 
@@ -176,7 +176,8 @@ class Translator
                 'expression' => $definition[1],
                 'id' => $definition[2],
                 'hasZero' => $definition[3],
-                'hasMany' => $definition[4]
+                'hasMany' => $definition[4],
+                'isContextual' => $isContextual
             )
         );
 
@@ -225,7 +226,7 @@ class Translator
 
         if ($firstArgumentType === Parser::TYPE_PROPERTY) {
             $property = $firstArgument[1];
-            $this->getProperty($class, $table, $property, $output);
+            $this->getProperty($class, $table, $property, true, $output);
             $this->getFunction($translateObjectKeys, $class, $table, $function, $arguments, $output);
             return $property;
         } else {
