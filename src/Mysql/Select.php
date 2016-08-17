@@ -53,9 +53,9 @@ class Select extends AbstractMysql
         return rtrim($mysql, "\n");
     }
 
-    public function addExpression($expression)
+    public function addExpression(AbstractExpression $expression)
     {
-        return self::insert($this->columns, $expression);
+        return self::insert($this->columns, $expression->getMysql());
     }
 
     public function setLimit(AbstractExpression $start, AbstractExpression $length)
@@ -120,9 +120,21 @@ class Select extends AbstractMysql
 
             $joinIdentifier = self::getIdentifier($id);
 
+            $splitExpression = explode(' ', $expression);
+            $newExpression = array();
             $from = array('`0`', '`1`');
             $to = array($tableAIdentifier, $joinIdentifier);
-            $expression = str_replace($from, $to, $expression);
+
+            foreach ($splitExpression as $key => $token) {
+                for ($i = 0; $i < count($from); $i++) {
+                    $token = str_replace($from[$i], $to[$i], $token, $count);
+                    if ($count > 0) {
+                        break;
+                    }
+                }
+                $newExpression[] = $token;
+            }
+            $expression = implode(' ', $newExpression);
 
             if ($type === self::JOIN_INNER) {
                 $mysqlJoin = 'INNER JOIN';

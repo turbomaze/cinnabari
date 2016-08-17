@@ -45,16 +45,12 @@ abstract class AbstractMysql
     /** @var string */
     protected $limit;
 
-    /** @var array */
-    protected $rollbackPoint;
-
     public function __construct()
     {
         $this->tables = array();
         $this->where = null;
         $this->orderBy = null;
         $this->limit = null;
-        $this->rollbackPoint = array();
     }
 
     /**
@@ -153,9 +149,21 @@ abstract class AbstractMysql
 
             $joinIdentifier = self::getIdentifier($id);
 
+            $splitExpression = explode(' ', $expression);
+            $newExpression = array();
             $from = array('`0`', '`1`');
             $to = array($tableAIdentifier, $joinIdentifier);
-            $expression = str_replace($from, $to, $expression);
+
+            foreach ($splitExpression as $key => $token) {
+                for ($i = 0; $i < count($from); $i++) {
+                    $token = str_replace($from[$i], $to[$i], $token, $count);
+                    if ($count > 0) {
+                        break;
+                    }
+                }
+                $newExpression[] = $token;
+            }
+            $expression = implode(' ', $newExpression);
 
             if ($type === self::JOIN_INNER) {
                 $mysqlJoin = 'INNER JOIN';
@@ -195,22 +203,6 @@ abstract class AbstractMysql
         }
 
         return "\tLIMIT {$this->limit}\n";
-    }
-
-    public function setRollbackPoint()
-    {
-        $this->rollbackPoint[] = array(count($this->tables));
-    }
-
-    public function clearRollbackPoint()
-    {
-        array_pop($this->rollbackPoint);
-    }
-
-    public function rollback()
-    {
-        $rollbackState = array_pop($this->rollbackPoint);
-        $this->tables = array_slice($this->tables, 0, $rollbackState[0]);
     }
 
     protected static function getColumnNameFromExpression($expression)

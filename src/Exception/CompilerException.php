@@ -49,7 +49,7 @@ class CompilerException extends AbstractException
     {
         $code = self::UNKNOWN_REQUEST_TYPE;
         $data = array('request' => $request);
-        $message = 'Only get, delete, and set queries are supported at the moment.';
+        $message = 'That top level function is not supported at the moment.';
 
         return new self($code, $data, $message);
     }
@@ -100,7 +100,7 @@ class CompilerException extends AbstractException
         $code = self::INVALID_METHOD_SEQUENCE;
         $data = array('request' => $request);
         $message = 'API requests must consist of optional filter/sort/slice ' .
-            'methods followed by a get, delete, or set.';
+            'methods followed by a get, delete, set, or insert.';
 
         return new self($code, $data, $message);
     }
@@ -131,7 +131,7 @@ class CompilerException extends AbstractException
     {
         $code = self::BAD_GET_ARGUMENT;
         $data = array('request' => $request);
-        $message = 'Get functions take a property, path, object, ' .
+        $message = 'Get functions take a fully resolved property, object, ' .
             'or function as an argument.';
 
         return new self($code, $data, $message);

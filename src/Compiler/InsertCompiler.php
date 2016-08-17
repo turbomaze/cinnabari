@@ -38,7 +38,7 @@ class InsertCompiler extends AbstractValuedCompiler
     /** @var Insert */
     protected $mysql;
     
-    public function compile($translatedRequest, $types)
+    public function compile($topLevelFunction, $translatedRequest, $types)
     {
         $this->request = $translatedRequest;
 

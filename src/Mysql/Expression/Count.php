@@ -22,9 +22,20 @@
  * @copyright 2016 Datto, Inc.
  */
 
-namespace Datto\Cinnabari\Compiler;
+namespace Datto\Cinnabari\Mysql\Expression;
 
-interface CompilerInterface
+class Count extends AbstractExpression
 {
-    public function compile($topLevelFunction, $translatedRequest, $types);
+    /** @var string */
+    private $mysql;
+
+    public function __construct($mysql)
+    {
+        $this->mysql = "COUNT({$mysql->getMysql()})";
+    }
+
+    public function getMysql()
+    {
+        return $this->mysql;
+    }
 }

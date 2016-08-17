@@ -642,7 +642,7 @@ EOS;
             $phpOutput);
     }
 
-    public function testGetSlice()
+    public function testGetSliceSort()
     {
         $scenario = self::getPeopleScenario();
 
@@ -902,6 +902,900 @@ EOS;
             $phpOutput);
     }
 
+    public function testCount()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    people
+)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(TRUE) AS `0`
+    FROM `People` AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    filter(people, age < :minimumAge)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(TRUE) AS `0`
+    FROM `People` AS `0`
+    WHERE (`0`.`Age` < :0)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = null;
+$isConsistent = false;
+if (is_integer($input['minimumAge']) || is_float($input['minimumAge'])) {
+    $isConsistent = true;
+}
+if ($isConsistent) {
+    $output = array(
+        $input['minimumAge']
+    );
+}
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountSort()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    sort(people, age)
+)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(TRUE) AS `0`
+    FROM `People` AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    slice(people, :start, :stop)
+)
+EOS;
+
+        $arguments = array(
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(TRUE) AS `0`
+    FROM `People` AS `0`
+    ORDER BY `0`.`Id` ASC
+    LIMIT :0, :1
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountSortFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    sort(filter(people, age < :minimumAge), age)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(TRUE) AS `0`
+    FROM `People` AS `0`
+    WHERE (`0`.`Age` < :0)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['minimumAge']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountFilterSort()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    filter(sort(people, age), age < :minimumAge)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(TRUE) AS `0`
+    FROM `People` AS `0`
+    WHERE (`0`.`Age` < :0)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['minimumAge']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountSliceFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    slice(filter(people, age < :minimumAge), :start, :stop)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18,
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`
+            FROM `People` AS `0`
+            WHERE (`0`.`Age` < :0)
+            ORDER BY `0`.`Id` ASC
+            LIMIT :1, :2
+    ) AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['minimumAge'],
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountFilterSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    filter(slice(people, :start, :stop), age < :minimumAge)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18,
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`,
+            `0`.`Age` AS `1`
+            FROM `People` AS `0`
+            ORDER BY `0`.`Id` ASC
+            LIMIT :0, :1
+    ) AS `0`
+    WHERE (`0`.`1` < :2)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'],
+    $input['stop'] - $input['start'],
+    $input['minimum']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountSliceSort()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    slice(sort(people, age), :start, :stop)
+)
+EOS;
+
+        $arguments = array(
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`
+            FROM `People` AS `0`
+            ORDER BY `0`.`Age` ASC
+            LIMIT :0, :1
+    ) AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountSortSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    sort(slice(people, :start, :stop), age)
+)
+EOS;
+
+        $arguments = array(
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`
+            FROM `People` AS `0`
+            ORDER BY `0`.`Id` ASC
+            LIMIT :0, :1
+    ) AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountSliceSortFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    slice(sort(filter(people, age < :minimumAge), age), :start, :stop)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18,
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`
+            FROM `People` AS `0`
+            WHERE (`0`.`Age` < :0)
+            ORDER BY `0`.`Age` ASC
+            LIMIT :1, :2
+    ) AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['minimumAge'],
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountSliceFilterSort()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    slice(filter(sort(people, age), age < :minimumAge), :start, :stop)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18,
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`
+            FROM `People` AS `0`
+            WHERE (`0`.`Age` < :0)
+            ORDER BY `0`.`Age` ASC
+            LIMIT :1, :2
+    ) AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['minimumAge'],
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testCountSortSliceFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    sort(slice(filter(people, age < :minimumAge), :start, :stop), age)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18,
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`
+            FROM `People` AS `0`
+            WHERE (`0`.`Age` < :0)
+            ORDER BY `0`.`Id` ASC
+            LIMIT :1, :2
+    ) AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['minimumAge'],
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSortFilterSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    sort(filter(slice(people, :start, :stop), age < :minimumAge), age)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18,
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`,
+            `0`.`Age` AS `1`,
+            FROM `People` AS `0`
+            ORDER BY `0`.`Id` ASC
+            LIMIT :0, :1
+    ) AS `0`
+    WHERE `0`.`1` < :2
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'],
+    $input['stop'] - $input['start'],
+    $input['minimumAge']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testFilterSliceSort()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    filter(slice(sort(people, age), :start, :stop), age < :minimumAge)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18,
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`,
+            `0`.`Age` AS `1`
+            FROM `People` AS `0`
+            ORDER BY `0`.`Age` ASC
+            LIMIT :0, :1
+    ) AS `0`
+    WHERE `0`.`1` < :2
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'],
+    $input['stop'] - $input['start'],
+    $input['minimumAge']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testFilterSortSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+count(
+    filter(sort(slice(people, :start, :stop), age), age < :minimumAge)
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18,
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`,
+            `0`.`Age` AS `1`
+            FROM `People` AS `0`
+            ORDER BY `0`.`Id` ASC
+            LIMIT :0, :1
+    ) AS `0`
+    WHERE `0`.`1` < :2
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'],
+    $input['stop'] - $input['start'],
+    $input['minimumAge']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = (integer)$row[0];
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSum()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+sum(
+    people,
+    age
+)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    SUM(`0`.`Age`) AS `0`
+    FROM `People` AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = isset($row[0]) ? (integer)$row[0] : null;
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSumSort()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+sum(
+    sort(people, age),
+    age
+)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    SUM(`0`.`Age`) AS `0`
+    FROM `People` AS `0`
+    ORDER BY `0`.`Age` ASC
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = isset($row[0]) ? (integer)$row[0] : null;
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSumFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+sum(
+    filter(people, age < :minimumAge),
+    age
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    SUM(`0`.`Age`) AS `0`
+    FROM `People` AS `0`
+    WHERE (`0`.`Age` < :0)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = null;
+$isConsistent = false;
+if (is_integer($input['minimumAge']) || is_float($input['minimumAge'])) {
+    $isConsistent = true;
+}
+if ($isConsistent) {
+    $output = array(
+        $input['minimumAge']
+    );
+}
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = isset($row[0]) ? (integer)$row[0] : null;
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSumSlice()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+sum(
+    slice(people, :start, :stop),
+    age
+)
+EOS;
+
+        $arguments = array(
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    SUM(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            `0`.`Age` AS `0`
+            FROM `People` AS `0`
+            LIMIT :0, :1
+    ) AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = isset($row[0]) ? (integer)$row[0] : null;
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testSumSliceSortFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+sum(
+    slice(sort(filter(people, age < :minimumAge), age), :start, :stop),
+    age
+)
+EOS;
+
+        $arguments = array(
+            'minimumAge' => 18,
+            'start' => 0,
+            'stop' => 3
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    SUM(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            `0`.`Age` AS `0`
+            FROM `People` AS `0`
+            WHERE (`0`.`Age` < :0)
+            ORDER BY `0`.`Age` ASC
+            LIMIT :1, :2
+    ) AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['minimumAge'],
+    $input['start'],
+    $input['stop'] - $input['start']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output = isset($row[0]) ? (integer)$row[0] : null;
+}
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
     public function testDelete()
     {
         $scenario = self::getPeopleScenario();
@@ -954,7 +1848,7 @@ EOS;
         $phpInput = <<<'EOS'
 $output = null;
 $isConsistent = false;
-if (is_integer($input['age'])) {
+if (is_integer($input['age']) || is_float($input['age'])) {
     $isConsistent = true;
 }
 if ($isConsistent) {
@@ -1128,10 +2022,10 @@ EOS;
         $phpInput = <<<'EOS'
 $output = null;
 $isConsistent = false;
-if (is_string($input['name']) || is_null($input['name'])) {
-    if (is_string($input['email']) || is_null($input['email'])) {
-        if (is_integer($input['age']) || is_null($input['age'])) {
-            if (is_float($input['height']) || is_null($input['height'])) {
+if (is_null($input['name']) || is_string($input['name'])) {
+    if (is_null($input['email']) || is_string($input['email'])) {
+        if (is_null($input['age']) || is_integer($input['age'])) {
+            if (is_null($input['height']) || is_float($input['height'])) {
                 if (is_null($input['isMarried']) || is_bool($input['isMarried'])) {
                     $isConsistent = true;
                 }
@@ -1184,7 +2078,7 @@ EOS;
         $phpInput = <<<'EOS'
 $output = null;
 $isConsistent = false;
-if (is_string($input['name']) || is_null($input['name'])) {
+if (is_null($input['name']) || is_string($input['name'])) {
     $isConsistent = true;
 }
 if ($isConsistent) {
@@ -1200,6 +2094,152 @@ EOS;
 
         $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
+
+    public function testSetFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+set(
+    filter(people, age < :age),
+    {
+        "name": :name,
+        "age": :age
+    }
+)
+EOS;
+
+        $arguments = array(
+            'name' => 'Nemo',
+            'age' => 18
+        );
+
+        $mysql = <<<'EOS'
+UPDATE
+    `People` AS `0`
+    SET
+        `0`.`Name` = :1,
+        `0`.`Age` = :0
+    WHERE (`0`.`Age` < :0)
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = null;
+$isConsistent = false;
+if (is_null($input['age']) || is_integer($input['age'])) {
+    if (is_null($input['name']) || is_string($input['name'])) {
+        $isConsistent = true;
+    }
+}
+if ($isConsistent) {
+    $output = array(
+        $input['age'],
+        $input['name']
+    );
+}
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testSetSliceSort()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+set(
+    slice(sort(people, age), :start, :end),
+    {
+        "name": :name,
+        "age": :age
+    }
+)
+EOS;
+
+        $arguments = array(
+            'name' => 'Nemo',
+            'age' => 18,
+            'start' => 0,
+            'end' => 10
+        );
+
+        $mysql = <<<'EOS'
+UPDATE
+    `People` AS `0`
+    SET
+        `0`.`Name` = :1,
+        `0`.`Age` = :2
+    ORDER BY `0`.`Age` ASC
+    LIMIT :0
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['end'] - $input['start'],
+    $input['name'],
+    $input['age']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+    public function testSetSliceSortFilter()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+set(
+    slice(sort(filter(people, age < :age), age), :start, :end),
+    {
+        "name": :name,
+        "age": :age
+    }
+)
+EOS;
+
+        $arguments = array(
+            'name' => 'Nemo',
+            'age' => 18,
+            'start' => 0,
+            'end' => 10
+        );
+
+        $mysql = <<<'EOS'
+UPDATE
+    `People` AS `0`
+    SET
+        `0`.`Name` = :2,
+        `0`.`Age` = :0
+    WHERE (`0`.`Age` < :0)
+    ORDER BY `0`.`Age` ASC
+    LIMIT :1
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['age'],
+    $input['end'] - $input['start'],
+    $input['name']
+);
+EOS;
+
+        $phpOutput = <<<'EOS'
+$output = null;
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
+    }
+
+
 
     private function verifyResult($scenarioJson, $method, $arguments, $mysql, $phpInput, $phpOutput)
     {

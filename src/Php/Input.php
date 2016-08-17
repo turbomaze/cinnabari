@@ -106,29 +106,25 @@ class Input
         $php = '';
         $rootName = $names[0];
         $validateConsistency = self::getAssignment(self::$consistencyFlag, 'true');
-        foreach ($hierarchy as $rootType => $subhierarchy) {
-            $typeCheck = self::getSingleTypeCheck($rootName, $rootType);
+        $nullCheck = self::getSingleTypeCheck($rootName, Output::TYPE_NULL);
+
+        if (reset($hierarchy) === true) {
+            $hierarchyChecks = array();
             if ($this->argumentTypes[$rootName] === true) {
-                $nullCheck = self::getSingleTypeCheck($rootName, Output::TYPE_NULL);
-                $typeCheck = self::getOr(array($typeCheck, $nullCheck));
+                $hierarchyChecks[] = $nullCheck;
             }
-            if ($subhierarchy === true) {
-                return self::getIf($typeCheck, $validateConsistency);
-            } else {
-                if (reset($subhierarchy) === true) {
-                    $subhierarchyChecks = array();
-                    if ($this->argumentTypes[$names[1]] === true) {
-                        $subhierarchyChecks[] = self::getSingleTypeCheck($names[1], Output::TYPE_NULL);
-                    }
-                    foreach ($subhierarchy as $type => $value) {
-                        $subhierarchyChecks[] = self::getSingleTypeCheck($names[1], $type);
-                    }
-                    $body = self::getIf(self::getOr($subhierarchyChecks), $validateConsistency);
-                    $php .= self::getIf($typeCheck, $body) . "\n";
-                } else {
-                    $body = self::getTypeCheck(array_slice($names, 1), $subhierarchy);
-                    $php .= self::getIf($typeCheck, $body) . "\n";
+            foreach ($hierarchy as $type => $value) {
+                $hierarchyChecks[] = self::getSingleTypeCheck($rootName, $type);
+            }
+            $php .= self::getIf(self::getOr($hierarchyChecks), $validateConsistency) . "\n";
+        } else {
+            foreach ($hierarchy as $rootType => $subhierarchy) {
+                $typeCheck = self::getSingleTypeCheck($rootName, $rootType);
+                if ($this->argumentTypes[$rootName] === true) {
+                    $typeCheck = self::getOr(array($nullCheck, $typeCheck));
                 }
+                $body = self::getTypeCheck(array_slice($names, 1), $subhierarchy);
+                $php .= self::getIf($typeCheck, $body) . "\n";
             }
         }
         return substr($php, 0, -1);

@@ -39,7 +39,7 @@ class SetCompiler extends AbstractValuedCompiler
     /** @var Update */
     protected $mysql;
     
-    public function compile($translatedRequest, $types)
+    public function compile($topLevelFunction, $translatedRequest, $types)
     {
         $this->request = $translatedRequest;
 
@@ -85,17 +85,15 @@ class SetCompiler extends AbstractValuedCompiler
         return true;
     }
 
-    protected function getSubtractiveParameters($nameA, $nameB, &$outputA, &$outputB)
+    protected function getSubtractiveParameters($nameA, $nameB, &$output)
     {
-        $idA = $this->input->useArgument($nameA, self::$REQUIRED);
-        $idB = $this->input->useSubtractiveArgument($nameA, $nameB, self::$REQUIRED);
+        $id = $this->arguments->useSubtractiveArgument($nameA, $nameB, self::$REQUIRED);
 
-        if (($idA === null) || ($idB === null)) {
+        if ($id === null) {
             return false;
         }
 
-        $outputA = new Parameter($idA);
-        $outputB = new Parameter($idB);
+        $output = new Parameter($id);
         return true;
     }
 
@@ -185,11 +183,11 @@ class SetCompiler extends AbstractValuedCompiler
             return false;
         }
 
-        if (!$this->getSubtractiveParameters($nameA, $nameB, $start, $end)) {
+        if (!$this->getSubtractiveParameters($nameA, $nameB, $length)) {
             return false;
         }
 
-        $this->mysql->setLimit($start, $end);
+        $this->mysql->setLimit($length);
 
         array_shift($this->request);
 
