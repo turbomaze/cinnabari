@@ -42,7 +42,8 @@ class DeleteCompiler extends AbstractCompiler
 
     public function compile($topLevelFunction, $translatedRequest, $types)
     {
-        $this->request = $translatedRequest;
+        $optimizedRequest = self::optimize($topLevelFunction, $translatedRequest);
+        $this->request = $optimizedRequest;
 
         $this->mysql = new Delete();
         $this->input = new Input($types);

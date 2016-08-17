@@ -54,7 +54,8 @@ class GetCompiler extends AbstractCompiler
     
     public function compile($topLevelFunction, $translatedRequest, $types)
     {
-        $this->request = $translatedRequest;
+        $optimizedRequest = self::optimize($topLevelFunction, $translatedRequest);
+        $this->request = $optimizedRequest;
 
         $this->mysql = new Select();
         $this->input = new Input($types);

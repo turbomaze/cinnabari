@@ -40,7 +40,8 @@ class InsertCompiler extends AbstractValuedCompiler
     
     public function compile($topLevelFunction, $translatedRequest, $types)
     {
-        $this->request = $translatedRequest;
+        $optimizedRequest = self::optimize($topLevelFunction, $translatedRequest);
+        $this->request = $optimizedRequest;
 
         $this->mysql = new Insert();
         $this->input = new Input($types);

@@ -664,6 +664,7 @@ if (
 } else {
     $output = null;
 }
+EOS;
 
         $phpOutput = <<<'EOS'
 foreach ($input as $row) {
@@ -673,8 +674,7 @@ foreach ($input as $row) {
 $output = isset($output) ? array_values($output) : array();
 EOS;
 
-        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
-            $phpOutput);
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput, $phpOutput);
     }
 
     public function testGet()
@@ -1049,9 +1049,13 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['minimumAge']
-);
+if (is_integer($input['minimumAge']) || is_float($input['minimumAge'])) {
+    $output = array(
+        $input['minimumAge']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'

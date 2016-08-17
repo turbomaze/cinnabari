@@ -86,6 +86,81 @@ abstract class AbstractCompiler implements CompilerInterface
      */
     abstract protected function getProperty($token, &$output, &$type);
 
+    protected function optimize($topLevelFunction, $request)
+    {
+        $method = self::analyze($topLevelFunction, $request);
+
+        // the following rule describes when to remove a sort function
+        if (
+            ($method['is']['count'] || $method['is']['aggregator'] || $method['is']['set'] || $method['is']['delete']) &&
+            $method['sorts'] && !$method['slices']
+        ) {
+            // remove sort
+            return array_filter(
+                $request,
+                function ($wrappedToken) {
+                    list($tokenType, $token) = each($wrappedToken);
+
+                    return ($tokenType !== Translator::TYPE_FUNCTION) ||
+                        $token['function'] !== 'sort';
+                }
+            );
+        }
+        return $request;
+    }
+
+    protected function analyze($topLevelFunction, $translatedRequest)
+    {
+        // is a get, delete, set, insert, count, aggregator
+        $method = array();
+        $method['is'] = array();
+        $method['is']['get'] = false;
+        $method['is']['delete'] = false;
+        $method['is']['set'] = false;
+        $method['is']['insert'] = false;
+        $method['is']['count'] = false;
+        $method['is']['aggregator'] = false;
+
+        if (array_key_exists($topLevelFunction, $method['is'])) {
+            $method['is'][$topLevelFunction] = true;
+        } else {
+            $method['is']['aggregator'] = true;
+        }
+
+        // order of the list functions
+        $functions = array();
+        foreach ($translatedRequest as $wrappedToken) {
+            list($tokenType, $token) = each($wrappedToken);
+            if ($tokenType === Translator::TYPE_FUNCTION) {
+                $functions[] = $token['function'];
+            }
+        }
+
+        $method['filter'] = array('before' => array('sort' => false, 'slice' => false));
+        $method['sort'] = array('before' => array('filter' => false, 'slice' => false));
+        $method['slice'] = array('before' => array('filter' => false, 'sort' => false));
+        $filterIndex = array_search('filter', $functions, true);
+        $sortIndex = array_search('sort', $functions, true);
+        $sliceIndex = array_search('slice', $functions, true);
+        $method['filters'] = $filterIndex !== false;
+        $method['sorts'] = $sortIndex !== false;
+        $method['slices'] = $sliceIndex !== false;
+        if ($method['filters'] && $method['sorts']) {
+            $method['filter']['before']['sort'] = $filterIndex < $sortIndex;
+            $method['sort']['before']['filter'] = $sortIndex < $filterIndex;
+        }
+        if ($method['filters'] && $method['slices']) {
+            $method['filter']['before']['slice'] = $filterIndex < $sliceIndex;
+            $method['slice']['before']['filter'] = $sliceIndex < $filterIndex;
+        }
+        if ($method['sorts'] && $method['slices']) {
+            $method['sort']['before']['slice'] = $sortIndex < $sliceIndex;
+            $method['slice']['before']['sort'] = $sliceIndex < $sortIndex;
+        }
+
+        return $method;
+    }
+
     protected function getOptionalFilterFunction()
     {
         if (!self::scanFunction(reset($this->request), $name, $arguments)) {

@@ -41,7 +41,8 @@ class SetCompiler extends AbstractValuedCompiler
     
     public function compile($topLevelFunction, $translatedRequest, $types)
     {
-        $this->request = $translatedRequest;
+        $optimizedRequest = self::optimize($topLevelFunction, $translatedRequest);
+        $this->request = $optimizedRequest;
 
         $this->mysql = new Update();
         $this->input = new Input($types);
