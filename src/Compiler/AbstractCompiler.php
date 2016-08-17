@@ -25,6 +25,7 @@
 
 namespace Datto\Cinnabari\Compiler;
 
+use Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\AbstractMysql;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
@@ -43,7 +44,6 @@ use Datto\Cinnabari\Mysql\Expression\OperatorRegexpBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Php\Input;
-use Datto\Cinnabari\Php\Output;
 use Datto\Cinnabari\Translator;
 
 /**
@@ -77,10 +77,10 @@ abstract class AbstractCompiler implements CompilerInterface
 
     /**
      * @param array $token
-     * @param string $neededType
      * @param AbstractExpression|null $output
+     * @param int $type
      */
-    abstract protected function getProperty($token, $neededType, &$output);
+    abstract protected function getProperty($token, &$output, &$type);
 
     protected function getOptionalFilterFunction()
     {
@@ -97,8 +97,7 @@ abstract class AbstractCompiler implements CompilerInterface
             throw CompilerException::noFilterArguments($this->request);
         }
 
-        // TODO: throw exception for bad filters
-        if (!$this->getBooleanExpression($arguments[0], self::$REQUIRED, $where)) {
+        if (!$this->getExpression($arguments[0], self::$REQUIRED, $where, $type)) {
             throw CompilerException::badFilterExpression(
                 $this->context,
                 $arguments[0]
@@ -135,23 +134,6 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected function getExpression($arrayToken, $hasZero, &$expression, &$type)
     {
-        if ($this->getBooleanExpression($arrayToken, $hasZero, $expression)) {
-            $type = Output::TYPE_BOOLEAN;
-        } else if ($this->getIntegerExpression($arrayToken, $hasZero, $expression)) {
-            $type = Output::TYPE_INTEGER;
-        } else if ($this->getFloatExpression($arrayToken, $hasZero, $expression)) {
-            $type = Output::TYPE_FLOAT;
-        } else if ($this->getStringExpression($arrayToken, $hasZero, $expression)) {
-            $type = Output::TYPE_STRING;
-        } else {
-            return false;
-        }
-
-        return true;
-    }
-
-    private function getBooleanExpression($arrayToken, $hasZero, &$output)
-    {
         $firstElement = reset($arrayToken);
         list($tokenType, $token) = each($firstElement);
 
@@ -164,22 +146,22 @@ abstract class AbstractCompiler implements CompilerInterface
                 $this->handleJoin($token);
                 array_shift($arrayToken);
                 $result = $this->conditionallyRollback(
-                    $this->getBooleanExpression($arrayToken, $hasZero, $output)
+                    $this->getExpression($arrayToken, $hasZero, $expression, $type)
                 );
                 break;
 
             case Translator::TYPE_PARAMETER:
-                $result = $this->getBooleanParameter($token, $hasZero, $output);
+                $result = $this->getParameter($token, $hasZero, $expression);
                 break;
 
             case Translator::TYPE_VALUE:
-                $result = $this->getBooleanProperty($token, $output);
+                $result = $this->getProperty($token, $expression, $type);
                 break;
 
             case Translator::TYPE_FUNCTION:
                 $name = $token['function'];
                 $arguments = $token['arguments'];
-                $result = $this->getBooleanFunction($name, $arguments, $hasZero, $output);
+                $result = $this->getFunction($name, $arguments, $hasZero, $expression, $type);
                 break;
         }
 
@@ -187,387 +169,101 @@ abstract class AbstractCompiler implements CompilerInterface
         return $result;
     }
 
-    protected function getIntegerExpression($arrayToken, $hasZero, &$output)
-    {
-        $firstElement = reset($arrayToken);
-        list($tokenType, $token) = each($firstElement);
-
-        $context = $this->context;
-        $result = false;
-
-        switch ($tokenType) {
-            case Translator::TYPE_JOIN:
-                $this->setRollbackPoint();
-                $this->handleJoin($token);
-                array_shift($arrayToken);
-                $result = $this->conditionallyRollback(
-                    $this->getIntegerExpression($arrayToken, $hasZero, $output)
-                );
-                break;
-
-            case Translator::TYPE_PARAMETER:
-                $result = $this->getIntegerParameter($token, $hasZero, $output);
-                break;
-
-            case Translator::TYPE_VALUE:
-                $result = $this->getIntegerProperty($token, $output);
-                break;
-
-            case Translator::TYPE_FUNCTION:
-                $name = $token['function'];
-                $arguments = $token['arguments'];
-
-                if (count($arguments) < 2) {
-                    return false;
-                }
-
-                $result = $this->getIntegerBinaryFunction($name, $arguments[0], $arguments[1], $hasZero, $output);
-                break;
-        }
-
-        $this->context = $context;
-        return $result;
-    }
-
-    protected function getFloatExpression($arrayToken, $hasZero, &$output)
-    {
-        $firstElement = reset($arrayToken);
-        list($tokenType, $token) = each($firstElement);
-
-        $context = $this->context;
-        $result = false;
-
-        switch ($tokenType) {
-            case Translator::TYPE_JOIN:
-                $this->setRollbackPoint();
-                $this->handleJoin($token);
-                array_shift($arrayToken);
-                $result = $this->conditionallyRollback(
-                    $this->getFloatExpression($arrayToken, $hasZero, $output)
-                );
-                break;
-
-            case Translator::TYPE_PARAMETER:
-                $result = $this->getFloatParameter($token, $hasZero, $output);
-                break;
-
-            case Translator::TYPE_VALUE:
-                $result = $this->getFloatProperty($token, $output);
-                break;
-
-            case Translator::TYPE_FUNCTION:
-                $name = $token['function'];
-                $arguments = $token['arguments'];
-
-                if (count($arguments) < 2) {
-                    return false;
-                }
-
-                $result = $this->getFloatBinaryFunction($name, $arguments[0], $arguments[1], $hasZero, $output);
-                break;
-        }
-
-        $this->context = $context;
-        return $result;
-    }
-
-    protected function getStringExpression($arrayToken, $hasZero, &$output)
-    {
-        $firstElement = reset($arrayToken);
-        list($tokenType, $token) = each($firstElement);
-
-        $context = $this->context;
-        $result = false;
-
-        switch ($tokenType) {
-            case Translator::TYPE_JOIN:
-                $this->setRollbackPoint();
-                $this->handleJoin($token);
-                array_shift($arrayToken);
-                $result = $this->conditionallyRollback(
-                    $this->getStringExpression($arrayToken, $hasZero, $output)
-                );
-                break;
-
-            case Translator::TYPE_PARAMETER:
-                $result = $this->getStringParameter($token, $hasZero, $output);
-                break;
-
-            case Translator::TYPE_VALUE:
-                $result = $this->getStringProperty($token, $output);
-                break;
-        }
-
-        $this->context = $context;
-        return $result;
-    }
-
-    protected function getBooleanFunction($name, $arguments, $hasZero, &$output)
+    protected function getFunction($name, $arguments, $hasZero, &$output, &$type)
     {
         $countArguments = count($arguments);
 
         if ($countArguments === 1) {
             $argument = current($arguments);
-            return $this->getBooleanUnaryFunction($name, $argument, $hasZero, $output);
+            return $this->getUnaryFunction($name, $argument, $hasZero, $output, $type);
         }
 
         if ($countArguments === 2) {
             list($argumentA, $argumentB) = $arguments;
-            return $this->getBooleanBinaryFunction($name, $argumentA, $argumentB, $hasZero, $output);
+            return $this->getBinaryFunction($name, $argumentA, $argumentB, $hasZero, $output, $type);
         }
 
         return false;
     }
 
-    protected function getBooleanUnaryFunction($name, $argument, $hasZero, &$expression)
+    protected function getUnaryFunction($name, $argument, $hasZero, &$expression, &$type)
     {
         if ($name !== 'not') {
             return false;
         }
 
-        if (!$this->getBooleanExpression($argument, $hasZero, $childExpression)) {
+        if (!$this->getExpression($argument, $hasZero, $childExpression, $argumentType)) {
             return false;
         }
 
         $expression = new OperatorNot($childExpression);
+        $type = self::getReturnTypeFromFunctionName($name, $argumentType, false);
         return true;
     }
 
-    protected function getBooleanBinaryFunction($name, $argumentA, $argumentB, $hasZero, &$expression)
+    protected function getBinaryFunction($name, $argumentA, $argumentB, $hasZero, &$expression, &$type)
     {
+        if (
+            !$this->getExpression($argumentA, $hasZero, $expressionA, $argumentTypeOne) ||
+            !$this->getExpression($argumentB, $hasZero, $expressionB, $argumentTypeTwo)
+        ) {
+            return false;
+        }
+        
+        $type = self::getReturnTypeFromFunctionName($name, $argumentTypeOne, $argumentTypeTwo);
+
         switch ($name) {
+            case 'plus':
+                $expression = new OperatorPlus($expressionA, $expressionB);
+                return true;
+
+            case 'minus':
+                $expression = new OperatorMinus($expressionA, $expressionB);
+                return true;
+
+            case 'times':
+                $expression = new OperatorTimes($expressionA, $expressionB);
+                return true;
+
+            case 'divides':
+                $expression = new OperatorDivides($expressionA, $expressionB);
+                return true;
+
             case 'equal':
-                return $this->getEqualFunction($argumentA, $argumentB, $hasZero, $expression);
+                $expression = new OperatorEqual($expressionA, $expressionB);
+                return true;
 
             case 'and':
-                return $this->getAndFunction($argumentA, $argumentB, $hasZero, $expression);
+                $expression = new OperatorAnd($expressionA, $expressionB);
+                return true;
 
             case 'or':
-                return $this->getOrFunction($argumentA, $argumentB, $hasZero, $expression);
+                $expression = new OperatorOr($expressionA, $expressionB);
+                return true;
 
             case 'notEqual':
-                return $this->getNotEqualFunction($argumentA, $argumentB, $hasZero, $expression);
+                $equalExpression = new OperatorEqual($expressionA, $expressionB);
+                $expression = new OperatorNot($equalExpression);
+                return true;
 
             case 'less':
-                return $this->getLessFunction($argumentA, $argumentB, $hasZero, $expression);
+                $expression = new OperatorLess($expressionA, $expressionB);
+                return true;
 
             case 'lessEqual':
-                return $this->getLessEqualFunction($argumentA, $argumentB, $hasZero, $expression);
+                $expression = new OperatorLessEqual($expressionA, $expressionB);
+                return true;
 
             case 'greater':
-                return $this->getGreaterFunction($argumentA, $argumentB, $hasZero, $expression);
+                $expression = new OperatorGreater($expressionA, $expressionB);
+                return true;
 
             case 'greaterEqual':
-                return $this->getGreaterEqualFunction($argumentA, $argumentB, $hasZero, $expression);
+                $expression = new OperatorGreaterEqual($expressionA, $expressionB);
+                return true;
 
             case 'match':
                 return $this->getMatchFunction($argumentA, $argumentB, $expression);
-
-            default:
-                return false;
-        }
-    }
-
-    protected function getEqualFunction($argumentA, $argumentB, $hasZero, &$expression)
-    {
-        if (
-            (
-                $this->getBooleanExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getBooleanExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getIntegerExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getIntegerExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getFloatExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getFloatExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getStringExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getStringExpression($argumentB, $hasZero, $expressionB)
-            )
-        ) {
-            $expression = new OperatorEqual($expressionA, $expressionB);
-            return true;
-        }
-
-        return false;
-    }
-
-    protected function getAndFunction($argumentA, $argumentB, $hasZero, &$expression)
-    {
-        if (
-            !$this->getBooleanExpression($argumentA, $hasZero, $outputA) ||
-            !$this->getBooleanExpression($argumentB, $hasZero, $outputB)
-        ) {
-            return false;
-        }
-
-        $expression = new OperatorAnd($outputA, $outputB);
-        return true;
-    }
-
-    protected function getOrFunction($argumentA, $argumentB, $hasZero, &$expression)
-    {
-        if (
-            !$this->getBooleanExpression($argumentA, $hasZero, $outputA) ||
-            !$this->getBooleanExpression($argumentB, $hasZero, $outputB)
-        ) {
-            return false;
-        }
-
-        $expression = new OperatorOr($outputA, $outputB);
-        return true;
-    }
-
-    protected function getNotEqualFunction($argumentA, $argumentB, $hasZero, &$expression)
-    {
-        if (!$this->getEqualFunction($argumentA, $argumentB, $hasZero, $equalExpression)) {
-            return false;
-        }
-
-        $expression = new OperatorNot($equalExpression);
-        return true;
-    }
-
-    protected function getLessFunction($argumentA, $argumentB, $hasZero, &$expression)
-    {
-        if (
-            (
-                $this->getIntegerExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getIntegerExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getFloatExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getFloatExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getStringExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getStringExpression($argumentB, $hasZero, $expressionB)
-            )
-        ) {
-            $expression = new OperatorLess($expressionA, $expressionB);
-            return true;
-        }
-
-        return false;
-    }
-
-    protected function getLessEqualFunction($argumentA, $argumentB, $hasZero, &$expression)
-    {
-        if (
-            (
-                $this->getIntegerExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getIntegerExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getFloatExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getFloatExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getStringExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getStringExpression($argumentB, $hasZero, $expressionB)
-            )
-        ) {
-            $expression = new OperatorLessEqual($expressionA, $expressionB);
-            return true;
-        }
-
-        return false;
-    }
-
-    protected function getGreaterFunction($argumentA, $argumentB, $hasZero, &$expression)
-    {
-        if (
-            (
-                $this->getIntegerExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getIntegerExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getFloatExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getFloatExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getStringExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getStringExpression($argumentB, $hasZero, $expressionB)
-            )
-        ) {
-            $expression = new OperatorGreater($expressionA, $expressionB);
-            return true;
-        }
-
-        return false;
-    }
-
-    protected function getGreaterEqualFunction($argumentA, $argumentB, $hasZero, &$expression)
-    {
-        if (
-            (
-                $this->getIntegerExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getIntegerExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getFloatExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getFloatExpression($argumentB, $hasZero, $expressionB)
-            ) || (
-                $this->getStringExpression($argumentA, $hasZero, $expressionA) &&
-                $this->getStringExpression($argumentB, $hasZero, $expressionB)
-            )
-        ) {
-            $expression = new OperatorGreaterEqual($expressionA, $expressionB);
-            return true;
-        }
-
-        return false;
-    }
-
-    protected function getIntegerBinaryFunction($name, $argumentA, $argumentB, $hasZero, &$expression)
-    {
-        if (
-            !$this->getIntegerExpression($argumentA, $hasZero, $expressionA) ||
-            !$this->getIntegerExpression($argumentB, $hasZero, $expressionB)
-        ) {
-            return false;
-        }
-
-        switch ($name) {
-            case 'plus':
-                $expression = new OperatorPlus($expressionA, $expressionB);
-                return true;
-
-            case 'minus':
-                $expression = new OperatorMinus($expressionA, $expressionB);
-                return true;
-
-            case 'times':
-                $expression = new OperatorTimes($expressionA, $expressionB);
-                return true;
-
-            case 'divides':
-                $expression = new OperatorDivides($expressionA, $expressionB);
-                return true;
-
-            default:
-                return false;
-        }
-    }
-
-    protected function getFloatBinaryFunction($name, $argumentA, $argumentB, $hasZero, &$expression)
-    {
-        if (
-            !$this->getFloatExpression($argumentA, $hasZero, $expressionA) ||
-            !$this->getFloatExpression($argumentB, $hasZero, $expressionB)
-        ) {
-            return false;
-        }
-
-        switch ($name) {
-            case 'plus':
-                $expression = new OperatorPlus($expressionA, $expressionB);
-                return true;
-
-            case 'minus':
-                $expression = new OperatorMinus($expressionA, $expressionB);
-                return true;
-
-            case 'times':
-                $expression = new OperatorTimes($expressionA, $expressionB);
-                return true;
-
-            case 'divides':
-                $expression = new OperatorDivides($expressionA, $expressionB);
-                return true;
 
             default:
                 return false;
@@ -598,8 +294,8 @@ abstract class AbstractCompiler implements CompilerInterface
         }
 
         if (
-            !$this->getStringProperty($propertyToken, $argumentExpression) ||
-            !$this->getStringParameter($name, self::$REQUIRED, $patternExpression)
+            !$this->getProperty($propertyToken, $argumentExpression, $type) ||
+            !$this->getParameter($name, self::$REQUIRED, $patternExpression)
         ) {
             $this->context = $state;
             return false;
@@ -609,50 +305,43 @@ abstract class AbstractCompiler implements CompilerInterface
         $this->context = $state;
         return true;
     }
-
-    protected function getBooleanProperty($propertyToken, &$output)
+    
+    protected static function getReturnTypeFromFunctionName($name, $typeOne, $typeTwo)
     {
-        return $this->getProperty($propertyToken, Output::TYPE_BOOLEAN, $output);
+        $allSignatures = Compiler::getSignatures();
+        if (array_key_exists($name, $allSignatures)) {
+            $signatures = $allSignatures[$name];
+            
+            foreach ($signatures as $signature) {
+                if (self::signatureMatchesArguments($signature, $typeOne, $typeTwo)) {
+                    return $signature['return'];
+                }
+            }
+            
+            // just return the return type of the first signature
+            return $signatures[0]['return'];
+        } else {
+            return false;
+        }
+    }
+    
+    protected static function signatureMatchesArguments($signature, $typeOne, $typeTwo)
+    {
+        if ($signature['arguments'][0] !== $typeOne) {
+            return false;
+        }
+
+        // TODO: assumes functions take at most 2 arguments for simplicity
+        if (count($signature['arguments']) >= 2) {
+            return $signature['arguments'][1] === $typeTwo;
+        } else {
+            return true;
+        }
     }
 
-    protected function getBooleanParameter($name, $hasZero, &$output)
+    protected function getParameter($name, $hasZero, &$output)
     {
-        return $this->getParameter($name, 'boolean', $hasZero, $output);
-    }
-
-    protected function getIntegerProperty($propertyToken, &$output)
-    {
-        return $this->getProperty($propertyToken, Output::TYPE_INTEGER, $output);
-    }
-
-    protected function getIntegerParameter($name, $hasZero, &$output)
-    {
-        return $this->getParameter($name, 'integer', $hasZero, $output);
-    }
-
-    protected function getFloatProperty($propertyToken, &$output)
-    {
-        return $this->getProperty($propertyToken, Output::TYPE_FLOAT, $output);
-    }
-
-    protected function getFloatParameter($name, $hasZero, &$output)
-    {
-        return $this->getParameter($name, 'float', $hasZero, $output);
-    }
-
-    protected function getStringProperty($propertyToken, &$output)
-    {
-        return $this->getProperty($propertyToken, Output::TYPE_STRING, $output);
-    }
-
-    protected function getStringParameter($name, $hasZero, &$output)
-    {
-        return $this->getParameter($name, 'string', $hasZero, $output);
-    }
-
-    protected function getParameter($name, $type, $hasZero, &$output)
-    {
-        $id = $this->input->useArgument($name, $type, $hasZero);
+        $id = $this->input->useArgument($name, $hasZero);
 
         if ($id === null) {
             return false;

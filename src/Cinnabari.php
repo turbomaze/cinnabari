@@ -28,6 +28,7 @@ use Datto\Cinnabari\Exception\CinnabariException;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Exception\LexerException;
 use Datto\Cinnabari\Exception\TranslatorException;
+use Datto\PhpTypeInferer\InconsistentTypeException;
 
 class Cinnabari
 {
@@ -37,7 +38,7 @@ class Cinnabari
     }
 
     // TODO: trim the query string before Cinnabari
-    public function translate($query, $arguments)
+    public function translate($query)
     {
         try {
             $lexer = new Lexer();
@@ -46,13 +47,15 @@ class Cinnabari
 
             $tokens = $lexer->tokenize($query);
             $request = $parser->parse($tokens);
-            return $compiler->compile($request, $arguments);
+            return $compiler->compile($request);
         } catch (LexerException $exception) {
             throw CinnabariException::lexer($exception);
         } catch (TranslatorException $exception) {
             throw CinnabariException::translator($exception);
         } catch (CompilerException $exception) {
             throw CinnabariException::compiler($exception);
+        } catch (InconsistentTypeException $exception) {
+            throw CinnabariException::arguments($exception);
         }
     }
 }

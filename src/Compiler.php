@@ -26,9 +26,11 @@ namespace Datto\Cinnabari;
 
 use Datto\Cinnabari\Compiler\DeleteCompiler;
 use Datto\Cinnabari\Compiler\GetCompiler;
-use Datto\Cinnabari\Compiler\SetCompiler;
 use Datto\Cinnabari\Compiler\InsertCompiler;
+use Datto\Cinnabari\Compiler\SetCompiler;
 use Datto\Cinnabari\Exception\CompilerException;
+use Datto\Cinnabari\Php\Output;
+use Datto\PhpTypeInferer\TypeInferer;
 
 /**
  * Class Compiler
@@ -44,7 +46,10 @@ class Compiler
     private $getCompiler;
     private $deleteCompiler;
     private $setCompiler;
+    private $insertCompiler;
     private $translator;
+
+    private static $signatures = null;
 
     public function __construct($schema)
     {
@@ -55,32 +60,163 @@ class Compiler
         $this->translator = new Translator($schema);
     }
     
-    public function compile($request, $arguments)
+    public static function getSignatures()
+    {
+        if (!isset(self::$signatures)) {
+            $anythingToList = array(
+                array('arguments' => array(Output::TYPE_BOOLEAN), 'return' => 'list'),
+                array('arguments' => array(Output::TYPE_INTEGER), 'return' => 'list'),
+                array('arguments' => array(Output::TYPE_FLOAT), 'return' => 'list'),
+                array('arguments' => array(Output::TYPE_STRING), 'return' => 'list')
+            );
+            $aggregator = array(
+                array('arguments' => array(Output::TYPE_INTEGER), 'return' => Output::TYPE_FLOAT),
+                array('arguments' => array(Output::TYPE_FLOAT), 'return' => Output::TYPE_FLOAT)
+            );
+            $unaryBoolean = array(
+                array('arguments' => array(Output::TYPE_BOOLEAN), 'return' => Output::TYPE_BOOLEAN)
+            );
+            $numeric = array(
+                array(
+                    'arguments' => array(Output::TYPE_INTEGER, Output::TYPE_INTEGER),
+                    'return' => Output::TYPE_INTEGER
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_FLOAT, Output::TYPE_INTEGER),
+                    'return' => Output::TYPE_FLOAT
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_INTEGER, Output::TYPE_FLOAT),
+                    'return' => Output::TYPE_FLOAT
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_FLOAT, Output::TYPE_FLOAT),
+                    'return' => Output::TYPE_FLOAT
+                )
+            );
+            $strictComparison = array(
+                array(
+                    'arguments' => array(Output::TYPE_BOOLEAN, Output::TYPE_BOOLEAN),
+                    'return' => Output::TYPE_BOOLEAN
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_INTEGER, Output::TYPE_INTEGER),
+                    'return' => Output::TYPE_BOOLEAN
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_FLOAT, Output::TYPE_FLOAT),
+                    'return' => Output::TYPE_BOOLEAN
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_STRING, Output::TYPE_STRING),
+                    'return' => Output::TYPE_BOOLEAN
+                )
+            );
+            $binaryBoolean = array(
+                array(
+                    'arguments' => array(Output::TYPE_BOOLEAN, Output::TYPE_BOOLEAN),
+                    'return' => Output::TYPE_BOOLEAN
+                )
+            );
+            $comparison = array(
+                array(
+                    'arguments' => array(Output::TYPE_INTEGER, Output::TYPE_INTEGER),
+                    'return' => Output::TYPE_BOOLEAN
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_FLOAT, Output::TYPE_INTEGER),
+                    'return' => Output::TYPE_BOOLEAN
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_INTEGER, Output::TYPE_FLOAT),
+                    'return' => Output::TYPE_BOOLEAN
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_FLOAT, Output::TYPE_FLOAT),
+                    'return' => Output::TYPE_BOOLEAN
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_STRING, Output::TYPE_STRING),
+                    'return' => Output::TYPE_BOOLEAN
+                )
+            );
+            self::$signatures = array(
+                'get' => $anythingToList,
+                'average' => $aggregator,
+                'sum' => $aggregator,
+                'min' => $aggregator,
+                'max' => $aggregator,
+                'filter' => array(
+                    array(
+                        'arguments' => array(Output::TYPE_BOOLEAN),
+                        'return' => 'list'
+                    )
+                ),
+                'sort' => $anythingToList,
+                'slice' => array(
+                    array(
+                        'arguments' => array(Output::TYPE_INTEGER, Output::TYPE_INTEGER),
+                        'return' => 'list'
+                    )
+                ),
+                'not' => $unaryBoolean,
+                'plus' => $numeric,
+                'minus' => $numeric,
+                'times' => $numeric,
+                'divides' => $numeric,
+                'equal' => $strictComparison,
+                'and' => $binaryBoolean,
+                'or' => $binaryBoolean,
+                'notEqual' => $strictComparison,
+                'less' => $comparison,
+                'lessEqual' => $comparison,
+                'greater' => $comparison,
+                'greaterEqual' => $comparison,
+                'match' => array(
+                    array(
+                        'arguments' => array(Output::TYPE_STRING, Output::TYPE_STRING),
+                        'return' => Output::TYPE_BOOLEAN
+                    )
+                ),
+
+                // TODO: this function is used internally by the type inferer to handle sets/inserts
+                'assign' => $strictComparison
+            );
+        }
+
+        return self::$signatures;
+    }
+
+    public function compile($request)
     {
         $queryType = self::getQueryType($request);
 
         switch ($queryType) {
             case self::$TYPE_GET:
                 $translatedRequest = $this->translator->translateIgnoringObjects($request);
-                return $this->getCompiler->compile($translatedRequest, $arguments);
+                $types = self::getTypes($translatedRequest);
+                return $this->getCompiler->compile($translatedRequest, $types);
 
             case self::$TYPE_DELETE:
                 $translatedRequest = $this->translator->translateIgnoringObjects($request);
-                return $this->deleteCompiler->compile($translatedRequest, $arguments);
+                $types = self::getTypes($translatedRequest);
+                return $this->deleteCompiler->compile($translatedRequest, $types);
 
             case self::$TYPE_SET:
                 $translatedRequest = $this->translator->translateIncludingObjects($request);
-                return $this->setCompiler->compile($translatedRequest, $arguments);
+                $types = self::getTypes($translatedRequest);
+                return $this->setCompiler->compile($translatedRequest, $types);
 
             case self::$TYPE_INSERT:
                 $translatedRequest = $this->translator->translateIncludingObjects($request);
-                return $this->insertCompiler->compile($translatedRequest, $arguments);
+                $types = self::getTypes($translatedRequest);
+                return $this->insertCompiler->compile($translatedRequest, $types);
         }
         
         return null;
     }
 
-    public static function getQueryType($request)
+    private static function getQueryType($request)
     {
         if (isset($request) && (count($request) >= 1)) {
             $firstToken = reset($request);
@@ -106,5 +242,74 @@ class Compiler
         }
     
         throw CompilerException::unknownRequestType($request);
+    }
+
+    private static function getTypes($translatedRequest)
+    {
+        self::extractExpression($translatedRequest, $expressions);
+        $typeInferer = new TypeInferer(self::getSignatures());
+        return $typeInferer->infer($expressions);
+    }
+
+    private static function extractExpression($requestArray, &$expressions)
+    {
+        if (!isset($expressions)) {
+            $expressions = array();
+        }
+        $localExpressions = array();
+
+        foreach ($requestArray as $request) {
+            list($tokenType, $token) = each($request);
+
+            switch ($tokenType) {
+                case Translator::TYPE_FUNCTION:
+                    $arguments = array();
+                    foreach ($token['arguments'] as $argument) {
+                        $argumentExpressions = self::extractExpression($argument, $expressions);
+                        if (count($argumentExpressions) > 0) {
+                            $expression = self::extractExpression($argument, $expressions);
+                            $arguments[] = end($expression);
+                        }
+                    }
+                    if (count($arguments) > 0) {
+                        $expressions[] = array(
+                            'name' => $token['function'],
+                            'type' => 'function',
+                            'arguments' => $arguments
+                        );
+                    }
+                    break;
+
+                case Translator::TYPE_PARAMETER:
+                    $localExpressions[] = array(
+                        'name' => $token,
+                        'type' => 'parameter'
+                    );
+                    break;
+
+                case Translator::TYPE_VALUE:
+                    $localExpressions[] = array(
+                        'name' => $token['type'],
+                        'type' => 'primitive'
+                    );
+                    break;
+
+                case Translator::TYPE_LIST:
+                    foreach ($token as $pair) {
+                        $left = self::extractExpression($pair['property'], $expressions);
+                        $right = self::extractExpression($pair['value'], $expressions);
+                        if ((count($left) > 0) && (count($right) > 0)) {
+                            $expressions[] = array(
+                                'name' => 'assign',
+                                'type' => 'function',
+                                'arguments' => array($left[0], $right[0])
+                            );
+                        }
+                    }
+                    break;
+            }
+        }
+
+        return $localExpressions;
     }
 }

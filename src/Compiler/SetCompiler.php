@@ -39,12 +39,12 @@ class SetCompiler extends AbstractValuedCompiler
     /** @var Update */
     protected $mysql;
     
-    public function compile($translatedRequest)
+    public function compile($translatedRequest, $types)
     {
         $this->request = $translatedRequest;
 
         $this->mysql = new Update();
-        $this->input = new Input();
+        $this->input = new Input($types);
 
         if (!$this->enterTable()) {
             return null;
@@ -87,8 +87,8 @@ class SetCompiler extends AbstractValuedCompiler
 
     protected function getSubtractiveParameters($nameA, $nameB, &$outputA, &$outputB)
     {
-        $idA = $this->input->useArgument($nameA);
-        $idB = $this->input->useSubtractiveArgument($nameA, $nameB);
+        $idA = $this->input->useArgument($nameA, self::$REQUIRED);
+        $idB = $this->input->useSubtractiveArgument($nameA, $nameB, self::$REQUIRED);
 
         if (($idA === null) || ($idB === null)) {
             return false;
@@ -196,14 +196,10 @@ class SetCompiler extends AbstractValuedCompiler
         return true;
     }
 
-    protected function getProperty($propertyToken, $neededType, &$output)
+    protected function getProperty($propertyToken, &$output, &$type)
     {
-        $actualType = $propertyToken['type'];
+        $type = $propertyToken['type'];
         $column = $propertyToken['expression'];
-
-        if ($neededType !== $actualType) {
-            return false;
-        }
 
         $tableId = $this->context;
         $tableAliasIdentifier = "`{$tableId}`";

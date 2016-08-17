@@ -26,7 +26,6 @@ namespace Datto\Cinnabari\Compiler;
 
 use Datto\Cinnabari\Mysql\AbstractValuedMysql;
 use Datto\Cinnabari\Mysql\Expression\Column;
-use Datto\Cinnabari\Php\Output;
 use Datto\Cinnabari\Translator;
 
 /**
@@ -58,31 +57,12 @@ abstract class AbstractValuedCompiler extends AbstractCompiler
         foreach ($list as $index => $pair) {
             $this->context = $initialContext;
             $property = $pair['property'];
-            $this->getColumnFromPropertyPath($property, $column, $type, $hasZero);
+            $this->getColumnFromPropertyPath($property, $column, $columnType, $hasZero);
 
             $this->context = $initialContext;
             $value = $pair['value'];
 
-            switch ($type) {
-                case Output::TYPE_BOOLEAN:
-                    $this->getStringExpression($value, $hasZero, $expression);
-                    break;
-
-                case Output::TYPE_INTEGER:
-                    $this->getIntegerExpression($value, $hasZero, $expression);
-                    break;
-
-                case Output::TYPE_FLOAT:
-                    $this->getFloatExpression($value, $hasZero, $expression);
-                    break;
-
-                case Output::TYPE_STRING:
-                    $this->getStringExpression($value, $hasZero, $expression);
-                    break;
-
-                default:
-                    return false;
-            }
+            $this->getExpression($value, $hasZero, $expression, $expressionType);
 
             $this->mysql->addPropertyValuePair($this->context, $column, $expression);
         }

@@ -38,12 +38,12 @@ class InsertCompiler extends AbstractValuedCompiler
     /** @var Insert */
     protected $mysql;
     
-    public function compile($translatedRequest)
+    public function compile($translatedRequest, $types)
     {
         $this->request = $translatedRequest;
 
         $this->mysql = new Insert();
-        $this->input = new Input();
+        $this->input = new Input($types);
 
         if (!$this->enterTable()) {
             return null;
@@ -108,14 +108,10 @@ class InsertCompiler extends AbstractValuedCompiler
         return true;
     }
 
-    protected function getProperty($propertyToken, $neededType, &$output)
+    protected function getProperty($propertyToken, &$output, &$type)
     {
-        $actualType = $propertyToken['type'];
+        $type = $propertyToken['type'];
         $column = $propertyToken['expression'];
-
-        if ($neededType !== $actualType) {
-            return false;
-        }
 
         $tableId = $this->context;
         $tableAliasIdentifier = "`{$tableId}`";

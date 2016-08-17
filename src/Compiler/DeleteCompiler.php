@@ -40,12 +40,12 @@ class DeleteCompiler extends AbstractCompiler
     /** @var Delete */
     protected $mysql;
 
-    public function compile($translatedRequest)
+    public function compile($translatedRequest, $types)
     {
         $this->request = $translatedRequest;
 
         $this->mysql = new Delete();
-        $this->input = new Input();
+        $this->input = new Input($types);
 
         if (!$this->enterTable()) {
             return null;
@@ -108,7 +108,7 @@ class DeleteCompiler extends AbstractCompiler
 
     protected function getSubtractiveParameters($nameA, $nameB, &$outputA)
     {
-        $idA = $this->input->useSubtractiveArgument($nameA, $nameB);
+        $idA = $this->input->useSubtractiveArgument($nameA, $nameB, self::$REQUIRED);
 
         if ($idA === null) {
             return false;
@@ -186,15 +186,11 @@ class DeleteCompiler extends AbstractCompiler
         return true;
     }
 
-    protected function getProperty($propertyToken, $neededType, &$output)
+    protected function getProperty($propertyToken, &$output, &$type)
     {
         $table = $propertyToken['table'];
-        $actualType = $propertyToken['type'];
+        $type = $propertyToken['type'];
         $column = $propertyToken['expression'];
-
-        if ($neededType !== $actualType) {
-            return false;
-        }
 
         $columnExpression = Delete::getAbsoluteExpression($table, $column);
         $output = new Column($columnExpression);

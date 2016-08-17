@@ -28,52 +28,50 @@ namespace Datto\Cinnabari\Php;
 class Input
 {
     /** @var array */
-    private $input;
+    private $argumentTypes;
 
     /** @var array */
-    private $argumentTypes;
+    private $types;
 
     /** @var array */
     private $output;
 
     /** @var array */
+    private static $consistencyFlag = '$isConsistent';
+
+    /** @var array */
     private static $typeCheckingFunctions = array(
-        'null' => 'is_null',
-        'boolean' => 'is_bool',
-        'integer' => 'is_integer',
-        'float' => 'is_float',
-        'string' => 'is_string'
+        Output::TYPE_NULL => 'is_null(:0)',
+        Output::TYPE_BOOLEAN => 'is_bool(:0)',
+        Output::TYPE_INTEGER => 'is_integer(:0)',
+        Output::TYPE_FLOAT => 'is_float(:0)',
+        Output::TYPE_STRING => 'is_string(:0)'
     );
 
-    public function __construct()
+    public function __construct($types)
     {
         $this->argumentTypes = array();
+        $this->types = $types;
         $this->output = array();
     }
 
-    public function useArgument($name, $type, $hasZero)
+    public function useArgument($name, $hasZero)
     {
         $input = self::getInputPhp($name);
         $id = $this->insertParameter($input);
 
-        $this->argumentTypes[] = array(
-            'name' => $name,
-            'type' => $type,
-            'hasZero' => $hasZero
-        );
-
+        $this->argumentTypes[$name] = $hasZero;
         return $id;
     }
 
-    public function useSubtractiveArgument($nameA, $nameB)
+    public function useSubtractiveArgument($nameA, $nameB, $hasZero)
     {
-        if (!array_key_exists($nameA, $this->input) || !array_key_exists($nameB, $this->input)) {
-            return null;
-        }
-
         $inputA = self::getInputPhp($nameA);
         $inputB = self::getInputPhp($nameB);
         $idB = $this->insertParameter("{$inputB} - {$inputA}");
+
+        $this->argumentTypes[$nameA] = $hasZero;
+        $this->argumentTypes[$nameB] = $hasZero;
 
         return $idB;
     }
@@ -85,37 +83,62 @@ class Input
         $assignment = self::getAssignment('$output', $array);
         if (count($this->argumentTypes) > 0) {
             $initialAssignment = self::getAssignment('$output', 'null');
-            $typeChecks = $this->getTypeCheck($assignment);
-            return $initialAssignment . "\n" . $typeChecks;
+            $guardedAssignment = $this->getGuardedAssignment($assignment);
+            return $initialAssignment . "\n" . $guardedAssignment;
         } else {
             return $assignment;
         }
     }
 
-    private function getTypeCheck($body)
+    private function getGuardedAssignment($body)
     {
-        $checks = array();
-        foreach ($this->argumentTypes as $key => $restriction) {
-            $input = self::getInputPhp($restriction['name']);
-            $type = $restriction['type'];
-            $typeCheck = (
-                self::$typeCheckingFunctions[$type] . "({$input})"
-            );
-            if ($restriction['hasZero']) {
-                $nullCheck = self::$typeCheckingFunctions['null'] . "({$input})";
-                $parameterTypeCheck = self::getOr(array($typeCheck, $nullCheck));
-                if (count($this->argumentTypes) > 1) {
-                    $checks[] = self::group($parameterTypeCheck);
-                } else {
-                    $checks[] = $parameterTypeCheck;
-                }        
+        $php = self::getAssignment(self::$consistencyFlag, 'false') . "\n";
+        $php .= self::getTypeCheck(
+            $this->types['ordering'],
+            $this->types['hierarchy']
+        );
+        $php .= "\n" . self::getIf(self::$consistencyFlag, $body);
+        return $php;
+    }
+
+    private function getTypeCheck($names, $hierarchy)
+    {
+        $php = '';
+        $rootName = $names[0];
+        $validateConsistency = self::getAssignment(self::$consistencyFlag, 'true');
+        foreach ($hierarchy as $rootType => $subhierarchy) {
+            $typeCheck = self::getSingleTypeCheck($rootName, $rootType);
+            if ($this->argumentTypes[$rootName] === true) {
+                $nullCheck = self::getSingleTypeCheck($rootName, Output::TYPE_NULL);
+                $typeCheck = self::getOr(array($typeCheck, $nullCheck));
+            }
+            if ($subhierarchy === true) {
+                return self::getIf($typeCheck, $validateConsistency);
             } else {
-                $checks[] = $typeCheck;
+                if (reset($subhierarchy) === true) {
+                    $subhierarchyChecks = array();
+                    if ($this->argumentTypes[$names[1]] === true) {
+                        $subhierarchyChecks[] = self::getSingleTypeCheck($names[1], Output::TYPE_NULL);
+                    }
+                    foreach ($subhierarchy as $type => $value) {
+                        $subhierarchyChecks[] = self::getSingleTypeCheck($names[1], $type);
+                    }
+                    $body = self::getIf(self::getOr($subhierarchyChecks), $validateConsistency);
+                    $php .= self::getIf($typeCheck, $body) . "\n";
+                } else {
+                    $body = self::getTypeCheck(array_slice($names, 1), $subhierarchy);
+                    $php .= self::getIf($typeCheck, $body) . "\n";
+                }
             }
         }
-        $conditional = self::getAnd($checks);
-        $ifStatement = self::getIf($conditional, $body);
-        return $ifStatement;
+        return substr($php, 0, -1);
+    }
+
+    private static function getSingleTypeCheck($name, $type)
+    {
+        $placeholder = ':0';
+        $input = self::getInputPhp($name);
+        return str_replace($placeholder, $input, self::$typeCheckingFunctions[$type]);
     }
 
     private function insertParameter($inputString)

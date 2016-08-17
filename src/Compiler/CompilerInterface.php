@@ -26,5 +26,5 @@ namespace Datto\Cinnabari\Compiler;
 
 interface CompilerInterface
 {
-    public function compile($translatedRequest);
+    public function compile($translatedRequest, $types);
 }
