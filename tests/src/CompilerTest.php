@@ -1544,7 +1544,6 @@ EOS;
 SELECT
     SUM(`0`.`Age`) AS `0`
     FROM `People` AS `0`
-    ORDER BY `0`.`Age` ASC
 EOS;
 
         $phpInput = <<<'EOS'
