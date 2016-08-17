@@ -402,15 +402,12 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
 if (is_integer($input[0])) {
-    $isConsistent = true;
-}
-if ($isConsistent) {
     $output = array(
         $input['0']
     );
+} else {
+    $output = null;
 }
 EOS;
 
@@ -477,73 +474,61 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
-if (is_integer($input['null'])) {
-    if (is_bool($input['true'])) {
-        if (is_integer($input['ageA'])) {
-            if (is_integer($input['ageB'])) {
-                if (is_integer($input['ageC'])) {
-                    if (is_integer($input['ageD'])) {
-                        if (is_integer($input['ageE']) || is_float($input['ageE'])) {
-                            $isConsistent = true;
-                        }
-                    }
-                    if (is_float($input['ageD'])) {
-                        if (is_integer($input['ageE']) || is_float($input['ageE'])) {
-                            $isConsistent = true;
-                        }
-                    }
-                }
-            }
-            if (is_float($input['ageB'])) {
-                if (is_integer($input['ageC'])) {
-                    if (is_integer($input['ageD'])) {
-                        if (is_integer($input['ageE']) || is_float($input['ageE'])) {
-                            $isConsistent = true;
-                        }
-                    }
-                    if (is_float($input['ageD'])) {
-                        if (is_integer($input['ageE']) || is_float($input['ageE'])) {
-                            $isConsistent = true;
-                        }
-                    }
-                }
-            }
-        }
-        if (is_float($input['ageA'])) {
-            if (is_integer($input['ageB'])) {
-                if (is_integer($input['ageC'])) {
-                    if (is_integer($input['ageD'])) {
-                        if (is_integer($input['ageE']) || is_float($input['ageE'])) {
-                            $isConsistent = true;
-                        }
-                    }
-                    if (is_float($input['ageD'])) {
-                        if (is_integer($input['ageE']) || is_float($input['ageE'])) {
-                            $isConsistent = true;
-                        }
-                    }
-                }
-            }
-            if (is_float($input['ageB'])) {
-                if (is_integer($input['ageC'])) {
-                    if (is_integer($input['ageD'])) {
-                        if (is_integer($input['ageE']) || is_float($input['ageE'])) {
-                            $isConsistent = true;
-                        }
-                    }
-                    if (is_float($input['ageD'])) {
-                        if (is_integer($input['ageE']) || is_float($input['ageE'])) {
-                            $isConsistent = true;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-if ($isConsistent) {
+if (
+    is_integer($input['null']) && (
+        is_bool($input['true']) && (
+            (
+                is_integer($input['ageA']) && (
+                    (
+                        is_integer($input['ageB']) && (
+                            is_integer($input['ageC']) && (
+                                (
+                                    is_integer($input['ageD']) && (is_integer($input['ageE']) || is_float($input['ageE']))
+                                ) || (
+                                    is_float($input['ageD']) && (is_integer($input['ageE']) || is_float($input['ageE']))
+                                )
+                            )
+                        )
+                    ) || (
+                        is_float($input['ageB']) && (
+                            is_integer($input['ageC']) && (
+                                (
+                                    is_integer($input['ageD']) && (is_integer($input['ageE']) || is_float($input['ageE']))
+                                ) || (
+                                    is_float($input['ageD']) && (is_integer($input['ageE']) || is_float($input['ageE']))
+                                )
+                            )
+                        )
+                    )
+                )
+            ) || (
+                is_float($input['ageA']) && (
+                    (
+                        is_integer($input['ageB']) && (
+                            is_integer($input['ageC']) && (
+                                (
+                                    is_integer($input['ageD']) && (is_integer($input['ageE']) || is_float($input['ageE']))
+                                ) || (
+                                    is_float($input['ageD']) && (is_integer($input['ageE']) || is_float($input['ageE']))
+                                )
+                            )
+                        )
+                    ) || (
+                        is_float($input['ageB']) && (
+                            is_integer($input['ageC']) && (
+                                (
+                                    is_integer($input['ageD']) && (is_integer($input['ageE']) || is_float($input['ageE']))
+                                ) || (
+                                    is_float($input['ageD']) && (is_integer($input['ageE']) || is_float($input['ageE']))
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+) {
     $output = array(
         $input['null'],
         $input['true'],
@@ -553,6 +538,8 @@ if ($isConsistent) {
         $input['ageD'],
         $input['ageE']
     );
+} else {
+    $output = null;
 }
 EOS;
 
@@ -667,20 +654,16 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
-if (is_integer($input['stop'])) {
-    if (is_integer($input['start'])) {
-        $isConsistent = true;
-    }
-}
-if ($isConsistent) {
+if (
+    is_integer($input['stop']) && is_integer($input['start'])
+) {
     $output = array(
         $input['start'],
         $input['stop'] - $input['start']
     );
+} else {
+    $output = null;
 }
-EOS;
 
         $phpOutput = <<<'EOS'
 foreach ($input as $row) {
@@ -878,15 +861,12 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
 if (is_string($input['firstName'])) {
-    $isConsistent = true;
-}
-if ($isConsistent) {
     $output = array(
         $input['firstName']
     );
+} else {
+    $output = null;
 }
 EOS;
 
@@ -956,15 +936,12 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
 if (is_integer($input['minimumAge']) || is_float($input['minimumAge'])) {
-    $isConsistent = true;
-}
-if ($isConsistent) {
     $output = array(
         $input['minimumAge']
     );
+} else {
+    $output = null;
 }
 EOS;
 
@@ -1682,15 +1659,12 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
 if (is_integer($input['minimumAge']) || is_float($input['minimumAge'])) {
-    $isConsistent = true;
-}
-if ($isConsistent) {
     $output = array(
         $input['minimumAge']
     );
+} else {
+    $output = null;
 }
 EOS;
 
@@ -1846,15 +1820,12 @@ DELETE
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
 if (is_integer($input['age']) || is_float($input['age'])) {
-    $isConsistent = true;
-}
-if ($isConsistent) {
     $output = array(
         $input['age']
     );
+} else {
+    $output = null;
 }
 EOS;
 
@@ -1904,17 +1875,14 @@ DELETE
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
-if (is_integer($input['stop'])) {
-    if (is_integer($input['start'])) {
-        $isConsistent = true;
-    }
-}
-if ($isConsistent) {
+if (
+    is_integer($input['stop']) && is_integer($input['start'])
+) {
     $output = array(
         $input['stop'] - $input['start']
     );
+} else {
+    $output = null;
 }
 EOS;
 
@@ -1951,27 +1919,23 @@ DELETE
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
-if (is_integer($input['age'])) {
-    if (is_integer($input['stop'])) {
-        if (is_integer($input['start'])) {
-            $isConsistent = true;
-        }
-    }
-}
-if (is_float($input['age'])) {
-    if (is_integer($input['stop'])) {
-        if (is_integer($input['start'])) {
-            $isConsistent = true;
-        }
-    }
-}
-if ($isConsistent) {
+if (
+    (
+        is_integer($input['age']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    ) || (
+        is_float($input['age']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    )
+) {
     $output = array(
         $input['age'],
         $input['stop'] - $input['start']
     );
+} else {
+    $output = null;
 }
 EOS;
 
@@ -2020,20 +1984,23 @@ INSERT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
-if (is_null($input['name']) || is_string($input['name'])) {
-    if (is_null($input['email']) || is_string($input['email'])) {
-        if (is_null($input['age']) || is_integer($input['age'])) {
-            if (is_null($input['height']) || is_float($input['height'])) {
-                if (is_null($input['isMarried']) || is_bool($input['isMarried'])) {
-                    $isConsistent = true;
-                }
-            }
-        }
-    }
-}
-if ($isConsistent) {
+if (
+    (
+        is_null($input['name']) || is_string($input['name'])
+    ) && (
+        (
+            is_null($input['email']) || is_string($input['email'])
+        ) && (
+            (
+                is_null($input['age']) || is_integer($input['age'])
+            ) && (
+                (
+                    is_null($input['height']) || is_float($input['height'])
+                ) && (is_null($input['isMarried']) || is_bool($input['isMarried']))
+            )
+        )
+    )
+) {
     $output = array(
         $input['name'],
         $input['email'],
@@ -2041,6 +2008,8 @@ if ($isConsistent) {
         $input['height'],
         $input['isMarried']
     );
+} else {
+    $output = null;
 }
 EOS;
 
@@ -2076,15 +2045,12 @@ UPDATE
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
 if (is_null($input['name']) || is_string($input['name'])) {
-    $isConsistent = true;
-}
-if ($isConsistent) {
     $output = array(
         $input['name']
     );
+} else {
+    $output = null;
 }
 EOS;
 
@@ -2124,18 +2090,17 @@ UPDATE
 EOS;
 
         $phpInput = <<<'EOS'
-$output = null;
-$isConsistent = false;
-if (is_null($input['age']) || is_integer($input['age'])) {
-    if (is_null($input['name']) || is_string($input['name'])) {
-        $isConsistent = true;
-    }
-}
-if ($isConsistent) {
+if (
+    (
+        is_null($input['age']) || is_integer($input['age'])
+    ) && (is_null($input['name']) || is_string($input['name']))
+) {
     $output = array(
         $input['age'],
         $input['name']
     );
+} else {
+    $output = null;
 }
 EOS;
 

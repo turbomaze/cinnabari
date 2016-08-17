@@ -37,9 +37,6 @@ class Input
     private $output;
 
     /** @var array */
-    private static $consistencyFlag = '$isConsistent';
-
-    /** @var array */
     private static $typeCheckingFunctions = array(
         Output::TYPE_NULL => 'is_null(:0)',
         Output::TYPE_BOOLEAN => 'is_bool(:0)',
@@ -82,9 +79,8 @@ class Input
         $array = self::getArray($statements);
         $assignment = self::getAssignment('$output', $array);
         if (count($this->argumentTypes) > 0) {
-            $initialAssignment = self::getAssignment('$output', 'null');
             $guardedAssignment = $this->getGuardedAssignment($assignment);
-            return $initialAssignment . "\n" . $guardedAssignment;
+            return $guardedAssignment;
         } else {
             return $assignment;
         }
@@ -92,23 +88,21 @@ class Input
 
     private function getGuardedAssignment($body)
     {
-        $php = self::getAssignment(self::$consistencyFlag, 'false') . "\n";
-        $php .= self::getTypeCheck(
+        $nullAssignment = self::getAssignment('$output', 'null');
+        $typeChecks = self::getTypeChecks(
             $this->types['ordering'],
             $this->types['hierarchy']
         );
-        $php .= "\n" . self::getIf(self::$consistencyFlag, $body);
-        return $php;
+        return self::getIfElse($typeChecks, $body, $nullAssignment);
     }
 
-    private function getTypeCheck($names, $hierarchy)
+    private function getTypeChecks($names, $hierarchy)
     {
-        $php = '';
         $rootName = $names[0];
-        $validateConsistency = self::getAssignment(self::$consistencyFlag, 'true');
         $nullCheck = self::getSingleTypeCheck($rootName, Output::TYPE_NULL);
 
         if (reset($hierarchy) === true) {
+            # if this is the last layer of checks
             $hierarchyChecks = array();
             if ($this->argumentTypes[$rootName] === true) {
                 $hierarchyChecks[] = $nullCheck;
@@ -116,18 +110,34 @@ class Input
             foreach ($hierarchy as $type => $value) {
                 $hierarchyChecks[] = self::getSingleTypeCheck($rootName, $type);
             }
-            $php .= self::getIf(self::getOr($hierarchyChecks), $validateConsistency) . "\n";
+            if (count($hierarchyChecks) > 1) {
+                return self::group(self::getOr($hierarchyChecks));
+            } else {
+                return self::getOr($hierarchyChecks);
+            }
         } else {
+            # there are nested checks within this, so recurse
+            $typeChecks = array();
             foreach ($hierarchy as $rootType => $subhierarchy) {
                 $typeCheck = self::getSingleTypeCheck($rootName, $rootType);
                 if ($this->argumentTypes[$rootName] === true) {
-                    $typeCheck = self::getOr(array($nullCheck, $typeCheck));
+                    $typeCheck = self::group(
+                        "\n" . self::indent(self::getOr(array($nullCheck, $typeCheck))) . "\n"
+                    );
                 }
-                $body = self::getTypeCheck(array_slice($names, 1), $subhierarchy);
-                $php .= self::getIf($typeCheck, $body) . "\n";
+                $conditional = self::getTypeChecks(array_slice($names, 1), $subhierarchy);
+                $typeChecks[] = self::group(
+                    "\n" . self::indent(self::getAnd(array($typeCheck, $conditional))) . "\n"
+                );
+            }
+            if (count($typeChecks) > 1) {
+                return self::group(
+                    "\n" . self::indent(self::getOr($typeChecks)) . "\n"
+                );
+            } else {
+                return self::getOr($typeChecks);
             }
         }
-        return substr($php, 0, -1);
     }
 
     private static function getSingleTypeCheck($name, $type)
@@ -171,10 +181,39 @@ class Input
         return implode(" {$operator} ", $expressions);
     }
 
+    protected static function getIfElse($conditional, $body, $else)
+    {
+        $php = self::getIf($conditional, $body);
+        $indentedElse = self::indent($else);
+        $php .= " else {\n{$indentedElse}\n}";
+        return $php;
+    }
+
     protected static function getIf($conditional, $body)
     {
         $indentedBody = self::indent($body);
-        return "if ({$conditional}) {\n{$indentedBody}\n}";
+        if (self::isGrouped($conditional)) {
+            return "if {$conditional} {\n{$indentedBody}\n}";
+        } else {
+            return "if ({$conditional}) {\n{$indentedBody}\n}";
+        }
+    }
+
+    protected static function isGrouped($input)
+    {
+        if ($input[0] !== '(') {
+            return false;
+        }
+        $parentheses = preg_replace('/[^()]/', '', $input);
+        $count = 0;
+        for ($i = 1; $i < count($parentheses) - 1; $i++) {
+            $count += ($parentheses[$i] === '(') ? 1 : -1;
+            if ($count < 0) {
+                return false;
+            }
+        }
+        // assumes well-balanced parentheses to begin with
+        return $count === 0;
     }
 
     protected static function getArray($statements)
