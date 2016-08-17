@@ -310,6 +310,7 @@ class GetCompiler extends AbstractCompiler
         switch ($functionName) {
             case 'average':
                 $aggregator = new Average($column);
+                $type = Output::TYPE_FLOAT;
                 break;
 
             case 'sum':
@@ -329,7 +330,7 @@ class GetCompiler extends AbstractCompiler
         }
 
         $columnId = $this->mysql->addExpression($aggregator);
-        $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
+        $this->phpOutput = Output::getValue($columnId, true, $type);
 
         return true;
     }
