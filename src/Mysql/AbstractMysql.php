@@ -27,13 +27,14 @@ namespace Datto\Cinnabari\Mysql;
 
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
+use Datto\Cinnabari\Mysql\Expression\Table;
 
 abstract class AbstractMysql
 {
     const JOIN_INNER = 1;
     const JOIN_LEFT = 2;
 
-    /** @var string[] */
+    /** @var AbstractMysql[] */
     protected $tables;
 
     /** @var AbstractExpression */
@@ -54,13 +55,13 @@ abstract class AbstractMysql
     }
 
     /**
-     * @param string $name
+     * @param AbstractMysql $name
      * Mysql table identifier (e.g. "`people`")
      *
      * @return int
      * Numeric table identifier (e.g. 0)
      */
-    public function setTable($name)
+    public function setTable($expression)
     {
         $countTables = count($this->tables);
 
@@ -68,7 +69,7 @@ abstract class AbstractMysql
             return null;
         }
 
-        return self::insert($this->tables, $name);
+        return self::appendOrFind($this->tables, $expression);
     }
 
     public function setWhere(AbstractExpression $expression)
@@ -76,24 +77,15 @@ abstract class AbstractMysql
         $this->where = $expression;
     }
 
-    public function findTable($name)
-    {
-        if (array_key_exists($name, $this->tables)) {
-            return $this->tables[$name];
-        } else {
-            return false;
-        }
-    }
-
     public function addJoin($tableAId, $tableBIdentifier, $mysqlExpression, $hasZero, $hasMany)
     {
         $joinType = (!$hasZero && !$hasMany) ? self::JOIN_INNER : self::JOIN_LEFT;
         $tableAIdentifier = self::getIdentifier($tableAId);
-        $key = json_encode(array($tableAIdentifier, $tableBIdentifier, $mysqlExpression, $joinType));
-
-        return self::insert($this->tables, $key);
+        $join = new Table(json_encode(array($tableAIdentifier, $tableBIdentifier, $mysqlExpression, $joinType)));
+        return self::appendOrFind($this->tables, $join);
     }
 
+    // TODO: fix deletes
     public function getTable($id)
     {
         $name = array_search($id, $this->tables, true);
@@ -114,6 +106,7 @@ abstract class AbstractMysql
         return preg_replace('~`.*?`~', "{$context}.\$0", $expression);
     }
 
+    // insert if not already there; return index
     protected static function insert(&$array, $key)
     {
         $id = &$array[$key];
@@ -125,6 +118,17 @@ abstract class AbstractMysql
         return $id;
     }
 
+    protected static function appendOrFind(&$array, $value)
+    {
+        // TODO: fix search
+        $index = array_search($value, $array);
+        if ($index === false) {
+            $index = count($array);
+            $array[] = $value;
+        }
+        return $index;
+    }
+
     protected static function getIdentifier($name)
     {
         return "`{$name}`";
@@ -132,19 +136,17 @@ abstract class AbstractMysql
 
     protected function isValid()
     {
-        return (0 < count($this->tables));
+        return (0 < count($this->tables)) || isset($this->subquery);
     }
 
     protected function getTables()
     {
-        reset($this->tables);
-        list($table, ) = each($this->tables);
+        $table = reset($this->tables);
 
         $mysql = "\tFROM " . $table . "\n";
 
-        $tables = array_slice($this->tables, 1);
-
-        foreach ($tables as $joinJson => $id) {
+        for ($id = 1; $id < count($this->tables); $id++) {
+            $joinJson = $this->tables[$id];
             list($tableAIdentifier, $tableBIdentifier, $expression, $type) = json_decode($joinJson, true);
 
             $joinIdentifier = self::getIdentifier($id);
@@ -213,5 +215,10 @@ abstract class AbstractMysql
         } else {
             return $matches[0];
         }
+    }
+
+    protected static function indent($string)
+    {
+        return "\t" . preg_replace('~\n(?!\n)~', "\n\t", $string);
     }
 }

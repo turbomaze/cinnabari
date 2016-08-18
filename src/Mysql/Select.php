@@ -55,7 +55,8 @@ class Select extends AbstractMysql
 
     public function addExpression(AbstractExpression $expression)
     {
-        return self::insert($this->columns, $expression->getMysql());
+        $sql = $expression->getMysql();
+        return self::insert($this->columns, $sql);
     }
 
     public function setLimit(AbstractExpression $start, AbstractExpression $length)
@@ -87,7 +88,6 @@ class Select extends AbstractMysql
     {
         $table = self::getIdentifier($tableId);
         $name = self::getAbsoluteExpression($table, $column);
-
         return self::insert($this->columns, $name);
     }
 
@@ -109,13 +109,13 @@ class Select extends AbstractMysql
 
     protected function getTables()
     {
-        list($table, $id) = each($this->tables);
+        list($id, $table) = each($this->tables);
 
-        $mysql = "\tFROM " . self::getAliasedName($table, $id) . "\n";
+        $tableMysql = self::indentIfNeeded($table->getMysql());
+        $mysql = "\tFROM " . self::getAliasedName($tableMysql, $id) . "\n";
 
-        $tables = array_slice($this->tables, 1);
-
-        foreach ($tables as $joinJson => $id) {
+        for ($id = 1; $id < count($this->tables); $id++) {
+            $joinJson = $this->tables[$id]->getMysql();
             list($tableAIdentifier, $tableBIdentifier, $expression, $type) = json_decode($joinJson, true);
 
             $joinIdentifier = self::getIdentifier($id);
@@ -148,9 +148,18 @@ class Select extends AbstractMysql
         return $mysql;
     }
 
+    private function indentIfNeeded($input)
+    {
+        if (strpos($input, "\n") !== false) {
+            return "(\n" . self::indent(self::indent($input)) . "\n\t)";
+        } else {
+            return $input;
+        }
+    }
+
     protected function isValid()
     {
-        return (0 < count($this->tables)) && (0 < count($this->columns));
+        return ((0 < count($this->tables)) || isset($this->subquery)) && (0 < count($this->columns));
     }
 
     protected static function getAliasedName($name, $id)

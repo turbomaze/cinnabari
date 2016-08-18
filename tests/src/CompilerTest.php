@@ -1004,10 +1004,14 @@ EOS;
 
         $mysql = <<<'EOS'
 SELECT
-    COUNT(TRUE) AS `0`
-    FROM `People` AS `0`
-    ORDER BY `0`.`Id` ASC
-    LIMIT :0, :1
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`
+            FROM `People` AS `0`
+            ORDER BY `0`.`Id` ASC
+            LIMIT :0, :1
+    ) AS `0`
 EOS;
 
         $phpInput = <<<'EOS'
@@ -1145,11 +1149,25 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['minimumAge'],
-    $input['start'],
-    $input['stop'] - $input['start']
-);
+if (
+    (
+        is_integer($input['minimumAge']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    ) || (
+        is_float($input['minimumAge']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    )
+) {
+    $output = array(
+        $input['minimumAge'],
+        $input['start'],
+        $input['stop'] - $input['start']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1238,10 +1256,16 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['start'],
-    $input['stop'] - $input['start']
-);
+if (
+    is_integer($input['stop']) && is_integer($input['start'])
+) {
+    $output = array(
+        $input['start'],
+        $input['stop'] - $input['start']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1328,11 +1352,25 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['minimumAge'],
-    $input['start'],
-    $input['stop'] - $input['start']
-);
+if (
+    (
+        is_integer($input['minimumAge']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    ) || (
+        is_float($input['minimumAge']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    )
+) {
+    $output = array(
+        $input['minimumAge'],
+        $input['start'],
+        $input['stop'] - $input['start']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1439,7 +1477,7 @@ EOS;
             $phpOutput);
     }
 
-    public function testSortFilterSlice()
+    public function testCountSortFilterSlice()
     {
         $scenario = self::getPeopleScenario();
 
@@ -1487,7 +1525,7 @@ EOS;
             $phpOutput);
     }
 
-    public function testFilterSliceSort()
+    public function testCountFilterSliceSort()
     {
         $scenario = self::getPeopleScenario();
 
@@ -1535,7 +1573,7 @@ EOS;
             $phpOutput);
     }
 
-    public function testFilterSortSlice()
+    public function testCountFilterSortSlice()
     {
         $scenario = self::getPeopleScenario();
 
@@ -2248,9 +2286,21 @@ EOS;
         $actual = self::translate($scenarioJson, $method, $arguments);
         $expected = array($mysql, $phpInput, $phpOutput);
 
+        // $this->assertSame(
+        //     self::standardize($expected),
+        //     self::standardize($actual)
+        // );
         $this->assertSame(
-            self::standardize($expected),
-            self::standardize($actual)
+            self::standardizeMysql($expected[0]),
+            self::standardizeMysql($actual[0])
+        );
+        $this->assertSame(
+            self::standardizePhp($expected[1]),
+            self::standardizePhp($actual[1])
+        );
+        $this->assertSame(
+            self::standardizePhp($expected[2]),
+            self::standardizePhp($actual[2])
         );
     }
 

@@ -93,13 +93,13 @@ class Update extends AbstractValuedMysql
 
     protected function getTables()
     {
-        list($table, $id) = each($this->tables);
+        list($id, $table) = each($this->tables);
 
         $mysql = "\t" . self::getAliasedName($table, $id) . "\n";
 
         $tables = array_slice($this->tables, 1);
 
-        foreach ($tables as $joinJson => $id) {
+        foreach ($tables as $id => $joinJson) {
             list($tableAIdentifier, $tableBIdentifier, $expression, $type) = json_decode($joinJson, true);
 
             $joinIdentifier = self::getIdentifier($id);

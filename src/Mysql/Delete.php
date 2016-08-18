@@ -47,7 +47,7 @@ class Delete extends AbstractMysql
 
     public function setOrderBy($tableId, $column, $isAscending)
     {
-        $table = $this->getTable($tableId);
+        $table = $this->tables[$tableId];
         $name = self::getAbsoluteExpression($table, $column);
 
         $mysql = "ORDER BY {$name}";

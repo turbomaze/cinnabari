@@ -127,6 +127,19 @@ abstract class AbstractCompiler implements CompilerInterface
             $request = self::insertFunctionBefore($sortFunction, 'slice', $request);
         }
 
+        // Rule: slices in counts/aggregators require subqueries
+        if ($method['is']['count'] || $method['is']['aggregator']) {
+            if ($method['slices']) {
+                $forkFunction = array(
+                    Translator::TYPE_FUNCTION => array(
+                        'function' => 'fork',
+                        'arguments' => array()
+                    )
+                );
+                $request = self::insertFunctionBefore($forkFunction, 'count', $request);
+            }
+        }
+
         return $request;
     }
 
@@ -547,6 +560,8 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected static function scanJoin($input, &$object)
     {
+        reset($input);
+
         list($tokenType, $token) = each($input);
 
         if ($tokenType !== Translator::TYPE_JOIN) {

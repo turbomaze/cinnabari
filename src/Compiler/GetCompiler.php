@@ -35,6 +35,7 @@ use Datto\Cinnabari\Mysql\Expression\Max;
 use Datto\Cinnabari\Mysql\Expression\Min;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Mysql\Expression\Sum;
+use Datto\Cinnabari\Mysql\Expression\Table;
 use Datto\Cinnabari\Mysql\Select;
 use Datto\Cinnabari\Php\Input;
 use Datto\Cinnabari\Php\Output;
@@ -49,6 +50,9 @@ class GetCompiler extends AbstractCompiler
     /** @var Select */
     protected $mysql;
 
+    /** @var Select */
+    protected $subquery;
+
     /** @var String */
     private $phpOutput;
     
@@ -58,6 +62,7 @@ class GetCompiler extends AbstractCompiler
         $this->request = $optimizedRequest;
 
         $this->mysql = new Select();
+        $this->subquery = null;
         $this->input = new Input($types);
         $this->phpOutput = null;
 
@@ -83,7 +88,7 @@ class GetCompiler extends AbstractCompiler
         $firstElement = array_shift($this->request);
         list(, $token) = each($firstElement);
 
-        $this->context = $this->mysql->setTable($token['table']);
+        $this->context = $this->mysql->setTable(new Table($token['table']));
         $id = $token['id'];
         $hasZero = $token['hasZero'];
 
@@ -101,8 +106,12 @@ class GetCompiler extends AbstractCompiler
         $this->getOptionalSortFunction();
         $this->getOptionalSliceFunction();
 
-        if (!isset($this->request) || (count($this->request) !== 1)) {
+        if (!isset($this->request) || count($this->request) === 0) {
             throw CompilerException::badGetArgument($this->request);
+        }
+
+        if ($this->readFork()) {
+            return $this->getFunctionSequence($topLevelFunction, null, null);
         }
 
         $this->request = reset($this->request);
@@ -122,6 +131,25 @@ class GetCompiler extends AbstractCompiler
         }
 
         throw CompilerException::invalidMethodSequence($this->request);
+    }
+
+    protected function readFork()
+    {
+        if (!self::scanFunction(reset($this->request), $name, $arguments)) {
+            return false;
+        }
+
+        if ($name !== 'fork') {
+            return false;
+        }
+
+        array_shift($this->request);
+
+        $this->subquery = $this->mysql;
+        $this->mysql = new Select();
+        $this->context = $this->mysql->setTable($this->subquery);
+
+        return true;
     }
 
     protected function getSubtractiveParameters($nameA, $nameB, &$outputA, &$outputB)
@@ -269,8 +297,20 @@ class GetCompiler extends AbstractCompiler
         // at this point they definitely intend to use a count function
         $this->request = reset($arguments);
 
-        $count = new Count(new Boolean(true));
+        $true = new Boolean(true);
+        $expressionToCount = $true;
+        if (isset($this->subquery)) {
+            // select true in the subquery
+            $this->subquery->addExpression($true);
+            $expressionToCount = new Column('`0`.`0`');
+            $this->mysql = new Select();
+            $this->context = $this->mysql->setTable($this->subquery);
+        }
+
+        // select count in the main query
+        $count = new Count($expressionToCount);
         $columnId = $this->mysql->addExpression($count);
+
         $this->phpOutput = Output::getValue($columnId, false, Output::TYPE_INTEGER);
 
         return true;
