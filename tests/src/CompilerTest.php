@@ -1011,10 +1011,16 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['start'],
-    $input['stop'] - $input['start']
-);
+if (
+    is_integer($input['stop']) && is_integer($input['start'])
+) {
+    $output = array(
+        $input['start'],
+        $input['stop'] - $input['start']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1090,9 +1096,13 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['minimumAge']
-);
+if (is_integer($input['minimumAge']) || is_float($input['minimumAge'])) {
+    $output = array(
+        $input['minimumAge']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'

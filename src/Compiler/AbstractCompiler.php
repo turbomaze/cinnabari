@@ -44,6 +44,7 @@ use Datto\Cinnabari\Mysql\Expression\OperatorRegexpBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Php\Input;
+use Datto\Cinnabari\Php\Output;
 use Datto\Cinnabari\Translator;
 
 /**
@@ -90,23 +91,72 @@ abstract class AbstractCompiler implements CompilerInterface
     {
         $method = self::analyze($topLevelFunction, $request);
 
-        // the following rule describes when to remove a sort function
+        // Rule: remove unnecessary sort functions
         if (
-            ($method['is']['count'] || $method['is']['aggregator'] || $method['is']['set'] || $method['is']['delete']) &&
-            $method['sorts'] && !$method['slices']
+            $method['is']['count'] ||
+            $method['is']['aggregator'] ||
+            $method['is']['set'] ||
+            $method['is']['delete']
         ) {
-            // remove sort
-            return array_filter(
-                $request,
-                function ($wrappedToken) {
-                    list($tokenType, $token) = each($wrappedToken);
-
-                    return ($tokenType !== Translator::TYPE_FUNCTION) ||
-                        $token['function'] !== 'sort';
-                }
-            );
+            if ($method['sorts'] && !$method['slices']) {
+                $request = self::removeFunction('sort', $request);
+            }
         }
+
+        // Rule: slices imply a sort
+        if (
+            $method['slices'] && !$method['sorts'] &&
+            self::scanTable($request, $table, $id, $hasZero)
+        ) {
+            // TODO: get the type of the table's id; don't assume int
+            $type = Output::TYPE_INTEGER;
+            $valueToken = array(
+                Translator::TYPE_VALUE => array(
+                    'table' => $table,
+                    'expression' => $id,
+                    'type' => $type,
+                    'hasZero' => $hasZero
+                )
+            );
+            $sortFunction = array(
+                Translator::TYPE_FUNCTION => array(
+                    'function' => 'sort',
+                    'arguments' => array(array($valueToken))
+                )
+            );
+            $request = self::insertFunctionBefore($sortFunction, 'slice', $request);
+        }
+
         return $request;
+    }
+
+    private static function removeFunction($functionName, $request)
+    {
+        return array_filter(
+            $request,
+            function ($wrappedToken) use ($functionName) {
+                list($tokenType, $token) = each($wrappedToken);
+
+                return ($tokenType !== Translator::TYPE_FUNCTION) ||
+                    $token['function'] !== $functionName;
+            }
+        );
+    }
+
+    private static function insertFunctionBefore($function, $target, $request)
+    {
+        return array_reduce(
+            $request,
+            function ($carry, $wrappedToken) use ($function, $target) {
+                list($type, $token) = each($wrappedToken);
+                $tokensToAdd = array($wrappedToken);
+                if ($type === Translator::TYPE_FUNCTION && $token['function'] === $target) {
+                    array_unshift($tokensToAdd, $function);
+                }
+                return array_merge($carry, $tokensToAdd);
+            },
+            array()
+        );
     }
 
     protected function analyze($topLevelFunction, $translatedRequest)
@@ -431,6 +481,24 @@ abstract class AbstractCompiler implements CompilerInterface
         }
 
         $output = new Parameter($id);
+        return true;
+    }
+
+    protected static function scanTable($input, &$table, &$id, &$hasZero)
+    {
+        // scan the next token of the supplied arrayToken
+        $input = reset($input);
+
+        list($tokenType, $token) = each($input);
+
+        if ($tokenType !== Translator::TYPE_TABLE) {
+            return false;
+        }
+
+        $table = $token['table'];
+        $id = $token['id'];
+        $hasZero = $token['hasZero'];
+
         return true;
     }
 
