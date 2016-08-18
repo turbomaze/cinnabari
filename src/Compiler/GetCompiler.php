@@ -301,10 +301,12 @@ class GetCompiler extends AbstractCompiler
         $expressionToCount = $true;
         if (isset($this->subquery)) {
             // select true in the subquery
-            $this->subquery->addExpression($true);
-            $expressionToCount = new Column('`0`.`0`');
+            $expressionId = $this->subquery->addExpression($true);
             $this->mysql = new Select();
             $this->context = $this->mysql->setTable($this->subquery);
+            // TODO: these have to be strings right now since the mysql classes only
+            // build column selections when they're alone; not within functions like count
+            $expressionToCount = new Column("`{$this->context}`.`{$expressionId}`");
         }
 
         // select count in the main query

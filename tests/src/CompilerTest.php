@@ -2286,10 +2286,7 @@ EOS;
         $actual = self::translate($scenarioJson, $method, $arguments);
         $expected = array($mysql, $phpInput, $phpOutput);
 
-        // $this->assertSame(
-        //     self::standardize($expected),
-        //     self::standardize($actual)
-        // );
+        // these assersions are separated to improve PHPUnit's output
         $this->assertSame(
             self::standardizeMysql($expected[0]),
             self::standardizeMysql($actual[0])
