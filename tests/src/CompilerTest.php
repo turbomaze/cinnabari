@@ -929,10 +929,14 @@ EOS;
 
         $mysql = <<<'EOS'
 SELECT
-    COUNT(TRUE) AS `0`
-    FROM `People` AS `0`
-    ORDER BY `0`.`Id` ASC
-    LIMIT :0, :1
+    COUNT(`0`.`0`) AS `0`
+    FROM (
+        SELECT
+            TRUE AS `0`
+            FROM `People` AS `0`
+            ORDER BY `0`.`Id` ASC
+            LIMIT :0, :1
+    ) AS `0`
 EOS;
 
         $phpInput = <<<'EOS'
