@@ -2156,11 +2156,23 @@ UPDATE
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['end'] - $input['start'],
-    $input['name'],
-    $input['age']
-);
+if (
+    is_integer($input['end']) && (
+        is_integer($input['start']) && (
+            (
+                is_null($input['name']) || is_string($input['name'])
+            ) && (is_null($input['age']) || is_integer($input['age']))
+        )
+    )
+) {
+    $output = array(
+        $input['end'] - $input['start'],
+        $input['name'],
+        $input['age']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -2203,11 +2215,23 @@ UPDATE
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['age'],
-    $input['end'] - $input['start'],
-    $input['name']
-);
+if (
+    (
+        is_null($input['age']) || is_integer($input['age'])
+    ) && (
+        is_integer($input['end']) && (
+            is_integer($input['start']) && (is_null($input['name']) || is_string($input['name']))
+        )
+    )
+) {
+    $output = array(
+        $input['age'],
+        $input['end'] - $input['start'],
+        $input['name']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'

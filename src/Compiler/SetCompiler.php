@@ -88,7 +88,7 @@ class SetCompiler extends AbstractValuedCompiler
 
     protected function getSubtractiveParameters($nameA, $nameB, &$output)
     {
-        $id = $this->arguments->useSubtractiveArgument($nameA, $nameB, self::$REQUIRED);
+        $id = $this->input->useSubtractiveArgument($nameA, $nameB, self::$REQUIRED);
 
         if ($id === null) {
             return false;
