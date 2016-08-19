@@ -29,6 +29,7 @@ use Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\AbstractMysql;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
+use Datto\Cinnabari\Mysql\Expression\FunctionConcatenate;
 use Datto\Cinnabari\Mysql\Expression\FunctionLength;
 use Datto\Cinnabari\Mysql\Expression\FunctionLower;
 use Datto\Cinnabari\Mysql\Expression\FunctionSubstring;
@@ -464,7 +465,11 @@ abstract class AbstractCompiler implements CompilerInterface
 
         switch ($name) {
             case 'plus':
-                $expression = new OperatorPlus($expressionA, $expressionB);
+                if ($argumentTypeOne === Output::TYPE_STRING) {
+                    $expression = new FunctionConcatenate($expressionA, $expressionB);
+                } else {
+                    $expression = new OperatorPlus($expressionA, $expressionB);
+                }
                 return true;
 
             case 'minus':

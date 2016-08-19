@@ -76,6 +76,28 @@ class Compiler
             $unaryBoolean = array(
                 array('arguments' => array(Output::TYPE_BOOLEAN), 'return' => Output::TYPE_BOOLEAN)
             );
+            $plusSignature = array(
+                array(
+                    'arguments' => array(Output::TYPE_INTEGER, Output::TYPE_INTEGER),
+                    'return' => Output::TYPE_INTEGER
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_FLOAT, Output::TYPE_INTEGER),
+                    'return' => Output::TYPE_FLOAT
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_INTEGER, Output::TYPE_FLOAT),
+                    'return' => Output::TYPE_FLOAT
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_FLOAT, Output::TYPE_FLOAT),
+                    'return' => Output::TYPE_FLOAT
+                ),
+                array(
+                    'arguments' => array(Output::TYPE_STRING, Output::TYPE_STRING),
+                    'return' => Output::TYPE_STRING
+                )
+            );
             $numeric = array(
                 array(
                     'arguments' => array(Output::TYPE_INTEGER, Output::TYPE_INTEGER),
@@ -166,7 +188,7 @@ class Compiler
                     )
                 ),
                 'not' => $unaryBoolean,
-                'plus' => $numeric,
+                'plus' => $plusSignature,
                 'minus' => $numeric,
                 'times' => $numeric,
                 'divides' => $numeric,
