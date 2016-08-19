@@ -61,6 +61,16 @@ class Input
         return $id;
     }
 
+    public function useIncrementedArgument($name, $hasZero)
+    {
+        $input = self::getInputPhp($name);
+        $id = $this->insertParameter("{$input} + 1");
+
+        $this->argumentTypes[$name] = $hasZero;
+
+        return $id;
+    }
+
     public function useSubtractiveArgument($nameA, $nameB, $hasZero)
     {
         $inputA = self::getInputPhp($nameA);

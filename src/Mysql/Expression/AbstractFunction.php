@@ -27,10 +27,10 @@ namespace Datto\Cinnabari\Mysql\Expression;
 abstract class AbstractFunction extends AbstractExpression
 {
     /** @var string */
-    private $name;
+    protected $name;
 
     /** @var AbstractExpression[] */
-    private $arguments;
+    protected $arguments;
 
     public function __construct($name, $arguments)
     {

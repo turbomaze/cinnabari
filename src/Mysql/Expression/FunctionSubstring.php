@@ -24,10 +24,22 @@
 
 namespace Datto\Cinnabari\Mysql\Expression;
 
-class FunctionUpper extends AbstractFunction
+class FunctionSubstring extends AbstractFunction
 {
-    public function __construct($expression)
+    public function __construct($expressionA, $expressionB, $expressionC)
     {
-        parent::__construct('UPPER', array($expression));
+        parent::__construct('SUBSTRING', array($expressionA, $expressionB, $expressionC));
+    }
+    
+    public function getMysql()
+    {
+        $arguments = array();
+
+        /** @var AbstractExpression $argument */
+        foreach ($this->arguments as $argument) {
+            $arguments[] = $argument->getMysql();
+        }
+
+        return "{$this->name}({$arguments[0]} FROM {$arguments[1]} FOR {$arguments[2]})";
     }
 }

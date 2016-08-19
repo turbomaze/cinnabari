@@ -186,6 +186,18 @@ class Compiler
                 ),
                 'lowercase' => $stringFunction,
                 'uppercase' => $stringFunction,
+                'substring' => array(
+                    array(
+                        'arguments' => array(Output::TYPE_STRING, Output::TYPE_INTEGER, Output::TYPE_INTEGER),
+                        'return' => Output::TYPE_STRING
+                    )
+                ),
+                'length' => array(
+                    array(
+                        'arguments' => array(Output::TYPE_STRING),
+                        'return' => Output::TYPE_INTEGER
+                    )
+                ),
 
                 // TODO: this function is used internally by the type inferer to handle sets/inserts
                 'assign' => $strictComparison

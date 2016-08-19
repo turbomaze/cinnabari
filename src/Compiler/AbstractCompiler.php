@@ -29,6 +29,10 @@ use Datto\Cinnabari\Compiler;
 use Datto\Cinnabari\Exception\CompilerException;
 use Datto\Cinnabari\Mysql\AbstractMysql;
 use Datto\Cinnabari\Mysql\Expression\AbstractExpression;
+use Datto\Cinnabari\Mysql\Expression\FunctionLength;
+use Datto\Cinnabari\Mysql\Expression\FunctionLower;
+use Datto\Cinnabari\Mysql\Expression\FunctionSubstring;
+use Datto\Cinnabari\Mysql\Expression\FunctionUpper;
 use Datto\Cinnabari\Mysql\Expression\OperatorAnd;
 use Datto\Cinnabari\Mysql\Expression\OperatorDivides;
 use Datto\Cinnabari\Mysql\Expression\OperatorEqual;
@@ -36,14 +40,12 @@ use Datto\Cinnabari\Mysql\Expression\OperatorGreater;
 use Datto\Cinnabari\Mysql\Expression\OperatorGreaterEqual;
 use Datto\Cinnabari\Mysql\Expression\OperatorLess;
 use Datto\Cinnabari\Mysql\Expression\OperatorLessEqual;
-use Datto\Cinnabari\Mysql\Expression\FunctionLower;
 use Datto\Cinnabari\Mysql\Expression\OperatorMinus;
 use Datto\Cinnabari\Mysql\Expression\OperatorNot;
 use Datto\Cinnabari\Mysql\Expression\OperatorOr;
 use Datto\Cinnabari\Mysql\Expression\OperatorPlus;
 use Datto\Cinnabari\Mysql\Expression\OperatorRegexpBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
-use Datto\Cinnabari\Mysql\Expression\FunctionUpper;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Php\Input;
 use Datto\Cinnabari\Php\Output;
@@ -399,6 +401,11 @@ abstract class AbstractCompiler implements CompilerInterface
             return $this->getBinaryFunction($name, $argumentA, $argumentB, $hasZero, $output, $type);
         }
 
+        if ($countArguments === 3) {
+            list($argumentA, $argumentB, $argumentC) = $arguments;
+            return $this->getTernaryFunction($name, $argumentA, $argumentB, $argumentC, $hasZero, $output, $type);
+        }
+
         return false;
     }
 
@@ -408,7 +415,7 @@ abstract class AbstractCompiler implements CompilerInterface
             return false;
         }
 
-        $type = self::getReturnTypeFromFunctionName($name, $argumentType, false);
+        $type = self::getReturnTypeFromFunctionName($name, $argumentType, false, false);
 
         switch ($name) {
             case 'uppercase':
@@ -417,6 +424,10 @@ abstract class AbstractCompiler implements CompilerInterface
 
             case 'lowercase':
                 $expression = new FunctionLower($childExpression);
+                return true;
+
+            case 'length':
+                $expression = new FunctionLength($childExpression);
                 return true;
 
             case 'not':
@@ -438,7 +449,7 @@ abstract class AbstractCompiler implements CompilerInterface
             return false;
         }
         
-        $type = self::getReturnTypeFromFunctionName($name, $argumentTypeOne, $argumentTypeTwo);
+        $type = self::getReturnTypeFromFunctionName($name, $argumentTypeOne, $argumentTypeTwo, false);
 
         switch ($name) {
             case 'plus':
@@ -494,8 +505,56 @@ abstract class AbstractCompiler implements CompilerInterface
                 return $this->getMatchFunction($argumentA, $argumentB, $expression);
 
             default:
+                $type = null;
                 return false;
         }
+    }
+
+    protected function getTernaryFunction($name, $argumentA, $argumentB, $argumentC, $hasZero, &$expression, &$type)
+    {
+        if ($name === 'substring') {
+            return $this->getSubstringFunction($argumentA, $argumentB, $argumentC, $hasZero, $expression, $type);
+        }        
+        
+        if (
+            !$this->getExpression($argumentA, $hasZero, $expressionA, $argumentTypeOne) ||
+            !$this->getExpression($argumentB, $hasZero, $expressionB, $argumentTypeTwo) ||
+            !$this->getExpression($argumentC, $hasZero, $expressionC, $argumentTypeThree)
+        ) {
+
+            return false;
+        }
+        
+        $type = self::getReturnTypeFromFunctionName($name, $argumentTypeOne, $argumentTypeTwo, $argumentTypeThree);
+
+        switch ($name) {
+            default:
+                $type = null;
+                return false;
+        }
+    }
+
+    protected function getSubstringFunction($argumentA, $argumentB, $argumentC, $hasZero, &$expression, &$type)
+    {
+        if (!$this->getExpression($argumentA, self::$REQUIRED, $expressionA, $typeA)) {
+            return false;
+        }
+
+        if (
+            !$this->scanParameter($argumentB, $nameB) ||
+            !$this->scanParameter($argumentC, $nameC)
+        ) {
+            return false;
+        }
+
+        $idB = $this->input->useIncrementedArgument($nameB, self::$REQUIRED);
+        $idC = $this->input->useSubtractiveArgument($nameB, $nameC, self::$REQUIRED);
+        $parameterB = new Parameter($idB);
+        $parameterC = new Parameter($idC);
+
+        $type = Output::TYPE_STRING;
+        $expression = new FunctionSubstring($expressionA, $parameterB, $parameterC);
+        return true;
     }
 
     protected function getMatchFunction($property, $pattern, &$expression)
@@ -534,14 +593,14 @@ abstract class AbstractCompiler implements CompilerInterface
         return true;
     }
     
-    protected static function getReturnTypeFromFunctionName($name, $typeOne, $typeTwo)
+    protected static function getReturnTypeFromFunctionName($name, $typeOne, $typeTwo, $typeThree)
     {
         $allSignatures = Compiler::getSignatures();
         if (array_key_exists($name, $allSignatures)) {
             $signatures = $allSignatures[$name];
             
             foreach ($signatures as $signature) {
-                if (self::signatureMatchesArguments($signature, $typeOne, $typeTwo)) {
+                if (self::signatureMatchesArguments($signature, $typeOne, $typeTwo, $typeThree)) {
                     return $signature['return'];
                 }
             }
@@ -553,18 +612,26 @@ abstract class AbstractCompiler implements CompilerInterface
         }
     }
     
-    protected static function signatureMatchesArguments($signature, $typeOne, $typeTwo)
+    protected static function signatureMatchesArguments($signature, $typeOne, $typeTwo, $typeThree)
     {
         if ($signature['arguments'][0] !== $typeOne) {
             return false;
         }
 
-        // TODO: assumes functions take at most 2 arguments for simplicity
+        // TODO: assumes functions take at most 3 arguments for simplicity
         if (count($signature['arguments']) >= 2) {
-            return $signature['arguments'][1] === $typeTwo;
-        } else {
+            if ($signature['arguments'][1] !== $typeTwo) {
+                return false;
+            }
+
+            if (count($signature['arguments']) >= 3) {
+                return $signature['arguments'][2] === $typeThree;
+            }
+            
             return true;
         }
+
+        return true;
     }
 
     protected function getParameter($name, $hasZero, &$output)

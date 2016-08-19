@@ -1050,10 +1050,16 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['start'] + 1,
-    $input['stop'] - $input['start']
-);
+if (
+    is_integer($input['stop']) && is_integer($input['start'])
+) {
+    $output = array(
+        $input['start'] + 1,
+        $input['stop'] - $input['start']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'

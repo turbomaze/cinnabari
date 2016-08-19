@@ -403,7 +403,8 @@ class GetCompiler extends AbstractCompiler
 
             case 'uppercase':
             case 'lowercase':
-
+            case 'substring':
+            case 'length':
             case 'plus':
             case 'minus':
             case 'times':

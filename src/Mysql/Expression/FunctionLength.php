@@ -24,10 +24,10 @@
 
 namespace Datto\Cinnabari\Mysql\Expression;
 
-class FunctionUpper extends AbstractFunction
+class FunctionLength extends AbstractFunction
 {
     public function __construct($expression)
     {
-        parent::__construct('UPPER', array($expression));
+        parent::__construct('CHAR_LENGTH', array($expression));
     }
 }
