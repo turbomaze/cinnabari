@@ -884,12 +884,12 @@ EOS;
 
     public function testGetLowercase()
     {
-        $scenario = self::getPeopleScenario();
+        $scenario = self::getRelationshipsScenario();
 
         $method = <<<'EOS'
 get(
     people,
-    lowercase(email)
+    lowercase(name)
 )
 EOS;
 
@@ -898,7 +898,7 @@ EOS;
         $mysql = <<<'EOS'
 SELECT
     `0`.`Id` AS `0`,
-    LOWER(`0`.`Email`) AS `1`
+    LOWER(`0`.`Name`) AS `1`
     FROM `People` AS `0`
 EOS;
 
@@ -925,7 +925,7 @@ EOS;
         $method = <<<'EOS'
 get(
     people,
-    uppercase(email)
+    uppercase(name)
 )
 EOS;
 
@@ -934,7 +934,7 @@ EOS;
         $mysql = <<<'EOS'
 SELECT
     `0`.`Id` AS `0`,
-    UPPER(`0`.`Email`) AS `1`
+    UPPER(`0`.`Name`) AS `1`
     FROM `People` AS `0`
 EOS;
 
