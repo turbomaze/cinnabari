@@ -811,6 +811,42 @@ EOS;
             $phpOutput);
     }
 
+    public function testGetLowercase()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+get(
+    people,
+    lowercase(email)
+)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`,
+    LOWER(`0`.`Email`) AS `1`
+    FROM `People` AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = $row[1];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
     public function testGetUppercase()
     {
         $scenario = self::getPeopleScenario();
@@ -842,6 +878,9 @@ foreach ($input as $row) {
 
 $output = isset($output) ? array_values($output) : array();
 EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
     }
 
     public function testCount()
