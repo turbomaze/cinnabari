@@ -909,7 +909,7 @@ EOS;
 
         $phpOutput = <<<'EOS'
 foreach ($input as $row) {
-    $output[$row[0]] = $row[1];
+    $output[$row[0]] = isset($row[1]) ? (integer)$row[1] : null;
 }
 
 $output = isset($output) ? array_values($output) : array();
