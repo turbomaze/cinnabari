@@ -1198,24 +1198,32 @@ EOS;
 
         $mysql = <<<'EOS'
 SELECT
-    COUNT(`0`.`0`) AS `0`
+    COUNT(`0`.`1`) AS `0`
     FROM (
         SELECT
-            TRUE AS `0`,
-            `0`.`Age` AS `1`
+            `0`.`Age` AS `0`,
+            TRUE AS `1`
             FROM `People` AS `0`
             ORDER BY `0`.`Id` ASC
             LIMIT :0, :1
     ) AS `0`
-    WHERE (`0`.`1` < :2)
+    WHERE (`0`.`0` < :2)
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['start'],
-    $input['stop'] - $input['start'],
-    $input['minimum']
-);
+if (
+    is_integer($input['stop']) && (
+        is_integer($input['start']) && (is_integer($input['minimumAge']) || is_float($input['minimumAge']))
+    )
+) {
+    $output = array(
+        $input['start'],
+        $input['stop'] - $input['start'],
+        $input['minimumAge']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1306,10 +1314,16 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['start'],
-    $input['stop'] - $input['start']
-);
+if (
+    is_integer($input['stop']) && is_integer($input['start'])
+) {
+    $output = array(
+        $input['start'],
+        $input['stop'] - $input['start']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1413,11 +1427,25 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['minimumAge'],
-    $input['start'],
-    $input['stop'] - $input['start']
-);
+if (
+    (
+        is_integer($input['minimumAge']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    ) || (
+        is_float($input['minimumAge']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    )
+) {
+    $output = array(
+        $input['minimumAge'],
+        $input['start'],
+        $input['stop'] - $input['start']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1460,11 +1488,25 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['minimumAge'],
-    $input['start'],
-    $input['stop'] - $input['start']
-);
+if (
+    (
+        is_integer($input['minimumAge']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    ) || (
+        is_float($input['minimumAge']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    )
+) {
+    $output = array(
+        $input['minimumAge'],
+        $input['start'],
+        $input['stop'] - $input['start']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1495,24 +1537,32 @@ EOS;
 
         $mysql = <<<'EOS'
 SELECT
-    COUNT(`0`.`0`) AS `0`
+    COUNT(`0`.`1`) AS `0`
     FROM (
         SELECT
-            TRUE AS `0`,
-            `0`.`Age` AS `1`,
+            `0`.`Age` AS `0`,
+            TRUE AS `1`
             FROM `People` AS `0`
             ORDER BY `0`.`Id` ASC
             LIMIT :0, :1
     ) AS `0`
-    WHERE `0`.`1` < :2
+    WHERE (`0`.`0` < :2)
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['start'],
-    $input['stop'] - $input['start'],
-    $input['minimumAge']
-);
+if (
+    is_integer($input['stop']) && (
+        is_integer($input['start']) && (is_integer($input['minimumAge']) || is_float($input['minimumAge']))
+    )
+) {
+    $output = array(
+        $input['start'],
+        $input['stop'] - $input['start'],
+        $input['minimumAge']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1543,24 +1593,32 @@ EOS;
 
         $mysql = <<<'EOS'
 SELECT
-    COUNT(`0`.`0`) AS `0`
+    COUNT(`0`.`1`) AS `0`
     FROM (
         SELECT
-            TRUE AS `0`,
-            `0`.`Age` AS `1`
+            `0`.`Age` AS `0`,
+            TRUE AS `1`
             FROM `People` AS `0`
             ORDER BY `0`.`Age` ASC
             LIMIT :0, :1
     ) AS `0`
-    WHERE `0`.`1` < :2
+    WHERE (`0`.`0` < :2)
 EOS;
 
-        $phpInput = <<<'EOS'
-$output = array(
-    $input['start'],
-    $input['stop'] - $input['start'],
-    $input['minimumAge']
-);
+    $phpInput = <<<'EOS'
+if (
+    is_integer($input['stop']) && (
+        is_integer($input['start']) && (is_integer($input['minimumAge']) || is_float($input['minimumAge']))
+    )
+) {
+    $output = array(
+        $input['start'],
+        $input['stop'] - $input['start'],
+        $input['minimumAge']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1591,24 +1649,32 @@ EOS;
 
         $mysql = <<<'EOS'
 SELECT
-    COUNT(`0`.`0`) AS `0`
+    COUNT(`0`.`1`) AS `0`
     FROM (
         SELECT
-            TRUE AS `0`,
-            `0`.`Age` AS `1`
+            `0`.`Age` AS `0`,
+            TRUE AS `1`
             FROM `People` AS `0`
             ORDER BY `0`.`Id` ASC
             LIMIT :0, :1
     ) AS `0`
-    WHERE `0`.`1` < :2
+    WHERE (`0`.`0` < :2)
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['start'],
-    $input['stop'] - $input['start'],
-    $input['minimumAge']
-);
+if (
+    is_integer($input['stop']) && (
+        is_integer($input['start']) && (is_integer($input['minimumAge']) || is_float($input['minimumAge']))
+    )
+) {
+    $output = array(
+        $input['start'],
+        $input['stop'] - $input['start'],
+        $input['minimumAge']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1752,15 +1818,22 @@ SELECT
         SELECT
             `0`.`Age` AS `0`
             FROM `People` AS `0`
+            ORDER BY `0`.`Id` ASC
             LIMIT :0, :1
     ) AS `0`
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['start'],
-    $input['stop'] - $input['start']
-);
+if (
+    is_integer($input['stop']) && is_integer($input['start'])
+) {
+    $output = array(
+        $input['start'],
+        $input['stop'] - $input['start']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'
@@ -1804,11 +1877,25 @@ SELECT
 EOS;
 
         $phpInput = <<<'EOS'
-$output = array(
-    $input['minimumAge'],
-    $input['start'],
-    $input['stop'] - $input['start']
-);
+if (
+    (
+        is_integer($input['minimumAge']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    ) || (
+        is_float($input['minimumAge']) && (
+            is_integer($input['stop']) && is_integer($input['start'])
+        )
+    )
+) {
+    $output = array(
+        $input['minimumAge'],
+        $input['start'],
+        $input['stop'] - $input['start']
+    );
+} else {
+    $output = null;
+}
 EOS;
 
         $phpOutput = <<<'EOS'

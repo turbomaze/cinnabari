@@ -106,6 +106,11 @@ abstract class AbstractMysql
         return preg_replace('~`.*?`~', "{$context}.\$0", $expression);
     }
 
+    public static function getIdentifier($name)
+    {
+        return "`{$name}`";
+    }
+
     // insert if not already there; return index
     protected static function insert(&$array, $key)
     {
@@ -127,11 +132,6 @@ abstract class AbstractMysql
             $array[] = $value;
         }
         return $index;
-    }
-
-    protected static function getIdentifier($name)
-    {
-        return "`{$name}`";
     }
 
     protected function isValid()

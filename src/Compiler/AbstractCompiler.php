@@ -98,14 +98,25 @@ abstract class AbstractCompiler implements CompilerInterface
             $method['is']['set'] ||
             $method['is']['delete']
         ) {
-            if ($method['sorts'] && !$method['slices']) {
-                $request = self::removeFunction('sort', $request);
+            if (
+                ($method['sorts'] && !$method['slices']) ||
+                $method['before']['sorts']['slices']
+            ) {
+                $request = self::removeFunction('sort', $request, $sort);
+                $method['sorts'] = false;
+                $method['before']['sorts']['filters'] = false;
+                $method['before']['sorts']['slices'] = false;
+                $method['before']['filters']['sorts'] = false;
+                $method['before']['slices']['sorts'] = false;
             }
         }
 
         // Rule: slices imply a sort
         if (
-            $method['slices'] && !$method['sorts'] &&
+            (
+                ($method['slices'] && !$method['sorts']) ||
+                !$method['before']['slices']['sorts']
+            )  &&
             self::scanTable($request, $table, $id, $hasZero)
         ) {
             // TODO: get the type of the table's id; don't assume int
@@ -136,41 +147,78 @@ abstract class AbstractCompiler implements CompilerInterface
                         'arguments' => array()
                     )
                 );
-                $request = self::insertFunctionBefore($forkFunction, 'count', $request);
+
+                $request = self::insertFunctionAfter($forkFunction, 'slice', $request);
             }
+        }
+
+        // Rule: when filters and sorts are adjacent, force the filter to appear before the sort
+        if (
+            $method['before']['filters']['sorts'] &&
+            (
+                !$method['slices'] ||
+                // or the slice is not between the filter and the sort
+                ($method['before']['filters']['slices'] === $method['before']['sorts']['slices'])
+            )
+        ) {
+            $request = self::removeFunction('sort', $request, $removedFunction);
+            $request = self::insertFunctionAfter($removedFunction, 'filter', $request);
+            $method['before']['filters']['sorts'] = false;
+            $method['before']['sorts']['filters'] = true;
         }
 
         return $request;
     }
 
-    private static function removeFunction($functionName, $request)
+    private static function removeFunction($functionName, $request, &$removedFunction)
     {
         return array_filter(
             $request,
-            function ($wrappedToken) use ($functionName) {
+            function ($wrappedToken) use ($functionName, &$removedFunction) {
                 list($tokenType, $token) = each($wrappedToken);
 
-                return ($tokenType !== Translator::TYPE_FUNCTION) ||
+                $include = ($tokenType !== Translator::TYPE_FUNCTION) ||
                     $token['function'] !== $functionName;
+
+                if (!$include) {
+                    $removedFunction = $wrappedToken;
+                }
+
+                return $include;
             }
         );
     }
 
     private static function insertFunctionBefore($function, $target, $request)
     {
+        return self::insertFunctionRelativeTo(true, $function, $target, $request);
+    }
+
+    private static function insertFunctionAfter($function, $target, $request)
+    {
+        return self::insertFunctionRelativeTo(false, $function, $target, $request);
+    }
+
+    private static function insertFunctionRelativeTo($insertBefore, $function, $target, $request)
+    {
         return array_reduce(
             $request,
-            function ($carry, $wrappedToken) use ($function, $target) {
+            function ($carry, $wrappedToken) use ($insertBefore, $function, $target) {
                 list($type, $token) = each($wrappedToken);
                 $tokensToAdd = array($wrappedToken);
                 if ($type === Translator::TYPE_FUNCTION && $token['function'] === $target) {
-                    array_unshift($tokensToAdd, $function);
+                    if ($insertBefore) {
+                        array_unshift($tokensToAdd, $function);
+                    } else {
+                        $tokensToAdd[] =  $function;
+                    }
                 }
                 return array_merge($carry, $tokensToAdd);
             },
             array()
         );
     }
+
 
     protected function analyze($topLevelFunction, $translatedRequest)
     {
@@ -199,9 +247,11 @@ abstract class AbstractCompiler implements CompilerInterface
             }
         }
 
-        $method['filter'] = array('before' => array('sort' => false, 'slice' => false));
-        $method['sort'] = array('before' => array('filter' => false, 'slice' => false));
-        $method['slice'] = array('before' => array('filter' => false, 'sort' => false));
+        $method['before'] = array(  
+            'filters' => array('sorts' => false, 'slices' => false),
+            'sorts' => array('filters' => false, 'slices' => false),
+            'slices' => array('filters' => false, 'sorts' => false)
+        );
         $filterIndex = array_search('filter', $functions, true);
         $sortIndex = array_search('sort', $functions, true);
         $sliceIndex = array_search('slice', $functions, true);
@@ -209,16 +259,16 @@ abstract class AbstractCompiler implements CompilerInterface
         $method['sorts'] = $sortIndex !== false;
         $method['slices'] = $sliceIndex !== false;
         if ($method['filters'] && $method['sorts']) {
-            $method['filter']['before']['sort'] = $filterIndex < $sortIndex;
-            $method['sort']['before']['filter'] = $sortIndex < $filterIndex;
+            $method['before']['filters']['sorts'] = $filterIndex > $sortIndex;
+            $method['before']['sorts']['filters'] = $sortIndex > $filterIndex;
         }
         if ($method['filters'] && $method['slices']) {
-            $method['filter']['before']['slice'] = $filterIndex < $sliceIndex;
-            $method['slice']['before']['filter'] = $sliceIndex < $filterIndex;
+            $method['before']['filters']['slices'] = $filterIndex > $sliceIndex;
+            $method['before']['slices']['filters'] = $sliceIndex > $filterIndex;
         }
         if ($method['sorts'] && $method['slices']) {
-            $method['sort']['before']['slice'] = $sortIndex < $sliceIndex;
-            $method['slice']['before']['sort'] = $sliceIndex < $sortIndex;
+            $method['before']['sorts']['slices'] = $sortIndex > $sliceIndex;
+            $method['before']['slices']['sorts'] = $sliceIndex > $sortIndex;
         }
 
         return $method;
@@ -259,13 +309,23 @@ abstract class AbstractCompiler implements CompilerInterface
             $this->contextJoin = $token;
         }
 
-        $this->context = $this->mysql->addJoin(
-            $this->context,
-            $token['tableB'],
-            $token['expression'],
-            $token['hasZero'],
-            $token['hasMany']
-        );
+        if (isset($this->subquery)) {
+            $this->subqueryContext = $this->subquery->addJoin(
+                $this->subqueryContext,
+                $token['tableB'],
+                $token['expression'],
+                $token['hasZero'],
+                $token['hasMany']
+            );
+        } else {
+            $this->context = $this->mysql->addJoin(
+                $this->context,
+                $token['tableB'],
+                $token['expression'],
+                $token['hasZero'],
+                $token['hasMany']
+            );
+        }
     }
 
     protected function followJoins($arrayToken)
