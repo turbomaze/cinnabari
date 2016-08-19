@@ -411,6 +411,10 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected function getUnaryFunction($name, $argument, $hasZero, &$expression, &$type)
     {
+        if ($name === 'length') {
+            return $this->getLengthFunction($argument, $hasZero, $expression, $type);
+        }
+
         if (!$this->getExpression($argument, $hasZero, $childExpression, $argumentType)) {
             return false;
         }
@@ -426,10 +430,6 @@ abstract class AbstractCompiler implements CompilerInterface
                 $expression = new FunctionLower($childExpression);
                 return true;
 
-            case 'length':
-                $expression = new FunctionLength($childExpression);
-                return true;
-
             case 'not':
                 $expression = new OperatorNot($childExpression);
                 return true;
@@ -438,6 +438,17 @@ abstract class AbstractCompiler implements CompilerInterface
                 $type = null;
                 return false;
         }
+    }
+
+    protected function getLengthFunction($argument, $hasZero, &$expression, &$type)
+    {
+        if (!$this->getExpression($argument, self::$REQUIRED, $childExpression, $argumentType)) {
+            return false;
+        }
+
+        $type = Output::TYPE_INTEGER;
+        $expression = new FunctionLength($childExpression);
+        return true;
     }
 
     protected function getBinaryFunction($name, $argumentA, $argumentB, $hasZero, &$expression, &$type)

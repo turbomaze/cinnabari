@@ -421,7 +421,7 @@ class GetCompiler extends AbstractCompiler
                 /** @var AbstractExpression $expression */
                 $columnId = $this->mysql->addExpression($expression);
 
-                $isNullable = false; // TODO: assumption
+                $isNullable = true; // TODO: assumption
                 $this->phpOutput = Output::getValue(
                     $columnId,
                     $isNullable,
