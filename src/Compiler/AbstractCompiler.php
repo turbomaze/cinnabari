@@ -36,12 +36,14 @@ use Datto\Cinnabari\Mysql\Expression\OperatorGreater;
 use Datto\Cinnabari\Mysql\Expression\OperatorGreaterEqual;
 use Datto\Cinnabari\Mysql\Expression\OperatorLess;
 use Datto\Cinnabari\Mysql\Expression\OperatorLessEqual;
+use Datto\Cinnabari\Mysql\Expression\FunctionLower;
 use Datto\Cinnabari\Mysql\Expression\OperatorMinus;
 use Datto\Cinnabari\Mysql\Expression\OperatorNot;
 use Datto\Cinnabari\Mysql\Expression\OperatorOr;
 use Datto\Cinnabari\Mysql\Expression\OperatorPlus;
 use Datto\Cinnabari\Mysql\Expression\OperatorRegexpBinary;
 use Datto\Cinnabari\Mysql\Expression\OperatorTimes;
+use Datto\Cinnabari\Mysql\Expression\FunctionUpper;
 use Datto\Cinnabari\Mysql\Expression\Parameter;
 use Datto\Cinnabari\Php\Input;
 use Datto\Cinnabari\Php\Output;
@@ -402,17 +404,29 @@ abstract class AbstractCompiler implements CompilerInterface
 
     protected function getUnaryFunction($name, $argument, $hasZero, &$expression, &$type)
     {
-        if ($name !== 'not') {
-            return false;
-        }
-
         if (!$this->getExpression($argument, $hasZero, $childExpression, $argumentType)) {
             return false;
         }
 
-        $expression = new OperatorNot($childExpression);
         $type = self::getReturnTypeFromFunctionName($name, $argumentType, false);
-        return true;
+
+        switch ($name) {
+            case 'uppercase':
+                $expression = new FunctionUpper($childExpression);
+                return true;
+
+            case 'lowercase':
+                $expression = new FunctionLower($childExpression);
+                return true;
+
+            case 'not':
+                $expression = new OperatorNot($childExpression);
+                return true;
+
+            default:
+                $type = null;
+                return false;
+        }
     }
 
     protected function getBinaryFunction($name, $argumentA, $argumentB, $hasZero, &$expression, &$type)

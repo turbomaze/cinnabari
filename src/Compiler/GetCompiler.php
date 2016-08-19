@@ -401,6 +401,9 @@ class GetCompiler extends AbstractCompiler
             case 'get':
                 return $this->getGet($this->request);
 
+            case 'uppercase':
+            case 'lowercase':
+
             case 'plus':
             case 'minus':
             case 'times':

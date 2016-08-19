@@ -140,6 +140,12 @@ class Compiler
                     'return' => Output::TYPE_BOOLEAN
                 )
             );
+            $stringFunction = array(
+                array(
+                    'arguments' => array(Output::TYPE_STRING),
+                    'return' => Output::TYPE_STRING
+                )
+            );
             self::$signatures = array(
                 'get' => $anythingToList,
                 'average' => $aggregator,
@@ -178,6 +184,8 @@ class Compiler
                         'return' => Output::TYPE_BOOLEAN
                     )
                 ),
+                'lowercase' => $stringFunction,
+                'uppercase' => $stringFunction,
 
                 // TODO: this function is used internally by the type inferer to handle sets/inserts
                 'assign' => $strictComparison
