@@ -811,6 +811,39 @@ EOS;
             $phpOutput);
     }
 
+    public function testGetUppercase()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+get(
+    people,
+    uppercase(email)
+)
+EOS;
+
+        $arguments = array();
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`,
+    UPPER(`0`.`Email`) AS `1`
+    FROM `People` AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = $row[1];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+    }
+
     public function testCount()
     {
         $scenario = self::getPeopleScenario();
