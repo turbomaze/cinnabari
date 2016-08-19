@@ -813,7 +813,7 @@ EOS;
 
     public function testGetLowercase()
     {
-        $scenario = self::getRelationshipsScenario();
+        $scenario = self::getPeopleScenario();
 
         $method = <<<'EOS'
 get(
@@ -833,6 +833,48 @@ EOS;
 
         $phpInput = <<<'EOS'
 $output = array();
+EOS;
+
+        $phpOutput = <<<'EOS'
+foreach ($input as $row) {
+    $output[$row[0]] = $row[1];
+}
+
+$output = isset($output) ? array_values($output) : array();
+EOS;
+
+        $this->verifyResult($scenario, $method, $arguments, $mysql, $phpInput,
+            $phpOutput);
+    }
+
+    public function testGetSubstring()
+    {
+        $scenario = self::getPeopleScenario();
+
+        $method = <<<'EOS'
+get(
+    people,
+    substring(name, :start, :stop)
+)
+EOS;
+
+        $arguments = array(
+            'start' => 1,
+            'stop' => 2
+        );
+
+        $mysql = <<<'EOS'
+SELECT
+    `0`.`Id` AS `0`,
+    SUBSTRING(`0`.`Name` FROM :0 FOR :1) AS `1`
+    FROM `People` AS `0`
+EOS;
+
+        $phpInput = <<<'EOS'
+$output = array(
+    $input['start'] + 1,
+    $input['stop'] - $input['start']
+);
 EOS;
 
         $phpOutput = <<<'EOS'
