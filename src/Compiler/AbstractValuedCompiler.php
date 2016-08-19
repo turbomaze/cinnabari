@@ -70,7 +70,6 @@ abstract class AbstractValuedCompiler extends AbstractCompiler
         return true;
     }
 
-    // TODO: type checking
     protected function getColumnFromPropertyPath($arrayToken, &$output, &$type, &$hasZero)
     {
         $arrayToken = $this->followJoins($arrayToken);

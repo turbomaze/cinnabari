@@ -109,7 +109,8 @@ class Select extends AbstractMysql
 
     protected function getTables()
     {
-        list($id, $table) = each($this->tables);
+        $id = 0;
+        $table = $this->tables[$id];
 
         $tableMysql = self::indentIfNeeded($table->getMysql());
         $mysql = "\tFROM " . self::getAliasedName($tableMysql, $id) . "\n";

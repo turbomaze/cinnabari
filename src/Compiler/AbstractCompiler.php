@@ -65,6 +65,12 @@ abstract class AbstractCompiler implements CompilerInterface
     /** @var AbstractMysql */
     protected $mysql;
 
+    /** @var AbstractMysql */
+    protected $subquery;
+
+    /** @var int */
+    protected $subqueryContext;
+
     /** @var array */
     protected $contextJoin;
 
@@ -76,6 +82,8 @@ abstract class AbstractCompiler implements CompilerInterface
 
     public function __construct()
     {
+        $this->subquery = null;
+        $this->subqueryContext = null;
         $this->contextJoin = null;
         $this->rollbackPoint = array();
     }
@@ -99,8 +107,9 @@ abstract class AbstractCompiler implements CompilerInterface
             $method['is']['delete']
         ) {
             if (
-                ($method['sorts'] && !$method['slices']) ||
-                $method['before']['sorts']['slices']
+                $method['before']['sorts']['slices'] || (
+                    $method['sorts'] && !$method['slices']
+                )
             ) {
                 $request = self::removeFunction('sort', $request, $sort);
                 $method['sorts'] = false;
@@ -113,11 +122,11 @@ abstract class AbstractCompiler implements CompilerInterface
 
         // Rule: slices imply a sort
         if (
-            (
-                ($method['slices'] && !$method['sorts']) ||
-                !$method['before']['slices']['sorts']
-            )  &&
-            self::scanTable($request, $table, $id, $hasZero)
+            self::scanTable($request, $table, $id, $hasZero) && (
+                !$method['before']['slices']['sorts'] || (
+                    $method['slices'] && !$method['sorts']
+                )
+            )
         ) {
             // TODO: get the type of the table's id; don't assume int
             $type = Output::TYPE_INTEGER;
@@ -138,7 +147,7 @@ abstract class AbstractCompiler implements CompilerInterface
             $request = self::insertFunctionBefore($sortFunction, 'slice', $request);
         }
 
-        // Rule: slices in counts/aggregators require subqueries
+        // Rule: slices in countsaggregators require subqueries
         if ($method['is']['count'] || $method['is']['aggregator']) {
             if ($method['slices']) {
                 $forkFunction = array(
@@ -154,11 +163,11 @@ abstract class AbstractCompiler implements CompilerInterface
 
         // Rule: when filters and sorts are adjacent, force the filter to appear before the sort
         if (
-            $method['before']['filters']['sorts'] &&
-            (
-                !$method['slices'] ||
-                // or the slice is not between the filter and the sort
-                ($method['before']['filters']['slices'] === $method['before']['sorts']['slices'])
+            $method['before']['filters']['sorts'] && (
+                !$method['slices'] || (
+                    // the slice cannot be between the filter and the sort
+                    $method['before']['filters']['slices'] === $method['before']['sorts']['slices']
+                )
             )
         ) {
             $request = self::removeFunction('sort', $request, $removedFunction);
@@ -219,7 +228,6 @@ abstract class AbstractCompiler implements CompilerInterface
         );
     }
 
-
     protected function analyze($topLevelFunction, $translatedRequest)
     {
         // is a get, delete, set, insert, count, aggregator
@@ -247,7 +255,7 @@ abstract class AbstractCompiler implements CompilerInterface
             }
         }
 
-        $method['before'] = array(  
+        $method['before'] = array(
             'filters' => array('sorts' => false, 'slices' => false),
             'sorts' => array('filters' => false, 'slices' => false),
             'slices' => array('filters' => false, 'sorts' => false)

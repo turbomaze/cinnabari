@@ -29,7 +29,7 @@ class Max extends AbstractExpression
     /** @var string */
     private $mysql;
 
-    public function __construct($mysql)
+    public function __construct(AbstractExpression $mysql)
     {
         $this->mysql = "MAX({$mysql->getMysql()})";
     }

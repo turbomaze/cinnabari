@@ -49,21 +49,12 @@ class GetCompiler extends AbstractCompiler
 {
     /** @var Select */
     protected $mysql;
-
+    
     /** @var Select */
     protected $subquery;
 
-    /** @var int */
-    protected $subqueryContext;
-
     /** @var String */
     private $phpOutput;
-
-    public function __construct()
-    {
-        parent::__construct();
-        $this->subqueryContext = null;
-    }
     
     public function compile($topLevelFunction, $translatedRequest, $types)
     {

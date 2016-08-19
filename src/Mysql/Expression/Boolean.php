@@ -42,4 +42,3 @@ class Boolean extends AbstractExpression
         return $this->mysql;
     }
 }
-

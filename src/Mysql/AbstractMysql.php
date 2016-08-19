@@ -34,7 +34,7 @@ abstract class AbstractMysql
     const JOIN_INNER = 1;
     const JOIN_LEFT = 2;
 
-    /** @var AbstractMysql[] */
+    /** @var AbstractMysql[]|AbstractExpression[] */
     protected $tables;
 
     /** @var AbstractExpression */
@@ -55,8 +55,9 @@ abstract class AbstractMysql
     }
 
     /**
-     * @param AbstractMysql $name
-     * Mysql table identifier (e.g. "`people`")
+     * @param AbstractExpression|AbstractMysql $expression
+     * Mysql abstract expression (e.g. new Table("`People`"))
+     * Mysql abstract mysql (e.g. new Select())
      *
      * @return int
      * Numeric table identifier (e.g. 0)
@@ -85,7 +86,6 @@ abstract class AbstractMysql
         return self::appendOrFind($this->tables, $join);
     }
 
-    // TODO: fix deletes
     public function getTable($id)
     {
         $name = array_search($id, $this->tables, true);
@@ -125,7 +125,6 @@ abstract class AbstractMysql
 
     protected static function appendOrFind(&$array, $value)
     {
-        // TODO: fix search
         $index = array_search($value, $array);
         if ($index === false) {
             $index = count($array);

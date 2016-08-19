@@ -65,7 +65,7 @@ class Insert extends AbstractValuedMysql
 
     protected function getTables()
     {
-        list($id, $table) = each($this->tables);
+        list(, $table) = each($this->tables);
 
         $mysql = "\tINTO " . $table . "\n";
 
